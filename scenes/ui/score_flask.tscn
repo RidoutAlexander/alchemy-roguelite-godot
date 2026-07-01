@@ -1,0 +1,137 @@
+[gd_scene format=3 uid="uid://scoreflask01"]
+
+[ext_resource type="Script" path="res://scripts/ui/score_flask.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/sprites/score_flask.png" id="2_flask"]
+[ext_resource type="Texture2D" path="res://assets/sprites/score_flask_cavity_mask.png" id="7_mask"]
+[ext_resource type="Shader" path="res://shaders/flask_liquid.gdshader" id="3_shader"]
+[ext_resource type="Script" path="res://scripts/effects/flask_liquid_effect.gd" id="4_liquid_script"]
+[ext_resource type="Script" path="res://scripts/effects/flask_escape_bubbles.gd" id="5_bubbles"]
+[ext_resource type="FontFile" path="res://assets/fonts/ChildHood.otf" id="6_font"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flask_liquid"]
+shader = ExtResource("3_shader")
+shader_parameter/liquid_deep = Color(0.05, 0.18, 0.08, 1)
+shader_parameter/liquid_mid = Color(0.12, 0.45, 0.22, 1)
+shader_parameter/liquid_bright = Color(0.35, 0.72, 0.38, 1)
+shader_parameter/liquid_dark = Color(0.03, 0.12, 0.05, 1)
+shader_parameter/bubble_highlight = Color(0.55, 0.95, 0.62, 1)
+shader_parameter/ripple_color = Color(0.65, 1, 0.72, 1)
+shader_parameter/cavity_mask = ExtResource("7_mask")
+shader_parameter/fill_level = 0.0
+shader_parameter/uv_aspect = 0.5
+shader_parameter/texture_uv_aspect = 0.5625
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/interior_center_x = 0.5
+shader_parameter/interior_half_width = 0.097
+shader_parameter/interior_top = 0.13
+shader_parameter/interior_flat_bottom = 0.822
+shader_parameter/interior_bottom = 0.877
+
+[node name="ScoreFlask" type="Control"]
+custom_minimum_size = Vector2(110, 220)
+layout_mode = 0
+offset_right = 110.0
+offset_bottom = 220.0
+script = ExtResource("1_script")
+
+[node name="PulseContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FlaskAspect" type="AspectRatioContainer" parent="PulseContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+ratio = 0.5625
+stretch_mode = 0
+
+[node name="FlaskFrame" type="TextureRect" parent="PulseContainer/FlaskAspect"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_flask")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="FlaskLiquid" type="TextureRect" parent="PulseContainer/FlaskAspect"]
+z_index = 1
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("7_mask")
+expand_mode = 1
+stretch_mode = 0
+material = SubResource("ShaderMaterial_flask_liquid")
+script = ExtResource("4_liquid_script")
+
+[node name="EscapeBubbleSpawner" type="Node2D" parent="PulseContainer/FlaskAspect/FlaskLiquid"]
+z_index = 1
+script = ExtResource("5_bubbles")
+spawn_rate = 11.0
+rise_strength = 38.0
+
+[node name="ScoreLabel" type="Label" parent="PulseContainer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.08
+anchor_top = 0.06
+anchor_right = 0.92
+anchor_bottom = 0.22
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = ExtResource("6_font")
+theme_override_font_sizes/font_size = 20
+text = "0/0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CompleteLabel" type="Label" parent="PulseContainer"]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.72
+anchor_right = 0.95
+anchor_bottom = 0.98
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = ExtResource("6_font")
+theme_override_font_sizes/font_size = 18
+text = "Complete Potion"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2

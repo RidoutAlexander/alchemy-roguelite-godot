@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://cn2p7ghly6x2s"]
+
+[ext_resource type="Script" path="res://scripts/ui/gold_cost_badge.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="2_gold_icon"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="3_font"]
+
+[node name="GoldCostBadge" type="Control"]
+custom_minimum_size = Vector2(72, 44)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="Icon" type="TextureRect" parent="HBox"]
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("2_gold_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AmountLabel" type="Label" parent="HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.02, 0.75)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 34
+text = "1"
+vertical_alignment = 1

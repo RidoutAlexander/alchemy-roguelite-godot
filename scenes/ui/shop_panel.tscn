@@ -1,0 +1,204 @@
+[gd_scene format=3 uid="uid://bgpkp1ft6krc7"]
+
+[ext_resource type="Script" uid="uid://b8snav7qflyws" path="res://scripts/ui/shop_panel.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="2_button"]
+[ext_resource type="PackedScene" uid="uid://chxs5rbj0ce8s" path="res://scenes/ui/ingredient_card.tscn" id="4_card"]
+[ext_resource type="Texture2D" uid="uid://snsyexa0fab5" path="res://assets/sprites/ingredient_bag_button.png" id="5_bag"]
+[ext_resource type="PackedScene" uid="uid://visdaqixb1lg" path="res://scenes/ui/gold_display.tscn" id="6_gold_display"]
+[ext_resource type="Texture2D" uid="uid://x11qap0c5q4t" path="res://assets/shop/shop_background.jpg" id="7_shop_bg"]
+[ext_resource type="PackedScene" uid="uid://drm3rn8jxa4eq" path="res://scenes/ui/lives_display.tscn" id="8_lives_display"]
+[ext_resource type="AudioStream" uid="uid://13ysb20cqp5s" path="res://assets/audio/shop_select_pop.mp3" id="9_shop_select_pop"]
+[ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="10_reroll_button"]
+[ext_resource type="PackedScene" uid="uid://cn2p7ghly6x2s" path="res://scenes/ui/gold_cost_badge.tscn" id="11_reroll_cost"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="12_font"]
+[ext_resource type="PackedScene" uid="uid://bagcontentsoverlay01" path="res://scenes/ui/bag_contents_overlay.tscn" id="13_bag_contents"]
+
+[node name="ShopPanel" type="Control" unique_id=1019768551]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="ShopBackground" type="TextureRect" parent="." unique_id=567601220]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("7_shop_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="ShopSelectPopPlayer" type="AudioStreamPlayer" parent="." unique_id=1827657465]
+stream = ExtResource("9_shop_select_pop")
+volume_db = -15.0
+
+[node name="FlyLayer" type="CanvasLayer" parent="." unique_id=1325573488]
+layer = 50
+follow_viewport_enabled = true
+
+[node name="BagTarget" type="Control" parent="." unique_id=283375916]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -429.0
+offset_top = 223.0
+offset_right = -245.0
+offset_bottom = 407.0
+grow_horizontal = 0
+mouse_filter = 2
+z_index = 12
+
+[node name="BoomBerryRewardNote" type="Label" parent="BagTarget" unique_id=1093847261]
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 0.5
+anchor_bottom = 0.0
+offset_left = -220.0
+offset_top = -118.0
+offset_right = 220.0
+offset_bottom = -42.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.98, 0.93, 0.78, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.02, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("12_font")
+theme_override_font_sizes/font_size = 22
+text = "A Boomberry has been added to your bag"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="BagIcon" type="TextureRect" parent="BagTarget" unique_id=2140640792 groups=["shop_bag_fly_target"]]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 89.0
+offset_top = 112.0
+offset_right = 89.0
+offset_bottom = 112.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_bag")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BagButton" type="TextureButton" parent="BagTarget"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 89.0
+offset_top = 112.0
+offset_right = 89.0
+offset_bottom = 112.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_default_cursor_shape = 2
+texture_normal = ExtResource("5_bag")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="GoldCounter" parent="." unique_id=380044565 instance=ExtResource("6_gold_display")]
+anchors_preset = 0
+offset_left = 620.0
+offset_top = 13.0
+offset_right = 784.0
+offset_bottom = 65.0
+
+[node name="LivesDisplay" parent="." unique_id=2113263304 instance=ExtResource("8_lives_display")]
+anchors_preset = 0
+offset_left = 767.0
+offset_top = 15.0
+offset_right = 935.0
+offset_bottom = 67.0
+
+[node name="OfferCards" type="Control" parent="." unique_id=920444359]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 57.999985
+offset_top = 123.999985
+offset_right = -102.0
+offset_bottom = -176.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.45206344, 0.45206344)
+
+[node name="ShopOffer0Card" parent="OfferCards" unique_id=230238123 instance=ExtResource("4_card")]
+layout_mode = 0
+offset_left = -4.424123
+offset_top = -183.60252
+offset_right = 295.57587
+offset_bottom = 236.39748
+
+[node name="ShopOffer1Card" parent="OfferCards" unique_id=683596987 instance=ExtResource("4_card")]
+layout_mode = 0
+offset_left = 431.3554
+offset_top = -183.60251
+offset_right = 731.3554
+offset_bottom = 236.39749
+
+[node name="ShopOffer2Card" parent="OfferCards" unique_id=534567053 instance=ExtResource("4_card")]
+layout_mode = 0
+offset_left = 11.060431
+offset_top = 380.47763
+offset_right = 311.06042
+offset_bottom = 800.47766
+
+[node name="ShopOffer3Card" parent="OfferCards" unique_id=400897871 instance=ExtResource("4_card")]
+layout_mode = 0
+offset_left = 446.84
+offset_top = 378.26553
+offset_right = 746.84
+offset_bottom = 798.2655
+
+[node name="LeaveShopButton" parent="." unique_id=65643540 instance=ExtResource("2_button")]
+custom_minimum_size = Vector2(505, 260)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -166.99997
+offset_top = -394.99997
+offset_right = 338.0
+offset_bottom = -134.99997
+grow_horizontal = 2
+grow_vertical = 0
+scale = Vector2(0.37148014, 0.37148014)
+pivot_offset = Vector2(252.5, 130)
+label_text = "Done"
+
+[node name="RerollButton" parent="." unique_id=1964979746 instance=ExtResource("10_reroll_button")]
+z_index = 5
+offset_left = 516.0
+offset_top = 155.0
+offset_right = 604.0
+offset_bottom = 243.0
+
+[node name="RerollCost" parent="." unique_id=1707572620 instance=ExtResource("11_reroll_cost")]
+z_index = 5
+layout_mode = 0
+anchors_preset = 0
+offset_left = 586.0
+offset_top = 176.0
+offset_right = 658.0
+offset_bottom = 220.0
+
+[node name="BagContentsOverlay" parent="." instance=ExtResource("13_bag_contents")]
+z_index = 100

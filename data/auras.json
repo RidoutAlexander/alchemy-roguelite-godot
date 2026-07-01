@@ -1,0 +1,92 @@
+[
+  {
+    "id": "stable_brew",
+    "display_name": "Stable Brew",
+    "description": "Explosion limit +1 this level.",
+    "pool": "normal",
+    "explosion_limit_modifier": 1,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "gold_rush",
+    "display_name": "Gold Rush",
+    "description": "Gold earned +25% this level.",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 125
+  },
+  {
+    "id": "shaky_hands",
+    "display_name": "Shaky Hands",
+    "description": "Explosion limit -1 this level.",
+    "pool": "boss",
+    "explosion_limit_modifier": -1,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "volatile_brew",
+    "display_name": "Volatile Brew",
+    "description": "Explosion limit -2.",
+    "pool": "boss",
+    "explosion_limit_modifier": -2,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "stingy",
+    "display_name": "Stingy",
+    "description": "Gold earned -25%.",
+    "pool": "boss",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 75
+  },
+  {
+    "id": "low_expectations",
+    "display_name": "Low Expectations",
+    "description": "Threshold reduced by 15%",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 85,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "under_pressure",
+    "display_name": "Under Pressure",
+    "description": "Threshold increased by 50% and gold gained is double",
+    "pool": "boss",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 150,
+    "gold_multiplier_percent": 200
+  },
+  {
+    "id": "ambidextrous",
+    "display_name": "Ambidextrous",
+    "description": "Ingredients are added to the cauldron 2 at a time",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "in_rhythm",
+    "display_name": "In Rhythm",
+    "description": "every 3rd ingredient added to the cauldron has double score and explosiveness",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "practice brew",
+    "display_name": "Practice Brew",
+    "description": "You may restart the brew at anypoint before it explodes",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  }
+]

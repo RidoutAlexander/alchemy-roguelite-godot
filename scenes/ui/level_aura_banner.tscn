@@ -1,0 +1,77 @@
+[gd_scene format=3 uid="uid://ddoc3v3nf2mce"]
+
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="1_font"]
+[ext_resource type="Texture2D" uid="uid://cr0sjx1w8rryw" path="res://assets/cards/parchment_plate.png" id="2_parchment"]
+[ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="3_practice_restart"]
+
+[node name="LevelAuraBanner" type="Control"]
+custom_minimum_size = Vector2(306, 106)
+layout_mode = 0
+offset_right = 306.0
+offset_bottom = 106.0
+mouse_filter = 2
+
+[node name="ParchmentBackground" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_parchment")
+expand_mode = 1
+
+[node name="LevelLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 8.0
+offset_right = 292.0
+offset_bottom = 34.0
+theme_override_colors/font_color = Color(0.08, 0.05, 0.02, 1)
+theme_override_colors/font_outline_color = Color(0.95, 0.88, 0.7, 0.6)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = ExtResource("1_font")
+theme_override_font_sizes/font_size = 24
+text = "Level 1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AuraNameLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 32.0
+offset_right = 292.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(0.08, 0.05, 0.02, 1)
+theme_override_colors/font_outline_color = Color(0.95, 0.88, 0.7, 0.6)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("1_font")
+theme_override_font_sizes/font_size = 28
+text = "Aura Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AuraDescriptionLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 58.0
+offset_right = 288.0
+offset_bottom = 98.0
+theme_override_colors/font_color = Color(0.12, 0.08, 0.04, 1)
+theme_override_fonts/font = ExtResource("1_font")
+theme_override_font_sizes/font_size = 18
+text = "Aura description goes here."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="PracticeRestartButton" parent="." instance=ExtResource("3_practice_restart")]
+visible = false
+layout_mode = 0
+offset_left = 4.0
+offset_top = 68.0
+offset_right = 44.0
+offset_bottom = 108.0
+scale = Vector2(0.45, 0.45)
+pivot_offset = Vector2(44, 44)

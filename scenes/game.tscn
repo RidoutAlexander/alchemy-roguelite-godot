@@ -1,0 +1,241 @@
+[gd_scene format=3 uid="uid://tuusxj8a6emi"]
+
+[ext_resource type="Script" uid="uid://covvq82fxvua8" path="res://scripts/ui/game_hud.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="2_button"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="3_font"]
+[ext_resource type="PackedScene" uid="uid://bgpkp1ft6krc7" path="res://scenes/ui/shop_panel.tscn" id="4_shop"]
+[ext_resource type="Texture2D" uid="uid://jpwj7ug7g41u" path="res://assets/brew/brew_background.png" id="5_brew_bg"]
+[ext_resource type="PackedScene" uid="uid://ceuwrhtfgpbjk" path="res://scenes/effects/cauldron_liquid.tscn" id="6_cauldron_liquid"]
+[ext_resource type="PackedScene" uid="uid://ddoc3v3nf2mce" path="res://scenes/ui/level_aura_banner.tscn" id="7_level_banner"]
+[ext_resource type="PackedScene" uid="uid://2essrd54mbs3" path="res://scenes/ui/ingredient_bag_button.tscn" id="8_bag_button"]
+[ext_resource type="PackedScene" uid="uid://scoreflask01" path="res://scenes/ui/score_flask.tscn" id="9_score_flask"]
+[ext_resource type="PackedScene" uid="uid://visdaqixb1lg" path="res://scenes/ui/gold_display.tscn" id="10_gold_display"]
+[ext_resource type="PackedScene" uid="uid://x2x1bidlimb5" path="res://scenes/ui/gold_reward_display.tscn" id="11_gold_reward"]
+[ext_resource type="Script" uid="uid://co5cpvxwve17x" path="res://scripts/ui/brew_panel.gd" id="12_brew_panel"]
+[ext_resource type="PackedScene" uid="uid://chxs5rbj0ce8s" path="res://scenes/ui/ingredient_card.tscn" id="13_ingredient_card"]
+[ext_resource type="Script" uid="uid://obf35ap2s30q" path="res://scripts/ui/drawn_card_preview_host.gd" id="14_preview_host"]
+[ext_resource type="PackedScene" uid="uid://drm3rn8jxa4eq" path="res://scenes/ui/lives_display.tscn" id="15_lives_display"]
+[ext_resource type="PackedScene" uid="uid://b1hccpfdn3fyi" path="res://scenes/ui/explosiveness_display.tscn" id="16_explosiveness_display"]
+[ext_resource type="AudioStream" uid="uid://c7mc6800f2dpn" path="res://assets/audio/cauldron_plop.mp3" id="17_cauldron_plop"]
+[ext_resource type="AudioStream" uid="uid://bw0amfuurs636" path="res://assets/audio/boiling_water_loop.mp3" id="18_boiling_water"]
+[ext_resource type="AudioStream" uid="uid://coq7qbw3lffg3" path="res://assets/audio/cauldron_explosion.mp3" id="19_cauldron_explosion"]
+[ext_resource type="PackedScene" uid="uid://dmjonbvqoqxi7" path="res://scenes/ui/eyeball_puzzle_overlay.tscn" id="20_eyeball_puzzle"]
+
+[node name="Game" type="Control" unique_id=403037050]
+custom_minimum_size = Vector2(1024, 576)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1075299612]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.058824, 0.070588, 0.090196, 1)
+
+[node name="EyeballPuzzleOverlay" parent="." unique_id=2060019417 instance=ExtResource("20_eyeball_puzzle")]
+
+[node name="GameplayMusicPlayer" type="AudioStreamPlayer" parent="." unique_id=1668007247]
+
+[node name="HudOverlayLayer" type="CanvasLayer" parent="." unique_id=1982736451]
+layer = 10
+follow_viewport_enabled = true
+
+[node name="PhaseSwipeHost" type="Control" parent="." unique_id=1475295315]
+clip_children = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BrewPanel" type="Control" parent="PhaseSwipeHost" unique_id=2067961692]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("12_brew_panel")
+
+[node name="CauldronPlopPlayer" type="AudioStreamPlayer" parent="PhaseSwipeHost/BrewPanel" unique_id=658198309]
+stream = ExtResource("17_cauldron_plop")
+volume_db = 4.0
+
+[node name="BoilingWaterPlayer" type="AudioStreamPlayer" parent="PhaseSwipeHost/BrewPanel" unique_id=227185110]
+stream = ExtResource("18_boiling_water")
+volume_db = -18.0
+
+[node name="CauldronExplosionPlayer" type="AudioStreamPlayer" parent="PhaseSwipeHost/BrewPanel" unique_id=1295375791]
+stream = ExtResource("19_cauldron_explosion")
+volume_db = 6.0
+
+[node name="DrawFlyLayer" type="CanvasLayer" parent="PhaseSwipeHost/BrewPanel" unique_id=803560024]
+layer = 50
+follow_viewport_enabled = true
+
+[node name="ExplosionLayer" type="CanvasLayer" parent="PhaseSwipeHost/BrewPanel" unique_id=624654132]
+layer = 60
+follow_viewport_enabled = true
+
+[node name="BagDrawAnchor" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=438882828]
+anchors_preset = 0
+offset_left = 148.0
+offset_top = 200.0
+offset_right = 164.0
+offset_bottom = 216.0
+mouse_filter = 2
+
+[node name="CauldronDrawTarget" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=1332404559]
+anchors_preset = 0
+offset_left = 508.0
+offset_top = 222.0
+offset_right = 524.0
+offset_bottom = 238.0
+mouse_filter = 2
+
+[node name="BrewBackground" type="TextureRect" parent="PhaseSwipeHost/BrewPanel" unique_id=1978699750]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -5.0
+offset_right = -5.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_brew_bg")
+expand_mode = 1
+
+[node name="CauldronLiquid" parent="PhaseSwipeHost/BrewPanel" unique_id=712045404 instance=ExtResource("6_cauldron_liquid")]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 194.99998
+offset_right = 653.0
+offset_bottom = 267.0
+scale = Vector2(0.89229774, 0.6760991)
+
+[node name="GoldCounter" parent="PhaseSwipeHost/BrewPanel" unique_id=1257235171 instance=ExtResource("10_gold_display")]
+anchors_preset = 0
+offset_left = 638.0
+offset_top = 36.0
+offset_right = 802.0
+offset_bottom = 88.0
+
+[node name="LivesDisplay" parent="PhaseSwipeHost/BrewPanel" unique_id=1884570556 instance=ExtResource("15_lives_display")]
+anchors_preset = 0
+offset_left = 770.0
+offset_top = 36.0
+offset_right = 938.0
+offset_bottom = 88.0
+
+[node name="ExplosivenessCounter" parent="PhaseSwipeHost/BrewPanel" unique_id=1523366666 instance=ExtResource("16_explosiveness_display")]
+anchors_preset = 0
+offset_left = 49.0
+offset_top = 25.0
+offset_right = 197.0
+offset_bottom = 77.0
+
+[node name="LevelAuraBanner" parent="PhaseSwipeHost/BrewPanel" unique_id=1743272553 instance=ExtResource("7_level_banner")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -688.0
+offset_top = 10.0
+offset_right = -382.0
+offset_bottom = 162.0
+grow_horizontal = 0
+
+[node name="ScoreFlask" parent="PhaseSwipeHost/BrewPanel" unique_id=882441203 instance=ExtResource("9_score_flask")]
+anchors_preset = 0
+offset_left = 730.0
+offset_top = 96.0
+offset_right = 876.0
+offset_bottom = 406.0
+
+[node name="GoldRewardDisplay" parent="PhaseSwipeHost/BrewPanel" unique_id=1155486730 instance=ExtResource("11_gold_reward")]
+anchors_preset = 0
+offset_left = 836.0
+offset_top = 133.0
+offset_right = 956.0
+offset_bottom = 185.0
+
+[node name="AddIngredientButton" parent="PhaseSwipeHost/BrewPanel" unique_id=616607972 instance=ExtResource("8_bag_button")]
+offset_left = -56.0
+offset_top = 330.0
+offset_right = 283.36932
+offset_bottom = 531.2989
+scale = Vector2(0.77496696, 0.77496696)
+
+[node name="DrawnCardPreviewHost" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=1571212444]
+z_index = 20
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 120.0
+offset_right = 208.0
+offset_bottom = 324.0
+mouse_filter = 2
+script = ExtResource("14_preview_host")
+
+[node name="DrawnCardPreview" parent="PhaseSwipeHost/BrewPanel/DrawnCardPreviewHost" unique_id=1349557143 instance=ExtResource("13_ingredient_card")]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 17.999998
+offset_right = 324.0
+offset_bottom = 438.0
+scale = Vector2(0.42, 0.42)
+mouse_filter = 2
+
+[node name="SaveAndQuitButton" parent="PhaseSwipeHost/BrewPanel" unique_id=1216604950 instance=ExtResource("2_button")]
+offset_left = 744.0
+offset_top = 399.0
+offset_right = 1014.0
+offset_bottom = 538.0
+scale = Vector2(0.4607092, 0.4607092)
+label_text = "Save and Quit"
+
+[node name="ShopPanel" parent="PhaseSwipeHost" unique_id=1760442899 instance=ExtResource("4_shop")]
+visible = false
+layout_mode = 1
+
+[node name="GameOverPanel" type="Control" parent="." unique_id=418913210]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatsLabel" type="Label" parent="GameOverPanel" unique_id=2064972908]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 82.0
+offset_top = 13.0
+offset_right = -82.0
+offset_bottom = 290.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 28
+text = "Run Over"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="MainMenuButton" parent="GameOverPanel" unique_id=1703795255 instance=ExtResource("2_button")]
+offset_left = 362.0
+offset_top = 341.0
+offset_right = 661.0
+offset_bottom = 469.0
+label_text = "Main Menu"

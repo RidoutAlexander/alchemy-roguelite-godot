@@ -1,0 +1,99 @@
+[gd_scene format=3 uid="uid://cr5syaod6s2ge"]
+
+[ext_resource type="Script" uid="uid://c7wqttdgpecj6" path="res://scripts/ui/bag_contents_overlay.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="2_font"]
+[ext_resource type="PackedScene" uid="uid://chxs5rbj0ce8s" path="res://scenes/ui/ingredient_card.tscn" id="3_card"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+bg_color = Color(0.05, 0.06, 0.1, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.72, 0.6, 0.32, 0.85)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="BagContentsOverlay" type="Control" unique_id=857951980]
+z_index = 100
+layout_mode = 3
+anchor_right = 0.58
+anchor_bottom = 1.0
+offset_top = 20.0
+offset_bottom = -78.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="InputBlocker" type="ColorRect" parent="." unique_id=900000001]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.01)
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=1841494498]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Content" type="VBoxContainer" parent="Panel" unique_id=396701183]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Panel/Content" unique_id=367411817]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.9, 0.75, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 28
+text = "Your Bag"
+horizontal_alignment = 1
+
+[node name="EmptyLabel" type="Label" parent="Panel/Content" unique_id=1849820201]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.78, 0.74, 0.62, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+text = "Your bag is empty."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/Content" unique_id=1754520145]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="Grid" type="GridContainer" parent="Panel/Content/Scroll" unique_id=29546612]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 5
+
+[node name="PreviewLayer" type="CanvasLayer" parent="." unique_id=711457697]
+layer = 60
+visible = false
+
+[node name="PreviewCard" parent="PreviewLayer" unique_id=568896814 instance=ExtResource("3_card")]
+scale = Vector2(0.38, 0.38)
+mouse_filter = 2

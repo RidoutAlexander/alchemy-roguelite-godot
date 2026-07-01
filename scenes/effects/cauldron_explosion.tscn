@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3 uid="uid://dp807e4dgx6xo"]
+
+[ext_resource type="Shader" path="res://shaders/cauldron_explosion.gdshader" id="1_shader"]
+[ext_resource type="Script" path="res://scripts/effects/cauldron_explosion_effect.gd" id="2_script"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_explosion"]
+shader = ExtResource("1_shader")
+shader_parameter/expand_t = 0.0
+shader_parameter/burst_origin = Vector2(0.5, 0.4)
+shader_parameter/max_scale = 0.52
+shader_parameter/liquid_deep = Color(0.14, 0.02, 0.34, 1)
+shader_parameter/liquid_mid = Color(0.42, 0.1, 0.72, 1)
+shader_parameter/liquid_bright = Color(0.62, 0.28, 0.88, 1)
+shader_parameter/splash_highlight = Color(0.88, 0.62, 1, 1)
+
+[node name="CauldronExplosion" type="Node2D"]
+script = ExtResource("2_script")
+
+[node name="WaveOverlay" type="ColorRect" parent="."]
+mouse_filter = 2
+material = SubResource("ShaderMaterial_explosion")

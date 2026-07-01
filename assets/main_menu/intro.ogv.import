@@ -1,0 +1,14 @@
+[remap]
+
+importer="ogg_video"
+type="VideoStreamTheora"
+uid="uid://introvideo01"
+path="res://.godot/imported/intro.ogv-18ed8fd6fd6c901c52df1ac38e4d8f70.theorastr"
+metadata={
+"vram_texture": false
+}
+
+[deps]
+
+source_file="res://assets/main_menu/intro.ogv"
+dest_files=["res://.godot/imported/intro.ogv-18ed8fd6fd6c901c52df1ac38e4d8f70.theorastr"]

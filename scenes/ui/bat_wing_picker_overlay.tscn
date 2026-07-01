@@ -1,0 +1,78 @@
+[gd_scene format=3 uid="uid://b0gpfbxl6apr5"]
+
+[ext_resource type="Script" path="res://scripts/ui/bat_wing_picker_overlay.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="2_font"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.06, 0.07, 0.12, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.72, 0.6, 0.32, 0.9)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+
+[node name="BatWingPickerOverlay" type="CanvasLayer"]
+layer = 120
+visible = false
+follow_viewport_enabled = true
+script = ExtResource("1_script")
+
+[node name="Dimmer" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0.01, 0.02, 0.04, 0.9)
+
+[node name="Layout" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="PanelOffset" type="MarginContainer" parent="Layout"]
+layout_mode = 2
+theme_override_constants/margin_bottom = 20
+
+[node name="Panel" type="PanelContainer" parent="Layout/PanelOffset"]
+layout_mode = 2
+mouse_filter = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Content" type="VBoxContainer" parent="Layout/PanelOffset/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Title" type="Label" parent="Layout/PanelOffset/Panel/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.9, 0.75, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 26
+text = "Choose an ingredient"
+horizontal_alignment = 1
+
+[node name="HintLabel" type="Label" parent="Layout/PanelOffset/Panel/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.74, 0.62, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+text = "Tap a card to add it to your cauldron"
+horizontal_alignment = 1
+
+[node name="ChoicesRow" type="HBoxContainer" parent="Layout/PanelOffset/Panel/Content"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1

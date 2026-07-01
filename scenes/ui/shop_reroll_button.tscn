@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://nt6f30xuyjt5"]
+
+[ext_resource type="Script" path="res://scripts/ui/shop_reroll_button.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://d1p3amb31h3xf" path="res://assets/sprites/shop_reroll_button.png" id="2_tex"]
+
+[node name="ShopRerollButton" type="TextureButton"]
+custom_minimum_size = Vector2(88, 88)
+layout_mode = 0
+offset_right = 88.0
+offset_bottom = 88.0
+texture_normal = ExtResource("2_tex")
+ignore_texture_size = true
+stretch_mode = 5
+script = ExtResource("1_script")

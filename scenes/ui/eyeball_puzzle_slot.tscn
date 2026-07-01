@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://eyeballpuzzleslot"]
+
+[ext_resource type="Script" path="res://scripts/ui/eyeball_puzzle_slot.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="2_font"]
+
+[node name="EyeballPuzzleSlot" type="VBoxContainer"]
+theme_override_constants/separation = 8
+alignment = 1
+script = ExtResource("1_script")
+
+[node name="NumberOffset" type="Control" parent="."]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NumberLabel" type="Label" parent="NumberOffset"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -60.0
+offset_top = -50.0
+offset_right = 60.0
+offset_bottom = -18.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.95, 0.88, 0.65, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 28
+text = "1"
+horizontal_alignment = 1
+
+[node name="DropZone" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+
+[node name="CardHost" type="Control" parent="DropZone"]
+layout_mode = 2
+mouse_filter = 2
+clip_contents = false

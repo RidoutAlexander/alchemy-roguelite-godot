@@ -1,0 +1,28 @@
+# Godot 4
+.godot/
+*.tmp
+
+# Export builds (rebuild with tools/export_playtest.bat)
+exports/
+
+# Python tooling
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Bundled ffmpeg binaries (large; scripts live in tools/)
+tools/ffmpeg/ffmpeg.zip
+tools/ffmpeg/ffmpeg.exe
+tools/ffmpeg/extract/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
+godot.log
