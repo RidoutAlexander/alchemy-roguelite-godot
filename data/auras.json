@@ -88,5 +88,23 @@
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
+  },
+  {
+    "id": "regular_brew",
+    "display_name": "Regular Brew",
+    "description": "Nothing special",
+    "pool": "normal",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
+  },
+  {
+    "id": "regular_boss",
+    "display_name": "Regular Boss",
+    "description": "Nothing special",
+    "pool": "boss",
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
   }
 ]

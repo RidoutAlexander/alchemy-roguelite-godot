@@ -100,6 +100,12 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 		_request_brew_completion()
 
 
+func complete_frog_leg_save() -> void:
+	_presentation_in_progress = false
+	run.brew_session.complete_frog_leg_save()
+	_request_brew_completion()
+
+
 func try_end_brew() -> void:
 	if not can_player_draw():
 		return

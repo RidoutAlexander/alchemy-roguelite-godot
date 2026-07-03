@@ -21,6 +21,7 @@ var _unicorn_cures_next_explosive: bool = false
 var _parrot_doubles_next: bool = false
 var _voodoo_doll_arms_copy: bool = false
 var _practice_restart_used: bool = false
+var _frog_leg_save_pending: bool = false
 
 
 func start_brew(
@@ -114,6 +115,20 @@ func get_bat_wing_choices() -> Array[IngredientData]:
 	return _bat_wing_choices.duplicate()
 
 
+func is_frog_leg_save_pending() -> bool:
+	return _frog_leg_save_pending
+
+
+func complete_frog_leg_save() -> void:
+	if not _frog_leg_save_pending:
+		return
+	_frog_leg_save_pending = false
+	_apply_end_of_brew_bonuses()
+	context.outcome = BrewOutcome.Outcome.BANKED
+	_finalize_brew()
+	brew_updated.emit(context)
+
+
 func begin_eyeball_puzzle() -> void:
 	if _eyeball_reserved.is_empty():
 		return
@@ -129,7 +144,7 @@ func begin_bat_wing_picker() -> void:
 func complete_eyeball_puzzle(ordered: Array) -> void:
 	if ordered.is_empty():
 		return
-	context.bag.set_forced_draw_queue(ordered)
+	context.bag.apply_upcoming_draw_order(ordered)
 	_eyeball_reserved.clear()
 	_eyeball_puzzle_active = false
 	brew_updated.emit(context)
@@ -151,7 +166,8 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		_ambidextrous_draw_pending = false
-		_resolve_explosion()
+		if not _try_frog_leg_save():
+			_resolve_explosion()
 	ingredient_drawn.emit(context, selected)
 	brew_updated.emit(context)
 
@@ -222,7 +238,8 @@ func _draw_and_emit(_is_chain: bool) -> bool:
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		_ambidextrous_draw_pending = false
-		_resolve_explosion()
+		if not _try_frog_leg_save():
+			_resolve_explosion()
 
 	ingredient_drawn.emit(context, ingredient)
 	brew_updated.emit(context)
@@ -262,7 +279,7 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> void:
 	if effect.chain_draws > 0:
 		_chain_draws_remaining = effect.chain_draws
 	if effect.reserve_for_eyeball > 0:
-		_eyeball_reserved = context.bag.take_next(effect.reserve_for_eyeball)
+		_eyeball_reserved = context.bag.peek_upcoming_draws(effect.reserve_for_eyeball)
 	if effect.cures_next_explosive:
 		_unicorn_cures_next_explosive = true
 	if effect.doubles_next_ingredient:
@@ -288,25 +305,28 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> void:
 
 	if not context.is_exploded():
 		return
-	if ingredient.id == IngredientEffects.FROG_LEG_ID:
-		_frog_leg_escape(ingredient, point_value, explosive_add, bonus_score_added)
-	elif ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
+	if ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
 		_trigger_phoenix_save()
 
 
-func _frog_leg_escape(
-	ingredient: IngredientData,
-	point_value: int,
-	explosive_add: int,
-	bonus_score_added: int
-) -> void:
-	context.score = maxi(0, context.score - point_value - bonus_score_added)
-	context.explosiveness = maxi(0, context.explosiveness - explosive_add)
-	_remove_from_cauldron(ingredient)
-	var draw_index := context.drawn_this_brew.rfind(ingredient)
-	if draw_index >= 0:
-		context.drawn_this_brew.remove_at(draw_index)
-	frog_leg_escaped.emit(ingredient)
+func _try_frog_leg_save() -> bool:
+	var frog_leg := _find_frog_leg_in_cauldron()
+	if frog_leg == null:
+		return false
+
+	context.explosion_limit += 1
+	_remove_from_cauldron(frog_leg)
+	context.bag.remove_one_chip_from_master(frog_leg)
+	_frog_leg_save_pending = true
+	frog_leg_escaped.emit(frog_leg)
+	return true
+
+
+func _find_frog_leg_in_cauldron() -> IngredientData:
+	for entry in context.cauldron_contents:
+		if entry != null and entry.id == IngredientEffects.FROG_LEG_ID:
+			return entry
+	return null
 
 
 func _replace_voodoo_in_cauldron_with(ingredient: IngredientData) -> void:
@@ -423,3 +443,4 @@ func _reset_draw_flow_state() -> void:
 	_unicorn_cures_next_explosive = false
 	_parrot_doubles_next = false
 	_voodoo_doll_arms_copy = false
+	_frog_leg_save_pending = false

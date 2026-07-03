@@ -30,12 +30,7 @@ if not exist "%EXE%" (
 )
 
 echo Creating playtest ZIP...
-powershell -NoProfile -Command ^
-  "$files = Get-ChildItem -Path '%EXPORT_DIR%' -File | Where-Object { $_.Extension -in '.exe','.pck','.dll' -and $_.Name -notlike '*.tmp' }; ^
-   if ($files.Count -eq 0) { throw 'No export artifacts found in exports folder.' }; ^
-   if (Test-Path '%ZIP%') { Remove-Item '%ZIP%' -Force }; ^
-   Compress-Archive -Path $files.FullName -DestinationPath '%ZIP%' -Force; ^
-   Write-Host ('Packed {0} file(s) -> {1}' -f $files.Count, '%ZIP%')"
+powershell -NoProfile -Command "$files = Get-ChildItem -Path '%EXPORT_DIR%' -File | Where-Object { $_.Extension -in '.exe','.pck','.dll' -and $_.Name -notlike '*.tmp' }; if ($files.Count -eq 0) { throw 'No export artifacts found in exports folder.' }; if (Test-Path '%ZIP%') { Remove-Item '%ZIP%' -Force }; Compress-Archive -Path $files.FullName -DestinationPath '%ZIP%' -Force; Write-Host ('Packed {0} file(s) -> {1}' -f $files.Count, '%ZIP%')"
 
 echo Done.
 echo   EXE: %EXE%

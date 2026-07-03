@@ -78,6 +78,32 @@ func peek_next(count: int) -> Array[IngredientData]:
 	return peeked
 
 
+func peek_upcoming_draws(count: int) -> Array[IngredientData]:
+	var peeked: Array[IngredientData] = []
+	for chip in _forced_draw_queue:
+		if peeked.size() >= count:
+			break
+		peeked.append(chip)
+	var working_index := 0
+	while peeked.size() < count and working_index < _working_chips.size():
+		peeked.append(_working_chips[working_index])
+		working_index += 1
+	return peeked
+
+
+func apply_upcoming_draw_order(ordered: Array) -> void:
+	if ordered.is_empty():
+		return
+	_remove_upcoming_front(ordered.size())
+	var new_forced: Array[IngredientData] = []
+	for ingredient in ordered:
+		if ingredient != null:
+			new_forced.append(ingredient)
+	for chip in _forced_draw_queue:
+		new_forced.append(chip)
+	_forced_draw_queue = new_forced
+
+
 func take_next(count: int) -> Array[IngredientData]:
 	var picked: Array[IngredientData] = []
 	var slots := mini(count, _working_chips.size())
@@ -111,6 +137,19 @@ func replace_one_voodoo_doll_in_master_with(ingredient: IngredientData) -> void:
 			return
 
 
+func remove_one_chip_from_master(chip: IngredientData) -> void:
+	if chip == null:
+		return
+	for i in _master_chips.size():
+		if _master_chips[i] == chip:
+			_master_chips.remove_at(i)
+			return
+	for i in _master_chips.size():
+		if _master_chips[i] != null and _master_chips[i].id == chip.id:
+			_master_chips.remove_at(i)
+			return
+
+
 func reshuffle_after_phoenix(cauldron_contents: Array) -> void:
 	for ingredient in cauldron_contents:
 		if ingredient != null:
@@ -124,6 +163,16 @@ func set_forced_draw_queue(ingredients: Array) -> void:
 	for ingredient in ingredients:
 		if ingredient != null:
 			_forced_draw_queue.append(ingredient)
+
+
+func _remove_upcoming_front(count: int) -> void:
+	var remaining := count
+	while remaining > 0 and not _forced_draw_queue.is_empty():
+		_forced_draw_queue.pop_front()
+		remaining -= 1
+	while remaining > 0 and not _working_chips.is_empty():
+		_working_chips.pop_front()
+		remaining -= 1
 
 
 func _shuffle(chips: Array) -> void:

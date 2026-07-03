@@ -5,6 +5,7 @@ const LIGHTNING_ID := "lightning_in_a_bottle"
 const EYEBALL_ID := "eyeball"
 const RED_MUSHROOM_ID := "red_mushroom"
 const PUMPKIN_ID := "pumpkin"
+const JACK_O_LANTERN_ID := "jackolantern"
 const UNICORN_HORN_ID := "unicorn_horn"
 const PARROT_ID := "parrot"
 const FEATHER_ID := "feather"
@@ -25,6 +26,7 @@ const SAGE_ID := "sage"
 const LIGHTNING_CHAIN_DRAWS := 3
 const RED_MUSHROOM_PUMPKIN_CAP := 3
 const BAT_WING_PICK_COUNT := 3
+const SPIDER_STREAK_CAP := 4
 
 
 class EffectResult:
@@ -58,7 +60,7 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 
 	match ingredient.id:
 		RED_MUSHROOM_ID:
-			var pumpkin_count := _count_ingredient_id(context.cauldron_contents, PUMPKIN_ID)
+			var pumpkin_count := _count_pumpkin_like(context.cauldron_contents)
 			result.bonus_score = mini(RED_MUSHROOM_PUMPKIN_CAP, pumpkin_count)
 		LIGHTNING_ID:
 			result.chain_draws = LIGHTNING_CHAIN_DRAWS
@@ -99,7 +101,7 @@ static func _spider_streak_bonus(contents: Array) -> int:
 			streak += 1
 		else:
 			break
-	return streak
+	return mini(SPIDER_STREAK_CAP, streak)
 
 
 static func leech_boss_threshold_reduction(context: BrewContext) -> int:
@@ -115,5 +117,15 @@ static func _count_ingredient_id(contents: Array, ingredient_id: String) -> int:
 	var count := 0
 	for entry in contents:
 		if entry != null and entry.id == ingredient_id:
+			count += 1
+	return count
+
+
+static func _count_pumpkin_like(contents: Array) -> int:
+	var count := 0
+	for entry in contents:
+		if entry == null:
+			continue
+		if entry.id == PUMPKIN_ID or entry.id == JACK_O_LANTERN_ID:
 			count += 1
 	return count

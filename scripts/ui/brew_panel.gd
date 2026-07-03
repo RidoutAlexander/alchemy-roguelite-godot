@@ -330,14 +330,13 @@ func _play_draw_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
 
 
 func _finish_ingredient_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
-	if _pending_frog_escape == ingredient:
+	if _pending_frog_escape != null:
+		var escaping_frog := _pending_frog_escape
 		_pending_frog_escape = null
 		_play_frog_escape(
-			ingredient,
+			escaping_frog,
 			func() -> void:
-				if track_for_exit:
-					_on_brew_exit_animation_finished()
-				GameManager.notify_ingredient_presentation_finished()
+				GameManager.complete_frog_leg_save()
 		)
 		return
 	if track_for_exit:
