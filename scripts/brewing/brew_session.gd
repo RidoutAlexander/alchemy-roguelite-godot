@@ -579,10 +579,8 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> bool:
 		_bat_wing_choices = context.bag.take_random(effect.bat_wing_pick_count)
 	if effect.voodoo_doll_arms_copy:
 		_voodoo_doll_arms_copy = true
-	elif _voodoo_doll_arms_copy and ingredient.id != IngredientEffects.VOODOO_DOLL_ID:
-		_replace_voodoo_in_cauldron_with(ingredient)
-		context.bag.replace_one_voodoo_doll_in_master_with(ingredient)
-		_voodoo_doll_arms_copy = false
+	else:
+		_try_consume_voodoo_copy(ingredient)
 
 	if not context.is_exploded():
 		return parrot_doubled_this_ingredient
@@ -609,6 +607,25 @@ func _find_frog_leg_in_cauldron() -> IngredientData:
 		if entry != null and entry.id == IngredientEffects.FROG_LEG_ID:
 			return entry
 	return null
+
+
+func _try_consume_voodoo_copy(ingredient: IngredientData) -> void:
+	if not _voodoo_doll_arms_copy or ingredient == null:
+		return
+	if ingredient.id in [IngredientEffects.VOODOO_DOLL_ID, IngredientEffects.BAT_WING_ID]:
+		return
+	if not _has_voodoo_in_cauldron():
+		return
+	_replace_voodoo_in_cauldron_with(ingredient)
+	context.bag.replace_one_voodoo_doll_in_master_with(ingredient)
+	_voodoo_doll_arms_copy = false
+
+
+func _has_voodoo_in_cauldron() -> bool:
+	for entry in context.cauldron_contents:
+		if entry != null and entry.id == IngredientEffects.VOODOO_DOLL_ID:
+			return true
+	return false
 
 
 func _replace_voodoo_in_cauldron_with(ingredient: IngredientData) -> void:

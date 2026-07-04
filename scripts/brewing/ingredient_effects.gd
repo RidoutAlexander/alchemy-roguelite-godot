@@ -29,7 +29,8 @@ const LIGHTNING_CHAIN_DRAWS := 3
 const RED_MUSHROOM_PUMPKIN_CAP := 3
 const BAT_WING_PICK_COUNT := 3
 const SPIDER_STREAK_CAP := 4
-const MANDRAKE_BOSS_THRESHOLD_DISCOUNT := 2
+const MANDRAKE_BOSS_THRESHOLD_DISCOUNT := 1
+const LEECH_BOSS_THRESHOLD_PERCENT := 3
 
 
 class EffectResult:
@@ -116,7 +117,7 @@ static func leech_boss_threshold_reduction(context: BrewContext) -> int:
 	var leech_count := _count_ingredient_id(context.cauldron_contents, LEECH_ID)
 	if leech_count <= 0:
 		return 0
-	return (context.score / 10) * leech_count
+	return context.score * LEECH_BOSS_THRESHOLD_PERCENT * leech_count / 100
 
 
 static func _count_ingredient_id(contents: Array, ingredient_id: String) -> int:
