@@ -3,6 +3,13 @@ extends Node
 signal phase_changed(phase: int)
 signal run_changed
 signal brew_updated(context: BrewContext)
+signal hand_draw_batch_started(drawn: Array)
+signal hand_card_played(context: BrewContext, ingredient: IngredientData, slot_index: int)
+signal hand_mulligan_started(
+	old_ingredient: IngredientData,
+	new_ingredient: IngredientData,
+	slot_index: int
+)
 signal ingredient_drawn(context: BrewContext, ingredient: IngredientData)
 signal frog_leg_escaped(ingredient: IngredientData)
 signal brew_completion_requested(outcome: int)
@@ -27,10 +34,13 @@ func _ready() -> void:
 		randomize()
 		call_deferred("_apply_exclusive_fullscreen")
 	run.brew_session.brew_updated.connect(_on_brew_updated)
+	run.brew_session.hand_draw_batch_started.connect(_on_hand_draw_batch_started)
+	run.brew_session.hand_card_played.connect(_on_hand_card_played)
 	run.brew_session.ingredient_drawn.connect(_on_ingredient_drawn)
 	run.brew_session.frog_leg_escaped.connect(_on_frog_leg_escaped)
 	run.brew_session.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
 	run.brew_session.bat_wing_picker_requested.connect(_on_bat_wing_picker_requested)
+	run.brew_session.hand_mulligan_started.connect(_on_hand_mulligan_started)
 
 
 func has_save() -> bool:
@@ -60,12 +70,34 @@ func enter_brewing() -> void:
 	_enter_brewing()
 
 
-func can_player_draw() -> bool:
+func can_press_bag() -> bool:
 	return (
 		current_phase == GamePhase.Phase.BREWING
 		and not _brew_transition_pending
 		and not _presentation_in_progress
-		and run.brew_session.can_player_draw()
+		and run.brew_session.can_press_bag()
+	)
+
+
+func can_player_draw() -> bool:
+	return can_press_bag()
+
+
+func can_play_hand() -> bool:
+	return (
+		current_phase == GamePhase.Phase.BREWING
+		and not _brew_transition_pending
+		and not _presentation_in_progress
+		and run.brew_session.can_play_hand()
+	)
+
+
+func can_end_brew() -> bool:
+	return (
+		current_phase == GamePhase.Phase.BREWING
+		and not _brew_transition_pending
+		and not _presentation_in_progress
+		and run.brew_session.can_player_end_brew()
 	)
 
 
@@ -74,30 +106,100 @@ func set_presentation_in_progress(active: bool) -> void:
 
 
 func try_draw_ingredient() -> void:
-	if not can_player_draw():
+	if not can_press_bag():
 		return
-	run.brew_session.try_draw_ingredient()
+	run.brew_session.try_draw_to_hand()
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		_request_brew_completion()
 
 
-func notify_ingredient_presentation_finished() -> void:
+func try_play_hand() -> void:
+	if not can_play_hand():
+		return
+	run.brew_session.try_play_hand()
+	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		_request_brew_completion()
+
+
+func try_swap_hand_slots(from_slot: int, to_slot: int) -> void:
+	if (
+		current_phase != GamePhase.Phase.BREWING
+		or _brew_transition_pending
+		or _presentation_in_progress
+	):
+		return
+	if not run.brew_session.can_swap_hand():
+		return
+	run.brew_session.swap_hand_slots(from_slot, to_slot)
+
+
+func try_undo_hand_swap() -> void:
+	if not run.brew_session.can_undo_hand_swap():
+		return
+	run.brew_session.undo_hand_swap()
+
+
+func can_mulligan() -> bool:
+	return (
+		current_phase == GamePhase.Phase.BREWING
+		and not _brew_transition_pending
+		and not _presentation_in_progress
+		and run.brew_session.can_mulligan()
+	)
+
+
+func try_mulligan(slot_index: int) -> void:
+	if not can_mulligan():
+		return
+	if slot_index < 0:
+		return
+	if run.brew_session.try_mulligan(slot_index):
+		_presentation_in_progress = true
+
+
+func complete_mulligan(
+	slot_index: int,
+	old_ingredient: IngredientData,
+	new_ingredient: IngredientData
+) -> void:
+	run.brew_session.complete_mulligan(slot_index, old_ingredient, new_ingredient)
+
+
+func notify_mulligan_presentation_finished() -> void:
 	_presentation_in_progress = false
-	if run.brew_session.try_advance_chain_draw():
+
+
+func notify_hand_draw_batch_finished() -> void:
+	_presentation_in_progress = false
+	run.brew_session.on_hand_draw_batch_finished()
+	_sync_hand_completion()
+
+
+func notify_card_presentation_finished() -> void:
+	_presentation_in_progress = false
+	var session := run.brew_session
+	if session.get_hand_phase() == BrewSession.HandPhase.PLAYING:
+		session.on_hand_play_presentation_finished()
+		_sync_hand_completion()
 		return
-	run.brew_session.on_ingredient_presentation_finished()
+	if session.try_advance_chain_draw():
+		return
+	_sync_hand_completion()
+
+
+func _sync_hand_completion() -> void:
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		_request_brew_completion()
 
 
-func complete_eyeball_puzzle(ordered: Array) -> void:
+func complete_eyeball_puzzle(ordered: Array = []) -> void:
 	run.brew_session.complete_eyeball_puzzle(ordered)
+	_sync_hand_completion()
 
 
 func complete_bat_wing_picker(selected: IngredientData) -> void:
 	run.brew_session.complete_bat_wing_picker(selected)
-	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
-		_request_brew_completion()
+	_sync_hand_completion()
 
 
 func complete_frog_leg_save() -> void:
@@ -107,7 +209,7 @@ func complete_frog_leg_save() -> void:
 
 
 func try_end_brew() -> void:
-	if not can_player_draw():
+	if not can_end_brew():
 		return
 	if run.brew_session.try_end_brew():
 		_request_brew_completion()
@@ -219,6 +321,18 @@ func _on_brew_updated(context: BrewContext) -> void:
 	brew_updated.emit(context)
 
 
+func _on_hand_draw_batch_started(drawn: Array) -> void:
+	hand_draw_batch_started.emit(drawn)
+
+
+func _on_hand_card_played(
+	context: BrewContext,
+	ingredient: IngredientData,
+	slot_index: int
+) -> void:
+	hand_card_played.emit(context, ingredient, slot_index)
+
+
 func _on_ingredient_drawn(context: BrewContext, ingredient: IngredientData) -> void:
 	ingredient_drawn.emit(context, ingredient)
 
@@ -233,6 +347,14 @@ func _on_eyeball_puzzle_requested(reserved: Array) -> void:
 
 func _on_bat_wing_picker_requested(choices: Array) -> void:
 	bat_wing_picker_requested.emit(choices)
+
+
+func _on_hand_mulligan_started(
+	old_ingredient: IngredientData,
+	new_ingredient: IngredientData,
+	slot_index: int
+) -> void:
+	hand_mulligan_started.emit(old_ingredient, new_ingredient, slot_index)
 
 
 func _apply_exclusive_fullscreen() -> void:

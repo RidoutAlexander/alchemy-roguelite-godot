@@ -16,11 +16,17 @@ signal offer_pressed(slot_index: int)
 signal puzzle_drag_began(card: IngredientCard)
 signal choice_pressed(card: IngredientCard)
 signal picker_card_pressed(card: IngredientCard)
+signal hand_drag_began(card: IngredientCard)
+signal hand_hover_changed(hovered: bool)
 
 const CARD_TINT_SHADER := preload("res://shaders/card_rarity_tint.gdshader")
 
 const HOVER_SCALE := 1.08
+const HAND_HOVER_SCALE := 1.12
+const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
+const HAND_CARD_SCALE := 0.34
+const HAND_CARD_BASE_SIZE := Vector2(300.0, 420.0)
 
 @onready var _visual_root: Control = $VisualRoot
 @onready var _card_background: TextureRect = $VisualRoot/CardBackground
@@ -52,10 +58,16 @@ var _rarity_tint := Color.WHITE
 var _hover_enabled: bool = false
 var _is_hovered: bool = false
 var _puzzle_drag_enabled: bool = false
+var _hand_mode: bool = false
+var _hand_drag_enabled: bool = false
+var _hand_slot_index: int = -1
+var _hand_hover_offset: float = 0.0
+var _hand_selected: bool = false
 var _choice_mode: bool = false
 var _picker_mode: bool = false
 var _picker_selected: bool = false
 var _puzzle_press_position: Vector2 = Vector2.INF
+var _hand_press_position: Vector2 = Vector2.INF
 var _is_animating: bool = false
 
 
@@ -87,6 +99,98 @@ func _cache_optional_nodes() -> void:
 
 func get_ingredient() -> IngredientData:
 	return _ingredient
+
+
+func bind_hand_card(ingredient: IngredientData, slot_index: int, drag_enabled: bool) -> void:
+	_reset_mode_flags()
+	_hand_mode = true
+	_hand_slot_index = slot_index
+	_hand_drag_enabled = drag_enabled
+	bind_preview(ingredient)
+	_apply_hand_layout()
+	_sync_hand_input()
+
+
+func clear_hand_card() -> void:
+	set_hand_selected(false)
+	_reset_mode_flags()
+	_set_empty_state()
+
+
+func set_hand_selected(selected: bool) -> void:
+	if not _hand_mode:
+		_hand_selected = false
+		return
+	_hand_selected = selected
+	if selected:
+		_snap_hand_highlight(true)
+	elif not _is_hovered:
+		_snap_hand_highlight(false)
+
+
+func is_hand_selected() -> bool:
+	return _hand_selected
+
+
+func update_hand_hover(hovered: bool, delta: float) -> void:
+	if not _hand_mode or _visual_root == null:
+		return
+	var highlighted := hovered or _hand_selected
+	var target_scale := HAND_HOVER_SCALE if highlighted else 1.0
+	var target_rise := -HAND_HOVER_RISE if highlighted else 0.0
+	var next_scale := lerpf(_visual_root.scale.x, target_scale, SCALE_SPEED * delta)
+	_visual_root.scale = Vector2.ONE * next_scale
+	_hand_hover_offset = lerpf(_hand_hover_offset, target_rise, SCALE_SPEED * delta)
+	_visual_root.position.y = _hand_hover_offset
+
+
+func _apply_hand_layout() -> void:
+	scale = Vector2.ONE
+	custom_minimum_size = HAND_CARD_BASE_SIZE
+	size = HAND_CARD_BASE_SIZE
+	pivot_offset = Vector2.ZERO
+	if _visual_root != null:
+		_visual_root.scale = Vector2.ONE
+		_visual_root.position = Vector2.ZERO
+		_visual_root.pivot_offset = Vector2(HAND_CARD_BASE_SIZE.x * 0.5, HAND_CARD_BASE_SIZE.y)
+		_hand_hover_offset = 0.0
+	scale = Vector2.ONE * HAND_CARD_SCALE
+	pivot_offset = Vector2(HAND_CARD_BASE_SIZE.x * 0.5, HAND_CARD_BASE_SIZE.y) * HAND_CARD_SCALE
+
+
+func _snap_hand_highlight(active: bool) -> void:
+	if _visual_root == null:
+		return
+	if active:
+		_visual_root.scale = Vector2.ONE * HAND_HOVER_SCALE
+		_hand_hover_offset = -HAND_HOVER_RISE
+	else:
+		_visual_root.scale = Vector2.ONE
+		_hand_hover_offset = 0.0
+	_visual_root.position.y = _hand_hover_offset
+
+
+func _sync_hand_input() -> void:
+	if not _hand_mode:
+		return
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	disabled = true
+	focus_mode = Control.FOCUS_NONE
+	_hover_enabled = false
+	_hand_press_position = Vector2.INF
+	set_process(true)
+
+
+func _reset_mode_flags() -> void:
+	_puzzle_drag_enabled = false
+	_hand_mode = false
+	_hand_drag_enabled = false
+	_hand_slot_index = -1
+	_hand_hover_offset = 0.0
+	_hand_selected = false
+	_choice_mode = false
+	_picker_mode = false
+	_picker_selected = false
 
 
 func bind_puzzle_card(ingredient: IngredientData) -> void:
@@ -186,7 +290,8 @@ func bind_preview(ingredient: IngredientData) -> void:
 		_set_empty_state()
 		return
 
-	_slot_index = -1
+	if not _hand_mode:
+		_slot_index = -1
 	_is_animating = false
 	_ingredient = ingredient
 	_price = 0
@@ -210,7 +315,9 @@ func bind_preview(ingredient: IngredientData) -> void:
 	_set_cost_row_visible(false)
 	_apply_rarity_tint(ingredient.rarity)
 	_apply_ingredient_art(ingredient)
-	if _puzzle_drag_enabled:
+	if _hand_mode:
+		_sync_hand_input()
+	elif _puzzle_drag_enabled:
 		_sync_puzzle_input()
 	elif _picker_mode:
 		sync_picker_input()
@@ -411,6 +518,7 @@ func _sync_ingredient_art_visibility() -> void:
 func _set_empty_state() -> void:
 	if not is_node_ready():
 		return
+	_reset_mode_flags()
 	_has_offer = false
 	_hover_enabled = false
 	_is_hovered = false
@@ -458,6 +566,12 @@ func _is_cursor_over_card() -> bool:
 
 
 func _process(delta: float) -> void:
+	if _hand_mode:
+		var hovered := _is_cursor_over_card()
+		if hovered != _is_hovered:
+			_is_hovered = hovered
+			hand_hover_changed.emit(hovered)
+		return
 	if _picker_selected or not _hover_enabled or _is_animating or _visual_root == null:
 		return
 	_is_hovered = _is_cursor_over_card()
@@ -467,6 +581,21 @@ func _process(delta: float) -> void:
 
 
 func _on_gui_input(event: InputEvent) -> void:
+	if _hand_drag_enabled and _ingredient != null:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_hand_press_position = event.global_position
+			else:
+				_hand_press_position = Vector2.INF
+		elif event is InputEventMouseMotion and _hand_press_position != Vector2.INF:
+			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+				return
+			if event.global_position.distance_to(_hand_press_position) < 8.0:
+				return
+			_hand_press_position = Vector2.INF
+			hand_drag_began.emit(self)
+			accept_event()
+		return
 	if not _puzzle_drag_enabled or _ingredient == null:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -485,6 +614,8 @@ func _on_gui_input(event: InputEvent) -> void:
 
 
 func _on_pressed() -> void:
+	if _hand_mode:
+		return
 	if _picker_mode and not _is_animating:
 		picker_card_pressed.emit(self)
 		return

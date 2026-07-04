@@ -3,7 +3,6 @@ extends Control
 
 const _IngredientFlyUtil := preload("res://scripts/ui/ingredient_fly_util.gd")
 const _CauldronExplosionEffect := preload("res://scripts/effects/cauldron_explosion_effect.gd")
-const PREVIEW_SCALE := 0.38
 const FLY_ART_SIZE := Vector2(96.0, 96.0)
 const POST_PLOP_EXPLOSION_DELAY := 0.2
 const BOILING_BASE_PITCH := 0.9
@@ -12,19 +11,29 @@ const BOILING_FILL_SPEED := 0.45
 const BOILING_MAX_VOLUME_MULT := 1.5
 const PLOP_PITCH_MIN := 0.7
 const PLOP_PITCH_MAX := 1.3
+const PLAY_HAND_BUTTON_SCALE := 1.1
+const HAND_ACTION_LEFT_GAP := 30.0
+const HAND_ACTION_BUTTON_SIZE := Vector2(88.0, 88.0)
+const HAND_ACTION_LABEL_SIZE := Vector2(88.0, 24.0)
+const HAND_ACTION_LABEL_GAP := 4.0
+const HAND_ACTION_GROUP_GAP := 8.0
 
 @onready var _fly_layer: CanvasLayer = $DrawFlyLayer
 @onready var _explosion_layer: CanvasLayer = $ExplosionLayer
 @onready var _bag_anchor: Control = $BagDrawAnchor
 @onready var _cauldron_target: Control = $CauldronDrawTarget
 @onready var _cauldron_liquid: Control = $CauldronLiquid
-@onready var _preview_host: Control = $DrawnCardPreviewHost
-@onready var _preview_card: IngredientCard = $DrawnCardPreviewHost/DrawnCardPreview
 @onready var _cauldron_plop_player: AudioStreamPlayer = $CauldronPlopPlayer
 @onready var _boiling_water_player: AudioStreamPlayer = $BoilingWaterPlayer
 @onready var _cauldron_explosion_player: AudioStreamPlayer = $CauldronExplosionPlayer
 @onready var _cauldron_button: BaseButton = $CauldronTarget/CauldronButton
 @onready var _cauldron_contents: BagContentsOverlay = $CauldronContentsOverlay
+@onready var _player_hand: PlayerHandRow = $PlayerHandRow
+@onready var _play_hand_button: WoodenButton = $PlayHandButton
+@onready var _hand_undo_button: ShopRerollButton = $HandUndoButton
+@onready var _hand_undo_label: Label = $HandUndoLabel
+@onready var _hand_mulligan_button: ShopRerollButton = $HandMulliganButton
+@onready var _hand_mulligan_label: Label = $HandMulliganLabel
 @onready var _eyeball_puzzle: EyeballPuzzleOverlay = $"../../EyeballPuzzleOverlay"
 
 var _brew_exit_animations_pending: int = 0
@@ -35,6 +44,8 @@ var _cauldron_base_scale: Vector2 = Vector2.ONE
 var _cauldron_base_modulate: Color = Color.WHITE
 var _boiling_fill_display: float = 0.0
 var _boiling_base_volume_db: float = 0.0
+var _pending_hand_draw: Array = []
+var _pending_hand_draw_index: int = 0
 
 
 func _ready() -> void:
@@ -43,20 +54,40 @@ func _ready() -> void:
 		_cauldron_base_modulate = _cauldron_liquid.modulate
 	if _boiling_water_player != null:
 		_boiling_base_volume_db = _boiling_water_player.volume_db
-	_clear_preview()
+
+	GameManager.hand_draw_batch_started.connect(_on_hand_draw_batch_started)
+	GameManager.hand_mulligan_started.connect(_on_hand_mulligan_started)
+	GameManager.hand_card_played.connect(_on_hand_card_played)
 	GameManager.ingredient_drawn.connect(_on_ingredient_drawn)
 	GameManager.frog_leg_escaped.connect(_on_frog_leg_escaped)
 	GameManager.brew_updated.connect(_on_brew_updated)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
 	GameManager.bat_wing_picker_requested.connect(_on_bat_wing_picker_requested)
+
 	if _eyeball_puzzle != null:
 		_eyeball_puzzle.completed.connect(_on_eyeball_puzzle_completed)
 		_eyeball_puzzle.picker_completed.connect(_on_bat_wing_picker_completed)
 	if _cauldron_button != null and not _cauldron_button.pressed.is_connected(_on_cauldron_button_pressed):
 		_cauldron_button.pressed.connect(_on_cauldron_button_pressed)
+	if _play_hand_button != null and not _play_hand_button.pressed.is_connected(_on_play_hand_pressed):
+		_play_hand_button.pressed.connect(_on_play_hand_pressed)
+	if _hand_undo_button != null and not _hand_undo_button.pressed.is_connected(_on_hand_undo_pressed):
+		_hand_undo_button.pressed.connect(_on_hand_undo_pressed)
+	if _hand_mulligan_button != null and not _hand_mulligan_button.pressed.is_connected(
+		_on_hand_mulligan_pressed
+	):
+		_hand_mulligan_button.pressed.connect(_on_hand_mulligan_pressed)
+	if _player_hand != null:
+		_player_hand.swap_requested.connect(_on_hand_swap_requested)
+		if not _player_hand.selection_changed.is_connected(_on_hand_selection_changed):
+			_player_hand.selection_changed.connect(_on_hand_selection_changed)
+	if _play_hand_button != null:
+		_play_hand_button.scale = Vector2.ONE * PLAY_HAND_BUTTON_SCALE
+
 	visibility_changed.connect(_on_visibility_changed)
 	visibility_changed.connect(_sync_brew_ambience)
+	_sync_hand_ui()
 	_sync_brew_ambience()
 	set_process(true)
 
@@ -87,24 +118,74 @@ func _refresh_cauldron_contents_if_open() -> void:
 	_cauldron_contents.show_cauldron_contents(ctx.cauldron_contents)
 
 
-func _on_brew_updated(ctx: BrewContext) -> void:
+func _on_brew_updated(_ctx: BrewContext) -> void:
 	_refresh_cauldron_contents_if_open()
-	if ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
+	_sync_hand_ui()
+	if _ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
 		_brew_ambience_suppressed = false
-		if ctx.score <= 0:
+		if _ctx.score <= 0:
 			_boiling_fill_display = 0.0
 			if _cauldron_liquid != null:
 				_reset_cauldron_liquid()
 		_sync_brew_ambience()
-	if ctx.drawn_this_brew.is_empty() and ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
-		_clear_preview()
-		if (
-			ctx.score == 0
-			and ctx.explosiveness == 0
-			and _eyeball_puzzle != null
-			and _eyeball_puzzle.visible
-		):
-			_eyeball_puzzle.hide_puzzle()
+
+
+func _on_hand_draw_batch_started(drawn: Array) -> void:
+	_pending_hand_draw = drawn.duplicate()
+	_pending_hand_draw_index = 0
+	GameManager.set_presentation_in_progress(true)
+	if _player_hand != null:
+		_player_hand.visible = true
+		_player_hand.prepare_for_draw()
+	_set_hand_action_buttons_visible(false)
+	_play_next_hand_draw_animation()
+
+
+func _play_next_hand_draw_animation() -> void:
+	if _pending_hand_draw_index >= _pending_hand_draw.size():
+		_pending_hand_draw.clear()
+		_pending_hand_draw_index = 0
+		GameManager.notify_hand_draw_batch_finished()
+		return
+
+	var ingredient: IngredientData = _pending_hand_draw[_pending_hand_draw_index]
+	var slot_index := _pending_hand_draw.size() - 1 - _pending_hand_draw_index
+	_play_hand_draw_fly(ingredient, slot_index)
+
+
+func _play_hand_draw_fly(ingredient: IngredientData, slot_index: int) -> void:
+	var fly_data := _hand_draw_fly_data_for(ingredient, slot_index)
+	if fly_data.is_empty():
+		_on_hand_draw_landed(ingredient, slot_index)
+		return
+
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		fly_data["texture"],
+		fly_data["start_center"],
+		fly_data["target_center"],
+		fly_data["size"],
+		func() -> void:
+			_on_hand_draw_landed(ingredient, slot_index)
+	)
+
+
+func _on_hand_draw_landed(ingredient: IngredientData, slot_index: int) -> void:
+	if _player_hand != null:
+		_player_hand.reveal_slot(slot_index, ingredient)
+	_pending_hand_draw_index += 1
+	_play_next_hand_draw_animation()
+
+
+func _on_hand_card_played(_ctx: BrewContext, ingredient: IngredientData, slot_index: int) -> void:
+	if ingredient == null:
+		return
+	_refresh_cauldron_contents_if_open()
+	GameManager.set_presentation_in_progress(true)
+	if _player_hand != null:
+		_player_hand.hide_slot_for_fly(slot_index)
+	var brew_ended := _ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
+	_play_hand_card_fly(ingredient, slot_index, brew_ended)
 
 
 func _on_ingredient_drawn(ctx: BrewContext, ingredient: IngredientData) -> void:
@@ -112,25 +193,22 @@ func _on_ingredient_drawn(ctx: BrewContext, ingredient: IngredientData) -> void:
 		return
 	_refresh_cauldron_contents_if_open()
 	GameManager.set_presentation_in_progress(true)
-	_show_preview(ingredient)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	_play_draw_fly(ingredient, brew_ended)
+	_play_cauldron_fly(ingredient, brew_ended)
 
 
 func _on_eyeball_puzzle_requested(reserved: Array) -> void:
-	_clear_preview()
 	if _eyeball_puzzle == null:
-		GameManager.complete_eyeball_puzzle(reserved)
+		GameManager.complete_eyeball_puzzle()
 		return
-	_eyeball_puzzle.show_puzzle(reserved)
+	_eyeball_puzzle.show_preview(reserved)
 
 
-func _on_eyeball_puzzle_completed(ordered: Array) -> void:
-	GameManager.complete_eyeball_puzzle(ordered)
+func _on_eyeball_puzzle_completed(_ordered: Array) -> void:
+	GameManager.complete_eyeball_puzzle()
 
 
 func _on_bat_wing_picker_requested(choices: Array) -> void:
-	_clear_preview()
 	if _eyeball_puzzle == null:
 		if not choices.is_empty():
 			GameManager.complete_bat_wing_picker(choices[0])
@@ -146,7 +224,38 @@ func _on_bat_wing_picker_completed(selected: IngredientData) -> void:
 	GameManager.complete_bat_wing_picker(selected)
 
 
+func _on_play_hand_pressed() -> void:
+	GameManager.try_play_hand()
+
+
+func _on_hand_undo_pressed() -> void:
+	GameManager.try_undo_hand_swap()
+
+
+func _on_hand_mulligan_pressed() -> void:
+	if _player_hand == null:
+		return
+	GameManager.try_mulligan(_player_hand.get_selected_slot())
+
+
+func _on_hand_selection_changed(_slot_index: int) -> void:
+	_sync_hand_ui()
+
+
+func _on_hand_mulligan_started(
+	old_ingredient: IngredientData,
+	new_ingredient: IngredientData,
+	slot_index: int
+) -> void:
+	_play_mulligan_animation(old_ingredient, new_ingredient, slot_index)
+
+
+func _on_hand_swap_requested(from_slot: int, to_slot: int) -> void:
+	GameManager.try_swap_hand_slots(from_slot, to_slot)
+
+
 func _on_brew_completion_requested(outcome: int) -> void:
+	_sync_hand_ui()
 	if outcome == BrewOutcome.Outcome.EXPLODED:
 		_pending_brew_exit_outcome = outcome
 		_try_play_pending_brew_exit_effects()
@@ -229,19 +338,6 @@ func _reset_cauldron_liquid() -> void:
 		_cauldron_liquid.set_activity_level(0.0)
 
 
-func _show_preview(ingredient: IngredientData) -> void:
-	if _preview_card == null or _preview_host == null:
-		return
-	_preview_host.visible = true
-	_preview_host.z_index = 20
-	_preview_card.bind_preview(ingredient)
-
-
-func _clear_preview() -> void:
-	if _preview_host != null:
-		_preview_host.visible = false
-
-
 func _process(delta: float) -> void:
 	_update_score_fill_display(delta)
 
@@ -317,6 +413,107 @@ func _sync_brew_ambience() -> void:
 		_boiling_water_player.play()
 
 
+func _sync_hand_ui() -> void:
+	if GameManager.run == null:
+		return
+	var session := GameManager.run.brew_session
+	var hand_phase := session.get_hand_phase()
+	var can_interact := hand_phase == BrewSession.HandPhase.HAND
+
+	if hand_phase == BrewSession.HandPhase.DRAWING:
+		if _player_hand != null:
+			_player_hand.visible = true
+		_set_hand_action_buttons_visible(false)
+		return
+
+	if _player_hand != null:
+		var show_hand := (
+			hand_phase != BrewSession.HandPhase.BAG
+			or _hand_has_any_card(session.get_hand_slots())
+		)
+		_player_hand.visible = show_hand
+		_player_hand.refresh_hand(
+			session.get_hand_slots(),
+			can_interact,
+			session.can_swap_hand()
+		)
+
+	_set_hand_action_buttons_visible(can_interact)
+	if _play_hand_button != null:
+		_play_hand_button.disabled = not GameManager.can_play_hand()
+	var selected_slot := _player_hand.get_selected_slot() if _player_hand != null else -1
+	var show_undo := can_interact and session.can_undo_hand_swap()
+	var show_mulligan := can_interact and selected_slot >= 0 and session.can_mulligan()
+
+	if _hand_undo_button != null:
+		_hand_undo_button.visible = show_undo
+		_hand_undo_button.disabled = not show_undo
+	if _hand_undo_label != null:
+		_hand_undo_label.visible = show_undo
+	if _hand_mulligan_button != null:
+		_hand_mulligan_button.visible = show_mulligan
+		_hand_mulligan_button.disabled = not show_mulligan
+	if _hand_mulligan_label != null:
+		_hand_mulligan_label.visible = show_mulligan
+	if can_interact or show_undo or show_mulligan:
+		call_deferred("_align_hand_controls")
+
+
+func _align_hand_controls() -> void:
+	_align_play_hand_button()
+	_align_hand_action_buttons()
+
+
+func _align_play_hand_button() -> void:
+	if _play_hand_button == null or _player_hand == null:
+		return
+	if not _play_hand_button.visible:
+		return
+	var button_size := _play_hand_button.get_global_rect().size
+	_play_hand_button.global_position = _player_hand.get_play_button_global_position(button_size)
+
+
+func _align_hand_action_buttons() -> void:
+	if _play_hand_button == null or not _play_hand_button.visible:
+		return
+	var show_undo := _hand_undo_button != null and _hand_undo_button.visible
+	var show_mulligan := _hand_mulligan_button != null and _hand_mulligan_button.visible
+	if not show_undo and not show_mulligan:
+		return
+
+	var action_left := _play_hand_button.get_global_rect().end.x + HAND_ACTION_LEFT_GAP
+	var cursor_y := _play_hand_button.get_global_rect().position.y
+
+	if _hand_mulligan_button != null and _hand_mulligan_button.visible:
+		if _hand_mulligan_label != null:
+			_hand_mulligan_label.global_position = Vector2(action_left, cursor_y)
+			_hand_mulligan_label.size = HAND_ACTION_LABEL_SIZE
+			cursor_y += HAND_ACTION_LABEL_SIZE.y + HAND_ACTION_LABEL_GAP
+		_hand_mulligan_button.global_position = Vector2(action_left, cursor_y)
+		cursor_y += HAND_ACTION_BUTTON_SIZE.y + HAND_ACTION_GROUP_GAP
+
+	if _hand_undo_button != null and _hand_undo_button.visible:
+		if _hand_undo_label != null:
+			_hand_undo_label.global_position = Vector2(action_left, cursor_y)
+			_hand_undo_label.size = HAND_ACTION_LABEL_SIZE
+			cursor_y += HAND_ACTION_LABEL_SIZE.y + HAND_ACTION_LABEL_GAP
+		_hand_undo_button.global_position = Vector2(action_left, cursor_y)
+
+
+func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
+	if _play_hand_button != null:
+		_play_hand_button.visible = visible_buttons
+	if not visible_buttons:
+		if _hand_undo_button != null:
+			_hand_undo_button.visible = false
+		if _hand_undo_label != null:
+			_hand_undo_label.visible = false
+		if _hand_mulligan_button != null:
+			_hand_mulligan_button.visible = false
+		if _hand_mulligan_label != null:
+			_hand_mulligan_label.visible = false
+
+
 func _play_cauldron_explosion() -> void:
 	_brew_ambience_suppressed = true
 	if _boiling_water_player != null:
@@ -335,13 +532,26 @@ func _play_cauldron_plop() -> void:
 	_cauldron_plop_player.play()
 
 
-func _play_draw_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
-	var fly_data := _fly_data_for(ingredient)
+func _play_hand_card_fly(ingredient: IngredientData, slot_index: int, track_for_exit: bool) -> void:
+	var fly_data := _hand_play_fly_data_for(ingredient, slot_index)
+	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit)
+
+
+func _play_cauldron_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
+	var fly_data := _bag_to_cauldron_fly_data(ingredient)
+	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit)
+
+
+func _play_cauldron_fly_with_data(
+	fly_data: Dictionary,
+	ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
 	if fly_data.is_empty():
 		if track_for_exit:
 			_on_brew_exit_animation_finished()
 			_try_play_pending_brew_exit_effects()
-		GameManager.notify_ingredient_presentation_finished()
+		_finish_card_presentation(ingredient, track_for_exit)
 		return
 
 	if track_for_exit:
@@ -354,7 +564,7 @@ func _play_draw_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
 		fly_data["target_center"],
 		fly_data["size"],
 		func() -> void:
-			_finish_ingredient_presentation(ingredient, track_for_exit),
+			_finish_card_presentation(ingredient, track_for_exit),
 		func() -> void:
 			_play_cauldron_plop()
 			if track_for_exit:
@@ -362,7 +572,7 @@ func _play_draw_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
 	)
 
 
-func _finish_ingredient_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
+func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
 	if _pending_frog_escape != null:
 		var escaping_frog := _pending_frog_escape
 		_pending_frog_escape = null
@@ -374,7 +584,7 @@ func _finish_ingredient_presentation(ingredient: IngredientData, track_for_exit:
 		return
 	if track_for_exit:
 		_on_brew_exit_animation_finished()
-	GameManager.notify_ingredient_presentation_finished()
+	GameManager.notify_card_presentation_finished()
 
 
 func _play_frog_escape(ingredient: IngredientData, on_complete: Callable) -> void:
@@ -420,7 +630,59 @@ func _try_finalize_brew_transition() -> void:
 	GameManager.finalize_brew_transition()
 
 
-func _fly_data_for(ingredient: IngredientData) -> Dictionary:
+func _hand_draw_fly_data_for(ingredient: IngredientData, slot_index: int) -> Dictionary:
+	var texture := _load_ingredient_texture(ingredient)
+	if texture == null or _bag_anchor == null:
+		return {}
+	var target_center := (
+		_player_hand.get_slot_global_center(slot_index)
+		if _player_hand != null
+		else global_position
+	)
+	return {
+		"texture": texture,
+		"size": FLY_ART_SIZE,
+		"start_center": _bag_anchor.get_global_rect().get_center(),
+		"target_center": target_center,
+	}
+
+
+func _hand_play_fly_data_for(ingredient: IngredientData, slot_index: int) -> Dictionary:
+	var texture := _load_ingredient_texture(ingredient)
+	if texture == null or _cauldron_target == null:
+		return {}
+
+	var start_center := (
+		_player_hand.get_slot_global_center(slot_index)
+		if _player_hand != null
+		else global_position
+	)
+	var fly_data := (
+		_player_hand.get_slot_fly_data(slot_index)
+		if _player_hand != null
+		else {}
+	)
+	if not fly_data.is_empty() and fly_data.has("start_center"):
+		start_center = fly_data["start_center"]
+	if not fly_data.is_empty() and fly_data.has("texture"):
+		texture = fly_data["texture"]
+	if not fly_data.is_empty() and fly_data.has("size"):
+		return {
+			"texture": texture,
+			"size": fly_data["size"],
+			"start_center": start_center,
+			"target_center": _cauldron_target.get_global_rect().get_center(),
+		}
+
+	return {
+		"texture": texture,
+		"size": FLY_ART_SIZE,
+		"start_center": start_center,
+		"target_center": _cauldron_target.get_global_rect().get_center(),
+	}
+
+
+func _bag_to_cauldron_fly_data(ingredient: IngredientData) -> Dictionary:
 	var texture := _load_ingredient_texture(ingredient)
 	if texture == null or _bag_anchor == null or _cauldron_target == null:
 		return {}
@@ -430,6 +692,105 @@ func _fly_data_for(ingredient: IngredientData) -> Dictionary:
 		"start_center": _bag_anchor.get_global_rect().get_center(),
 		"target_center": _cauldron_target.get_global_rect().get_center(),
 	}
+
+
+func _play_mulligan_animation(
+	old_ingredient: IngredientData,
+	new_ingredient: IngredientData,
+	slot_index: int
+) -> void:
+	if old_ingredient == null or new_ingredient == null:
+		GameManager.notify_mulligan_presentation_finished()
+		return
+
+	GameManager.set_presentation_in_progress(true)
+	if _player_hand != null:
+		_player_hand.suppress_slot(slot_index)
+		_player_hand.clear_selection()
+	_sync_hand_ui()
+
+	var return_fly := _hand_to_bag_fly_data(old_ingredient, slot_index)
+	if return_fly.is_empty():
+		_play_mulligan_draw_in(new_ingredient, slot_index)
+		return
+
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		return_fly["texture"],
+		return_fly["start_center"],
+		return_fly["target_center"],
+		return_fly["size"],
+		func() -> void:
+			GameManager.complete_mulligan(slot_index, old_ingredient, new_ingredient)
+			_play_mulligan_draw_in(new_ingredient, slot_index)
+	)
+
+
+func _play_mulligan_draw_in(new_ingredient: IngredientData, slot_index: int) -> void:
+	if _player_hand != null:
+		_player_hand.hide_slot_for_fly(slot_index)
+
+	var draw_fly := _hand_draw_fly_data_for(new_ingredient, slot_index)
+	if draw_fly.is_empty():
+		if _player_hand != null:
+			_player_hand.reveal_slot(slot_index, new_ingredient)
+		GameManager.notify_mulligan_presentation_finished()
+		_sync_hand_ui()
+		return
+
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		draw_fly["texture"],
+		draw_fly["start_center"],
+		draw_fly["target_center"],
+		draw_fly["size"],
+		func() -> void:
+			if _player_hand != null:
+				_player_hand.reveal_slot(slot_index, new_ingredient)
+			GameManager.notify_mulligan_presentation_finished()
+			_sync_hand_ui()
+	)
+
+
+func _hand_to_bag_fly_data(ingredient: IngredientData, slot_index: int) -> Dictionary:
+	var texture := _load_ingredient_texture(ingredient)
+	if texture == null or _bag_anchor == null:
+		return {}
+	var start_center := (
+		_player_hand.get_slot_global_center(slot_index)
+		if _player_hand != null
+		else global_position
+	)
+	var fly_data := (
+		_player_hand.get_slot_fly_data(slot_index)
+		if _player_hand != null
+		else {}
+	)
+	if not fly_data.is_empty():
+		if fly_data.has("start_center"):
+			start_center = fly_data["start_center"]
+		if fly_data.has("texture"):
+			texture = fly_data["texture"]
+		if fly_data.has("size"):
+			return {
+				"texture": texture,
+				"size": fly_data["size"],
+				"start_center": start_center,
+				"target_center": _bag_anchor.get_global_rect().get_center(),
+			}
+	return {
+		"texture": texture,
+		"size": FLY_ART_SIZE,
+		"start_center": start_center,
+		"target_center": _bag_anchor.get_global_rect().get_center(),
+	}
+
+
+func _hand_has_any_card(slots: Array) -> bool:
+	for slot in slots:
+		if slot != null:
+			return true
+	return false
 
 
 func _load_ingredient_texture(ingredient: IngredientData) -> Texture2D:

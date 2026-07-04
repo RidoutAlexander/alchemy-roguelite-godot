@@ -21,7 +21,7 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 @onready var _add_ingredient_button: IngredientBagButton = $PhaseSwipeHost/BrewPanel/AddIngredientButton
 @onready var _bag_remaining_count_label: Label = $HudOverlayLayer/BagRemainingCountLabel
 
-const BAG_REMAINING_COUNT_INSET := Vector2(4.0, 2.0)
+const BAG_REMAINING_COUNT_INSET := Vector2(0.0, 6.0)
 @onready var _save_and_quit_button: BaseButton = $PhaseSwipeHost/BrewPanel/SaveAndQuitButton
 @onready var _main_menu_button: BaseButton = $GameOverPanel/MainMenuButton
 @onready var _gameplay_music_player: AudioStreamPlayer = $GameplayMusicPlayer
@@ -63,7 +63,10 @@ func _ready() -> void:
 	GameManager.phase_changed.connect(_on_phase_changed)
 	GameManager.run_changed.connect(_on_run_changed)
 	GameManager.brew_updated.connect(func(_ctx): _refresh_brew())
+	GameManager.brew_updated.connect(func(_ctx): _refresh_brew_input_state())
+	GameManager.brew_updated.connect(func(_ctx): _refresh_bag_remaining_count())
 	GameManager.ingredient_drawn.connect(func(_ctx, _ingredient): _refresh_bag_remaining_count())
+	GameManager.hand_draw_batch_started.connect(func(_drawn): _refresh_bag_remaining_count())
 	GameManager.brew_resolved.connect(_refresh_brew)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.game_over.connect(_refresh_game_over)
@@ -148,28 +151,12 @@ func _return_to_main_menu() -> void:
 
 
 func _on_brew_completion_requested(_outcome: int) -> void:
-	_set_brew_input_enabled(false)
+	_refresh_brew_input_state()
 
 
-func _set_brew_input_enabled(enabled: bool) -> void:
+func _refresh_brew_input_state() -> void:
 	if _add_ingredient_button != null:
-		_add_ingredient_button.disabled = not enabled
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if not event is InputEventKey:
-		return
-	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
-		return
-	if key_event.keycode != KEY_SPACE:
-		return
-	if _is_swiping or not GameManager.can_player_draw():
-		return
-	if _add_ingredient_button == null or _add_ingredient_button.disabled:
-		return
-	GameManager.try_draw_ingredient()
-	get_viewport().set_input_as_handled()
+		_add_ingredient_button.disabled = not GameManager.can_press_bag()
 
 
 func _on_phase_changed(phase: int) -> void:
@@ -183,7 +170,7 @@ func _on_phase_changed(phase: int) -> void:
 	_apply_phase_visibility(phase)
 	_active_phase = phase
 	if phase == GamePhase.Phase.BREWING:
-		_set_brew_input_enabled(true)
+		_refresh_brew_input_state()
 		_refresh_brew()
 
 
@@ -209,7 +196,7 @@ func _play_phase_swipe(phase: int) -> void:
 			_is_swiping = false
 			_active_phase = phase
 			if phase == GamePhase.Phase.BREWING:
-				_set_brew_input_enabled(true)
+				_refresh_brew_input_state()
 				_refresh_brew()
 	)
 
@@ -277,8 +264,8 @@ func _align_bag_remaining_count_label() -> void:
 	_bag_remaining_count_label.size = label_size
 	var bag_rect := _add_ingredient_button.get_global_rect()
 	_bag_remaining_count_label.position = Vector2(
-		bag_rect.end.x - label_size.x - BAG_REMAINING_COUNT_INSET.x,
-		bag_rect.end.y - label_size.y - BAG_REMAINING_COUNT_INSET.y
+		bag_rect.position.x + (bag_rect.size.x - label_size.x) * 0.5,
+		bag_rect.end.y + BAG_REMAINING_COUNT_INSET.y
 	)
 
 

@@ -49,6 +49,12 @@ KNOWN_SOURCES: dict[str, Path] = {
     "spider": SESSION_ASSETS / "image-92145769-b7a5-4a29-9f5e-5ec47434e2d1.jpg",
     "thorns": SESSION_ASSETS / "image-4a1ad30e-e54c-467e-91cb-e935d8c4de12.jpg",
     "cinnamon": SESSION_ASSETS / "image-7cf657ed-f989-4b9e-8dd0-e94332f42ac0.jpg",
+    "eye_of_ender": Path(
+        r"C:\Users\ridou\Downloads\grok-cca9a8ef-f4a7-43a2-a2bb-b0069fcb3761.jpg"
+    ),
+    "lucky_coin": Path(
+        r"C:\Users\ridou\Downloads\grok-82488574-8be3-4b6d-9583-8d813230dc83.jpg"
+    ),
 }
 
 

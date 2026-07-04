@@ -32,12 +32,18 @@ static func boss_number(level: int) -> int:
 	return level / BOSS_AURA_INTERVAL
 
 
-static func boss_boom_berry_reward_id(level: int) -> String:
-	var number := boss_number(level)
-	if number <= 0 or number % 2 != 0:
-		return ""
-	if number == 2:
-		return "boom_berry_1"
-	if number == 4:
-		return "boom_berry_2"
-	return "boom_berry_3"
+static func boss_boom_berry_reward_ids(level: int) -> Array[String]:
+	var boss := boss_number(level)
+	if boss <= 0:
+		return []
+	if boss == 1:
+		return ["boom_berry_1"]
+	if boss == 2:
+		return ["boom_berry_2"]
+	var rewards: Array[String] = []
+	if boss % 2 == 1:
+		rewards.append("boom_berry_1")
+	var tier_two_count := boss / 2 if boss % 2 == 0 else (boss - 1) / 2
+	for _i in tier_two_count:
+		rewards.append("boom_berry_2")
+	return rewards

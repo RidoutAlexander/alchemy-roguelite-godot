@@ -6,7 +6,7 @@ signal picker_completed(selected: IngredientData)
 
 const _CARD_SCENE := preload("res://scenes/ui/ingredient_card.tscn")
 
-enum Mode { PUZZLE, PICKER }
+enum Mode { PUZZLE, PREVIEW, PICKER }
 
 @onready var _title_label: Label = $Layout/PanelOffset/Panel/Content/Title
 @onready var _hint_label: Label = $Layout/PanelOffset/Panel/Content/HintLabel
@@ -44,6 +44,35 @@ func _gather_slots() -> void:
 			_order_slots.append(child)
 
 
+func show_preview(ingredients: Array) -> void:
+	_mode = Mode.PREVIEW
+	_selected_picker_card = null
+	if _done_button != null:
+		_done_button.visible = true
+		_done_button.disabled = false
+	var preview_count := ingredients.size()
+	match preview_count:
+		0:
+			_set_overlay_copy("No upcoming draws", "")
+		1:
+			_set_overlay_copy(
+				"Next draw",
+				"Press Done to continue"
+			)
+		2:
+			_set_overlay_copy(
+				"Next 2 draws",
+				"Press Done to continue"
+			)
+		_:
+			_set_overlay_copy(
+				"Next 3 of 5 draws",
+				"Press Done to continue"
+			)
+	_configure_slots_for_puzzle(preview_count)
+	_populate_slots(ingredients, false)
+
+
 func show_puzzle(ingredients: Array) -> void:
 	_mode = Mode.PUZZLE
 	_selected_picker_card = null
@@ -78,12 +107,12 @@ func show_picker(ingredients: Array) -> void:
 	_selected_picker_card = null
 	_set_overlay_copy(
 		"Choose an ingredient",
-		"Tap a card to add it to your cauldron"
+		"Tap a card to select it, then tap again or press Done"
 	)
 	_configure_slots_for_picker(ingredients.size())
 	_populate_slots(ingredients, false)
 	if _done_button != null:
-		_done_button.visible = false
+		_done_button.visible = true
 		_done_button.disabled = true
 
 
@@ -140,13 +169,13 @@ func _populate_slots(ingredients: Array, enable_drag: bool) -> void:
 		var card := _CARD_SCENE.instantiate() as IngredientCard
 		if card == null:
 			continue
+		_order_slots[i].place_card(card)
 		if enable_drag:
 			card.bind_puzzle_card(ingredient)
 			_wire_puzzle_card(card)
 		else:
 			card.bind_picker_card(ingredient)
 			_wire_picker_card(card)
-		_order_slots[i].place_card(card)
 
 
 func _wire_puzzle_card(card: IngredientCard) -> void:
@@ -162,7 +191,26 @@ func _wire_picker_card(card: IngredientCard) -> void:
 func _on_picker_card_pressed(card: IngredientCard) -> void:
 	if _mode != Mode.PICKER or card == null:
 		return
-	var selected := card.get_ingredient()
+	if card.get_ingredient() == null:
+		return
+	if _selected_picker_card == card:
+		_confirm_picker_selection()
+		return
+	_set_picker_selection(card)
+
+
+func _set_picker_selection(card: IngredientCard) -> void:
+	if _selected_picker_card != null and _selected_picker_card != card:
+		_selected_picker_card.set_picker_selected(false)
+	_selected_picker_card = card
+	card.set_picker_selected(true)
+	_update_done_button_state()
+
+
+func _confirm_picker_selection() -> void:
+	if _selected_picker_card == null:
+		return
+	var selected := _selected_picker_card.get_ingredient()
 	if selected == null:
 		return
 	hide_puzzle()
@@ -315,14 +363,12 @@ func _clear_cards() -> void:
 
 
 func _on_done_pressed() -> void:
-	if _mode == Mode.PICKER:
-		if _selected_picker_card == null:
-			return
-		var selected := _selected_picker_card.get_ingredient()
-		if selected == null:
-			return
+	if _mode == Mode.PREVIEW:
 		hide_puzzle()
-		picker_completed.emit(selected)
+		completed.emit([])
+		return
+	if _mode == Mode.PICKER:
+		_confirm_picker_selection()
 		return
 
 	var ordered: Array[IngredientData] = []

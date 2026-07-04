@@ -21,6 +21,8 @@
 [ext_resource type="AudioStream" uid="uid://coq7qbw3lffg3" path="res://assets/audio/cauldron_explosion.mp3" id="19_cauldron_explosion"]
 [ext_resource type="PackedScene" uid="uid://dmjonbvqoqxi7" path="res://scenes/ui/eyeball_puzzle_overlay.tscn" id="20_eyeball_puzzle"]
 [ext_resource type="PackedScene" uid="uid://cr5syaod6s2ge" path="res://scenes/ui/bag_contents_overlay.tscn" id="21_cauldron_contents"]
+[ext_resource type="PackedScene" uid="uid://playerhandrow01" path="res://scenes/ui/player_hand_row.tscn" id="22_player_hand"]
+[ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="23_hand_undo"]
 
 [node name="Game" type="Control" unique_id=403037050]
 custom_minimum_size = Vector2(1024, 576)
@@ -49,6 +51,20 @@ color = Color(0.058824, 0.070588, 0.090196, 1)
 [node name="HudOverlayLayer" type="CanvasLayer" parent="." unique_id=1982736451]
 layer = 10
 follow_viewport_enabled = true
+
+[node name="BagRemainingCountLabel" type="Label" parent="HudOverlayLayer"]
+visible = false
+offset_right = 40.0
+offset_bottom = 28.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 28
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="PhaseSwipeHost" type="Control" parent="." unique_id=1475295315]
 clip_children = 1
@@ -200,24 +216,64 @@ offset_right = 283.36932
 offset_bottom = 531.2989
 scale = Vector2(0.77496696, 0.77496696)
 
-[node name="DrawnCardPreviewHost" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=1571212444]
-z_index = 20
-anchors_preset = 0
-offset_left = 729.0
-offset_top = 135.0
-offset_right = 897.0
-offset_bottom = 339.0
-mouse_filter = 2
-script = ExtResource("14_preview_host")
+[node name="PlayerHandRow" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("22_player_hand")]
+z_index = 12
+visible = false
 
-[node name="DrawnCardPreview" parent="PhaseSwipeHost/BrewPanel/DrawnCardPreviewHost" unique_id=1349557143 instance=ExtResource("13_ingredient_card")]
-layout_mode = 0
-offset_left = 24.0
-offset_top = 17.999998
-offset_right = 324.0
-offset_bottom = 438.0
-scale = Vector2(0.42, 0.42)
+[node name="PlayHandButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("2_button")]
+visible = false
+offset_left = 408.0
+offset_top = 248.0
+offset_right = 568.0
+offset_bottom = 318.0
+scale = Vector2(1.1, 1.1)
+label_text = "Play"
+
+[node name="HandUndoButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("23_hand_undo")]
+z_index = 13
+visible = false
+offset_left = 580.0
+offset_top = 300.0
+offset_right = 668.0
+offset_bottom = 388.0
+
+[node name="HandUndoLabel" type="Label" parent="PhaseSwipeHost/BrewPanel"]
+z_index = 13
+visible = false
+offset_right = 88.0
+offset_bottom = 24.0
 mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+text = "undo"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HandMulliganButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("23_hand_undo")]
+z_index = 13
+visible = false
+offset_left = 580.0
+offset_top = 300.0
+offset_right = 668.0
+offset_bottom = 388.0
+
+[node name="HandMulliganLabel" type="Label" parent="PhaseSwipeHost/BrewPanel"]
+z_index = 13
+visible = false
+offset_right = 88.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+text = "mulligan"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="SaveAndQuitButton" parent="PhaseSwipeHost/BrewPanel" unique_id=1216604950 instance=ExtResource("2_button")]
 offset_left = 744.0

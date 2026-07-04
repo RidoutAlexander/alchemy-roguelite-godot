@@ -1,22 +1,18 @@
 [
   {
     "id": "boom_berry_1",
-    "count": 4
-  },
-  {
-    "id": "boom_berry_2",
-    "count": 2
-  },
-  {
-    "id": "boom_berry_3",
-    "count": 1
+    "count": 10
   },
   {
     "id": "pumpkin",
-    "count": 1
+    "count": 2
   },
   {
     "id": "spider",
+    "count": 2
+  },
+  {
+    "id": "feather",
     "count": 1
   }
 ]

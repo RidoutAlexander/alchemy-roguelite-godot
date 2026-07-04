@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://bxq7yk2vfxq3e"]
+
+[ext_resource type="Script" path="res://scripts/ui/player_hand_row.gd" id="1_script"]
+
+[node name="PlayerHandRow" type="Control"]
+custom_minimum_size = Vector2(720, 180)
+layout_mode = 0
+offset_left = 102.0
+offset_top = 360.0
+offset_right = 822.0
+offset_bottom = 540.0
+mouse_filter = 0
+script = ExtResource("1_script")
+
+[node name="SlotRow" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DragLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2

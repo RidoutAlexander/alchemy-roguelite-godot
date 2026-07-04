@@ -22,6 +22,8 @@ const GARLIC_ID := "garlic"
 const NEWT_TAIL_ID := "newt_tail"
 const CINNAMON_ID := "cinnamon"
 const SAGE_ID := "sage"
+const EYE_OF_ENDER_ID := "eye_of_ender"
+const LUCKY_COIN_ID := "lucky_coin"
 
 const LIGHTNING_CHAIN_DRAWS := 3
 const RED_MUSHROOM_PUMPKIN_CAP := 3
@@ -41,6 +43,7 @@ class EffectResult:
 	var bat_wing_pick_count: int = 0
 	var voodoo_doll_arms_copy: bool = false
 	var free_shop_rerolls: int = 0
+	var extra_mulligans: int = 0
 
 
 static func apply(ingredient: IngredientData, context: BrewContext) -> EffectResult:
@@ -65,7 +68,7 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		LIGHTNING_ID:
 			result.chain_draws = LIGHTNING_CHAIN_DRAWS
 		EYEBALL_ID:
-			result.reserve_for_eyeball = 3
+			result.reserve_for_eyeball = 5
 		UNICORN_HORN_ID:
 			result.cures_next_explosive = true
 		PARROT_ID:
@@ -87,6 +90,8 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 				result.explosion_limit_bonus = 1
 		SAGE_ID:
 			result.free_shop_rerolls = 1
+		EYE_OF_ENDER_ID:
+			result.extra_mulligans = 1
 		_:
 			pass
 

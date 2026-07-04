@@ -15,7 +15,7 @@ var locked_level_aura_id: String = ""
 var locked_level_aura_level: int = 0
 var current_aura: AuraData
 var current_shop_offers: Array = []
-var pending_boss_boom_berry_reward_id: String = ""
+var pending_boss_boom_berry_reward_ids: Array[String] = []
 var free_shop_rerolls: int = 0
 var bag := BagModel.new()
 var brew_session: BrewSession
@@ -47,7 +47,7 @@ func start_new_run(difficulty: int = GameDifficulty.Mode.HARD) -> void:
 	locked_level_aura_level = 0
 	current_aura = null
 	current_shop_offers.clear()
-	pending_boss_boom_berry_reward_id = ""
+	pending_boss_boom_berry_reward_ids.clear()
 	free_shop_rerolls = 0
 	bag.set_master_bag(_content.flatten_starter_bag())
 
@@ -207,12 +207,17 @@ func try_reroll_shop() -> bool:
 	return true
 
 
-func take_pending_boss_boom_berry_reward() -> IngredientData:
-	if pending_boss_boom_berry_reward_id == "":
-		return null
-	var ingredient := _content.find_ingredient(pending_boss_boom_berry_reward_id)
-	pending_boss_boom_berry_reward_id = ""
-	return ingredient
+func take_pending_boss_boom_berry_reward() -> Array[IngredientData]:
+	if pending_boss_boom_berry_reward_ids.is_empty():
+		return []
+	var reward_ids := pending_boss_boom_berry_reward_ids.duplicate()
+	pending_boss_boom_berry_reward_ids.clear()
+	var rewards: Array[IngredientData] = []
+	for berry_id in reward_ids:
+		var ingredient := _content.find_ingredient(berry_id)
+		if ingredient != null:
+			rewards.append(ingredient)
+	return rewards
 
 
 func try_purchase_offer(index: int) -> bool:
@@ -242,13 +247,19 @@ func _pick_aura_for_brew() -> AuraData:
 
 
 func _grant_boss_boom_berry_reward() -> void:
-	var berry_id := GameConstants.boss_boom_berry_reward_id(current_level)
-	if berry_id == "":
+	var reward_ids := GameConstants.boss_boom_berry_reward_ids(current_level)
+	if reward_ids.is_empty():
 		return
-	var ingredient := _content.find_ingredient(berry_id)
-	if ingredient != null:
+	var granted_ids: Array[String] = []
+	for berry_id in reward_ids:
+		var ingredient := _content.find_ingredient(berry_id)
+		if ingredient == null:
+			continue
 		bag.add_to_master_bag(ingredient)
-		pending_boss_boom_berry_reward_id = berry_id
+		granted_ids.append(berry_id)
+	if granted_ids.is_empty():
+		return
+	pending_boss_boom_berry_reward_ids = granted_ids
 
 
 func _clear_locked_level_aura() -> void:

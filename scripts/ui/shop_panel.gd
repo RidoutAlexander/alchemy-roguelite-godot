@@ -214,7 +214,7 @@ func _try_play_boss_boom_berry_reward() -> void:
 		return
 	if _purchase_animations_pending > 0:
 		return
-	if GameManager.run.pending_boss_boom_berry_reward_id == "":
+	if GameManager.run.pending_boss_boom_berry_reward_ids.is_empty():
 		_hide_boom_berry_reward_note()
 		return
 
@@ -222,41 +222,58 @@ func _try_play_boss_boom_berry_reward() -> void:
 		await get_tree().create_timer(0.05).timeout
 		if not is_inside_tree() or not visible:
 			return
-		if GameManager.run == null or GameManager.run.pending_boss_boom_berry_reward_id == "":
+		if (
+			GameManager.run == null
+			or GameManager.run.pending_boss_boom_berry_reward_ids.is_empty()
+		):
 			return
 		if _purchase_animations_pending > 0:
 			return
 
-	var ingredient := GameManager.run.take_pending_boss_boom_berry_reward()
-	if ingredient == null:
+	var rewards := GameManager.run.take_pending_boss_boom_berry_reward()
+	if rewards.is_empty():
 		_hide_boom_berry_reward_note()
 		return
-	_play_boss_boom_berry_reward(ingredient)
+	await _play_boss_boom_berry_rewards(rewards)
 
 
-func _play_boss_boom_berry_reward(ingredient: IngredientData) -> void:
-	var art_path := "res://assets/cards/ingredients/%s.png" % ingredient.get_art_filename()
-	if not ResourceLoader.exists(art_path):
-		_hide_boom_berry_reward_note()
-		return
-
-	var texture: Texture2D = load(art_path)
-	if texture == null:
-		_hide_boom_berry_reward_note()
-		return
-
-	_show_boom_berry_reward_note()
+func _play_boss_boom_berry_rewards(rewards: Array[IngredientData]) -> void:
+	_show_boom_berry_reward_note(rewards)
 	_purchase_animations_pending += 1
 
 	var target_center := _resolve_bag_fly_target_center()
 	var start_center := target_center + Vector2(-140.0, -260.0)
-	_spawn_boss_boom_berry_fly(texture, start_center, target_center)
+	for berry_index in rewards.size():
+		var ingredient: IngredientData = rewards[berry_index]
+		var art_path := "res://assets/cards/ingredients/%s.png" % ingredient.get_art_filename()
+		if not ResourceLoader.exists(art_path):
+			continue
+		var texture: Texture2D = load(art_path)
+		if texture == null:
+			continue
+		var fly_finished := false
+		_spawn_boss_boom_berry_fly(
+			texture,
+			start_center + Vector2(float(berry_index) * -18.0, float(berry_index) * -12.0),
+			target_center,
+			func() -> void:
+				fly_finished = true
+		)
+		while not fly_finished:
+			if not is_inside_tree():
+				return
+			await get_tree().process_frame
+		_refresh_bag_contents_if_open()
+
+	_purchase_animations_pending = maxi(0, _purchase_animations_pending - 1)
+	_schedule_boom_berry_reward_note_fade()
 
 
 func _spawn_boss_boom_berry_fly(
 	texture: Texture2D,
 	start_center: Vector2,
-	target_center: Vector2
+	target_center: Vector2,
+	on_complete: Callable = Callable()
 ) -> void:
 	_IngredientFlyUtil.play(
 		_fly_layer,
@@ -265,28 +282,67 @@ func _spawn_boss_boom_berry_fly(
 		target_center,
 		BOOM_BERRY_REWARD_FLY_SIZE,
 		func() -> void:
-			_on_boss_boom_berry_reward_fly_finished(),
+			if on_complete.is_valid():
+				on_complete.call(),
 		func() -> void:
 			_play_shop_select_pop()
 			_bounce_bag_target()
 	)
 
 
-func _on_boss_boom_berry_reward_fly_finished() -> void:
-	_purchase_animations_pending = maxi(0, _purchase_animations_pending - 1)
-	_refresh_bag_contents_if_open()
-	_schedule_boom_berry_reward_note_fade()
-
-
-func _show_boom_berry_reward_note() -> void:
+func _show_boom_berry_reward_note(rewards: Array[IngredientData]) -> void:
 	if _boom_berry_reward_note == null:
 		return
 	if _boom_berry_reward_note_tween != null and _boom_berry_reward_note_tween.is_valid():
 		_boom_berry_reward_note_tween.kill()
 		_boom_berry_reward_note_tween = null
-	_boom_berry_reward_note.text = "A Boomberry has been added to your bag"
+	_boom_berry_reward_note.text = _format_boom_berry_reward_note(rewards)
 	_boom_berry_reward_note.modulate = Color.WHITE
 	_boom_berry_reward_note.visible = true
+
+
+func _format_boom_berry_reward_note(rewards: Array[IngredientData]) -> String:
+	if rewards.is_empty():
+		return ""
+	var counts: Dictionary = {}
+	for ingredient in rewards:
+		if ingredient == null:
+			continue
+		var label := ingredient.display_name
+		counts[label] = int(counts.get(label, 0)) + 1
+	if counts.is_empty():
+		return ""
+
+	var parts: Array[String] = []
+	for label_key in counts.keys():
+		var label: String = str(label_key)
+		var count: int = int(counts[label_key])
+		if count == 1:
+			parts.append("a %s" % label)
+		else:
+			var plural_label: String = label
+			if plural_label.ends_with("Berry"):
+				plural_label = plural_label.substr(0, plural_label.length() - 5) + "Berries"
+			parts.append("%d %s" % [count, plural_label])
+
+	if parts.size() == 1:
+		var single := parts[0]
+		if single.begins_with("a "):
+			return "A %s has been added to your bag" % single.substr(2)
+		return "%s have been added to your bag" % single
+	if parts.size() == 2:
+		return "%s and %s have been added to your bag" % [
+			_format_reward_article(parts[0]),
+			parts[1],
+		]
+	var joined := ", ".join(parts.slice(0, parts.size() - 1))
+	return "%s, and %s have been added to your bag" % [joined, parts[-1]]
+
+
+func _format_reward_article(part: String) -> String:
+	if part.begins_with("a "):
+		return "A %s" % part.substr(2)
+	return part
 
 
 func _hide_boom_berry_reward_note() -> void:

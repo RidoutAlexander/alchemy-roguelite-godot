@@ -185,4 +185,5 @@ func _gui_input(event: InputEvent) -> void:
 	if not _is_complete:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		GameManager.try_end_brew()
+		if GameManager.can_end_brew():
+			GameManager.try_end_brew()
