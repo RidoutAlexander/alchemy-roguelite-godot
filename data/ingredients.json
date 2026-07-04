@@ -160,7 +160,7 @@
     "description": "If this would cause your cauldron to explode, instead, set explosiveness to 0 and reshuffle all ingredients back into your bag (you keep your score)",
     "point_value": 1,
     "explosive_value": 1,
-    "shop_cost": 9,
+    "shop_cost": 18,
     "rarity": "legendary",
     "shop_available": true
   },
