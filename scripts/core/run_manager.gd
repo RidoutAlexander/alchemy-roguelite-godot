@@ -95,6 +95,7 @@ func load_from_save(data: Dictionary) -> void:
 		offer.ingredient = ingredient
 		offer.price = int(offer_data.get("price", ingredient.shop_cost))
 		current_shop_offers.append(offer)
+	_strip_shadow_banned_shop_offers()
 
 
 func to_save_data() -> Dictionary:
@@ -187,7 +188,12 @@ func leave_shop_after_clear() -> void:
 
 
 func prepare_shop_for_current_level() -> void:
-	current_shop_offers = _shop_service.generate_offers(current_level, gold)
+	current_shop_offers = _shop_service.generate_offers(
+		current_level,
+		gold,
+		GameConstants.SHOP_SLOT_COUNT,
+		bag.master_ids()
+	)
 
 
 func get_shop_reroll_cost() -> int:
@@ -203,7 +209,12 @@ func try_reroll_shop() -> bool:
 		return false
 	else:
 		gold -= GameConstants.REROLL_COST
-	current_shop_offers = _shop_service.generate_offers(current_level, gold)
+	current_shop_offers = _shop_service.generate_offers(
+		current_level,
+		gold,
+		GameConstants.SHOP_SLOT_COUNT,
+		bag.master_ids()
+	)
 	return true
 
 
@@ -228,9 +239,12 @@ func try_purchase_offer(index: int) -> bool:
 		return false
 	if gold < offer.price:
 		return false
+	if not bag.can_add_to_master_bag(offer.ingredient):
+		return false
 	gold -= offer.price
 	bag.add_to_master_bag(offer.ingredient)
 	current_shop_offers[index] = null
+	_strip_shadow_banned_shop_offers()
 	return true
 
 
@@ -260,6 +274,17 @@ func _grant_boss_boom_berry_reward() -> void:
 	if granted_ids.is_empty():
 		return
 	pending_boss_boom_berry_reward_ids = granted_ids
+
+
+func _strip_shadow_banned_shop_offers() -> void:
+	if not bag.has_master_ingredient(IngredientEffects.UNICORN_HORN_ID):
+		return
+	for i in current_shop_offers.size():
+		var offer = current_shop_offers[i]
+		if offer == null:
+			continue
+		if offer.ingredient.id == IngredientEffects.UNICORN_HORN_ID:
+			current_shop_offers[i] = null
 
 
 func _clear_locked_level_aura() -> void:

@@ -17,6 +17,8 @@ const HAND_HOVER_RISE := 28.0
 const HAND_HOVER_SCALE := 1.12
 const MIDDLE_SLOT_INDEX := 2
 const PLAY_BUTTON_GAP := 12.0
+const RHYTHM_SHAKE_OFFSET := Vector2(5.0, 2.0)
+const RHYTHM_SHAKE_STEP := 0.07
 
 @onready var _slot_row: Control = $SlotRow
 @onready var _drag_layer: Control = $DragLayer
@@ -34,6 +36,9 @@ var _press_position: Vector2 = Vector2.INF
 var _drag_started: bool = false
 var _selected_slot: int = -1
 var _suppressed_slots: Dictionary = {}
+var _anchor_rest_positions: Array[Vector2] = []
+var _rhythm_shake_slot_tweens: Dictionary = {}
+var _active_rhythm_shake_slots: Array = []
 
 
 func _ready() -> void:
@@ -86,6 +91,7 @@ func clear_selection() -> void:
 func prepare_for_draw() -> void:
 	_interaction_enabled = false
 	_suppressed_slots.clear()
+	_stop_all_rhythm_shakes()
 	_set_selected_slot(-1)
 	_cancel_drag()
 	_press_slot = -1
@@ -112,7 +118,12 @@ func get_play_button_global_position(button_size: Vector2) -> Vector2:
 	)
 
 
-func refresh_hand(slots: Array, interaction_enabled: bool, swap_enabled: bool = true) -> void:
+func refresh_hand(
+	slots: Array,
+	interaction_enabled: bool,
+	swap_enabled: bool = true,
+	in_rhythm_shake_slots: Array = []
+) -> void:
 	_interaction_enabled = interaction_enabled
 	_swap_enabled = swap_enabled and interaction_enabled
 	_cancel_drag()
@@ -142,6 +153,7 @@ func refresh_hand(slots: Array, interaction_enabled: bool, swap_enabled: bool = 
 		_press_position = saved_press_position
 	_layout_slots()
 	_update_hover_process()
+	set_in_rhythm_shake_slots(in_rhythm_shake_slots)
 
 
 func get_slot_global_center(slot_index: int) -> Vector2:
@@ -206,16 +218,102 @@ func _bind_slot(slot_index: int, ingredient: IngredientData) -> void:
 	_apply_slot_z_index(slot_index)
 
 
+func set_in_rhythm_shake_slots(slot_indices: Array) -> void:
+	_active_rhythm_shake_slots = slot_indices.duplicate()
+	var active_slots: Dictionary = {}
+	for slot_index in _active_rhythm_shake_slots:
+		active_slots[int(slot_index)] = true
+
+	for slot_index in HAND_SLOT_COUNT:
+		if active_slots.has(slot_index) and _slot_has_visible_card(slot_index):
+			_ensure_rhythm_shake(slot_index)
+		else:
+			_stop_rhythm_shake(slot_index)
+
+
+func _slot_has_visible_card(slot_index: int) -> bool:
+	if slot_index < 0 or slot_index >= _slot_cards.size():
+		return false
+	var card := _slot_cards[slot_index]
+	return card != null and card.visible
+
+
+func _ensure_rhythm_shake(slot_index: int) -> void:
+	var tween: Tween = _rhythm_shake_slot_tweens.get(slot_index)
+	if tween != null and tween.is_valid():
+		return
+	_start_rhythm_shake(slot_index)
+
+
+func _start_rhythm_shake(slot_index: int) -> void:
+	_stop_rhythm_shake(slot_index)
+	if slot_index < 0 or slot_index >= _slot_anchors.size():
+		return
+	var anchor := _slot_anchors[slot_index]
+	if anchor == null:
+		return
+
+	var rest := _anchor_rest_position(slot_index)
+	anchor.position = rest
+	var shake_tween := create_tween().set_loops()
+	shake_tween.tween_property(
+		anchor,
+		"position",
+		rest + Vector2(RHYTHM_SHAKE_OFFSET.x, 0.0),
+		RHYTHM_SHAKE_STEP
+	)
+	shake_tween.tween_property(
+		anchor,
+		"position",
+		rest + Vector2(-RHYTHM_SHAKE_OFFSET.x, RHYTHM_SHAKE_OFFSET.y),
+		RHYTHM_SHAKE_STEP
+	)
+	shake_tween.tween_property(
+		anchor,
+		"position",
+		rest + Vector2(0.0, -RHYTHM_SHAKE_OFFSET.y),
+		RHYTHM_SHAKE_STEP
+	)
+	shake_tween.tween_property(anchor, "position", rest, RHYTHM_SHAKE_STEP)
+	_rhythm_shake_slot_tweens[slot_index] = shake_tween
+
+
+func _stop_rhythm_shake(slot_index: int) -> void:
+	var tween: Tween = _rhythm_shake_slot_tweens.get(slot_index)
+	if tween != null and tween.is_valid():
+		tween.kill()
+	_rhythm_shake_slot_tweens.erase(slot_index)
+	if slot_index < 0 or slot_index >= _slot_anchors.size():
+		return
+	var anchor := _slot_anchors[slot_index]
+	if anchor != null:
+		anchor.position = _anchor_rest_position(slot_index)
+
+
+func _stop_all_rhythm_shakes() -> void:
+	for slot_index in _rhythm_shake_slot_tweens.keys():
+		_stop_rhythm_shake(int(slot_index))
+
+
+func _anchor_rest_position(slot_index: int) -> Vector2:
+	if slot_index >= 0 and slot_index < _anchor_rest_positions.size():
+		return _anchor_rest_positions[slot_index]
+	return Vector2.ZERO
+
+
 func _layout_slots() -> void:
 	if _slot_row == null:
 		return
 	var total_width := CARD_DISPLAY_SIZE.x + SLOT_OVERLAP * float(HAND_SLOT_COUNT - 1)
 	var start_x := (size.x - total_width) * 0.5
+	_anchor_rest_positions.clear()
 	for slot_index in _slot_anchors.size():
 		var anchor := _slot_anchors[slot_index]
 		if anchor == null:
 			continue
-		anchor.position = Vector2(start_x + SLOT_OVERLAP * slot_index, 0.0)
+		var rest := Vector2(start_x + SLOT_OVERLAP * slot_index, 0.0)
+		anchor.position = rest
+		_anchor_rest_positions.append(rest)
 		_apply_slot_z_index(slot_index)
 
 
@@ -329,6 +427,7 @@ func _begin_drag_from_slot(slot_index: int) -> void:
 	_drag_grab_offset = global_pos - _mouse_global_position()
 	_dragging_card = card
 	_hover_slot = -1
+	_stop_rhythm_shake(slot_index)
 	set_process(true)
 	set_process_input(true)
 
@@ -353,6 +452,7 @@ func _finish_card_drag() -> void:
 		swap_requested.emit(source_slot, target_slot)
 
 	_update_hover_process()
+	set_in_rhythm_shake_slots(_active_rhythm_shake_slots)
 
 
 func _return_card_to_slot(card: IngredientCard, slot_index: int) -> void:

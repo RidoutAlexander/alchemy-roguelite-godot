@@ -29,6 +29,7 @@ const LIGHTNING_CHAIN_DRAWS := 3
 const RED_MUSHROOM_PUMPKIN_CAP := 3
 const BAT_WING_PICK_COUNT := 3
 const SPIDER_STREAK_CAP := 4
+const MANDRAKE_BOSS_THRESHOLD_DISCOUNT := 2
 
 
 class EffectResult:
@@ -76,7 +77,7 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		FEATHER_ID:
 			result.bonus_gold = 1
 		MANDRAKE_ID:
-			result.boss_threshold_discount = 1
+			result.boss_threshold_discount = MANDRAKE_BOSS_THRESHOLD_DISCOUNT
 		BAT_WING_ID:
 			result.bat_wing_pick_count = BAT_WING_PICK_COUNT
 		SPIDER_ID:

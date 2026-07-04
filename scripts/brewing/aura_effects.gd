@@ -21,3 +21,23 @@ static func in_rhythm_doubles_ingredient(cauldron_count_before_add: int, aura: A
 		return false
 	var count_after := cauldron_count_before_add + 1
 	return count_after % 3 == 0
+
+
+static func in_rhythm_double_hand_slots(
+	hand_slots: Array,
+	cauldron_count_before_hand: int,
+	aura: AuraData,
+	hand_slot_count: int = 5
+) -> Array[int]:
+	if aura == null or aura.id != GameConstants.IN_RHYTHM_AURA_ID:
+		return []
+
+	var doubled_slots: Array[int] = []
+	var cauldron_count := cauldron_count_before_hand
+	for slot_index in hand_slot_count:
+		if slot_index >= hand_slots.size() or hand_slots[slot_index] == null:
+			continue
+		if in_rhythm_doubles_ingredient(cauldron_count, aura):
+			doubled_slots.append(slot_index)
+		cauldron_count += 1
+	return doubled_slots

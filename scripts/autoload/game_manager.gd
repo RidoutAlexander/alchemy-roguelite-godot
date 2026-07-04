@@ -4,13 +4,22 @@ signal phase_changed(phase: int)
 signal run_changed
 signal brew_updated(context: BrewContext)
 signal hand_draw_batch_started(drawn: Array)
-signal hand_card_played(context: BrewContext, ingredient: IngredientData, slot_index: int)
+signal hand_card_played(
+	context: BrewContext,
+	ingredient: IngredientData,
+	slot_index: int,
+	parrot_doubled: bool
+)
 signal hand_mulligan_started(
 	old_ingredient: IngredientData,
 	new_ingredient: IngredientData,
 	slot_index: int
 )
-signal ingredient_drawn(context: BrewContext, ingredient: IngredientData)
+signal ingredient_drawn(
+	context: BrewContext,
+	ingredient: IngredientData,
+	parrot_doubled: bool
+)
 signal frog_leg_escaped(ingredient: IngredientData)
 signal brew_completion_requested(outcome: int)
 signal eyeball_puzzle_requested(reserved: Array)
@@ -333,13 +342,18 @@ func _on_hand_draw_batch_started(drawn: Array) -> void:
 func _on_hand_card_played(
 	context: BrewContext,
 	ingredient: IngredientData,
-	slot_index: int
+	slot_index: int,
+	parrot_doubled: bool
 ) -> void:
-	hand_card_played.emit(context, ingredient, slot_index)
+	hand_card_played.emit(context, ingredient, slot_index, parrot_doubled)
 
 
-func _on_ingredient_drawn(context: BrewContext, ingredient: IngredientData) -> void:
-	ingredient_drawn.emit(context, ingredient)
+func _on_ingredient_drawn(
+	context: BrewContext,
+	ingredient: IngredientData,
+	parrot_doubled: bool
+) -> void:
+	ingredient_drawn.emit(context, ingredient, parrot_doubled)
 
 
 func _on_frog_leg_escaped(ingredient: IngredientData) -> void:

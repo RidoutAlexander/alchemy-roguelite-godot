@@ -181,7 +181,12 @@ func _on_hand_draw_landed(ingredient: IngredientData, slot_index: int) -> void:
 	_play_next_hand_draw_animation()
 
 
-func _on_hand_card_played(_ctx: BrewContext, ingredient: IngredientData, slot_index: int) -> void:
+func _on_hand_card_played(
+	_ctx: BrewContext,
+	ingredient: IngredientData,
+	slot_index: int,
+	parrot_doubled: bool = false
+) -> void:
 	if ingredient == null:
 		return
 	_refresh_cauldron_contents_if_open()
@@ -189,16 +194,20 @@ func _on_hand_card_played(_ctx: BrewContext, ingredient: IngredientData, slot_in
 	if _player_hand != null:
 		_player_hand.hide_slot_for_fly(slot_index)
 	var brew_ended := _ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	_play_hand_card_fly(ingredient, slot_index, brew_ended)
+	_play_hand_card_fly(ingredient, slot_index, brew_ended, 2 if parrot_doubled else 1)
 
 
-func _on_ingredient_drawn(ctx: BrewContext, ingredient: IngredientData) -> void:
+func _on_ingredient_drawn(
+	ctx: BrewContext,
+	ingredient: IngredientData,
+	parrot_doubled: bool = false
+) -> void:
 	if ingredient == null:
 		return
 	_refresh_cauldron_contents_if_open()
 	GameManager.set_presentation_in_progress(true)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	_play_cauldron_fly(ingredient, brew_ended)
+	_play_cauldron_fly(ingredient, brew_ended, 2 if parrot_doubled else 1)
 
 
 func _on_eyeball_puzzle_requested(reserved: Array) -> void:
@@ -445,6 +454,7 @@ func _sync_hand_ui() -> void:
 	if hand_phase == BrewSession.HandPhase.DRAWING:
 		if _player_hand != null:
 			_player_hand.visible = true
+			_player_hand.set_in_rhythm_shake_slots([])
 		_set_play_undo_visible(false)
 		if show_mulligan:
 			call_deferred("_align_mulligan_control")
@@ -459,7 +469,8 @@ func _sync_hand_ui() -> void:
 		_player_hand.refresh_hand(
 			session.get_hand_slots(),
 			can_interact,
-			can_interact
+			can_interact,
+			session.get_in_rhythm_double_hand_slots()
 		)
 
 	_set_play_undo_visible(can_interact)
@@ -660,20 +671,30 @@ func _play_cauldron_plop() -> void:
 	_cauldron_plop_player.play()
 
 
-func _play_hand_card_fly(ingredient: IngredientData, slot_index: int, track_for_exit: bool) -> void:
+func _play_hand_card_fly(
+	ingredient: IngredientData,
+	slot_index: int,
+	track_for_exit: bool,
+	fly_count: int = 1
+) -> void:
 	var fly_data := _hand_play_fly_data_for(ingredient, slot_index)
-	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit)
+	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit, fly_count)
 
 
-func _play_cauldron_fly(ingredient: IngredientData, track_for_exit: bool) -> void:
+func _play_cauldron_fly(
+	ingredient: IngredientData,
+	track_for_exit: bool,
+	fly_count: int = 1
+) -> void:
 	var fly_data := _bag_to_cauldron_fly_data(ingredient)
-	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit)
+	_play_cauldron_fly_with_data(fly_data, ingredient, track_for_exit, fly_count)
 
 
 func _play_cauldron_fly_with_data(
 	fly_data: Dictionary,
 	ingredient: IngredientData,
-	track_for_exit: bool
+	track_for_exit: bool,
+	fly_count: int = 1
 ) -> void:
 	if fly_data.is_empty():
 		if track_for_exit:
@@ -685,6 +706,20 @@ func _play_cauldron_fly_with_data(
 	if track_for_exit:
 		_brew_exit_animations_pending += 1
 
+	_play_cauldron_fly_repeat(
+		fly_data,
+		ingredient,
+		track_for_exit,
+		maxi(1, fly_count)
+	)
+
+
+func _play_cauldron_fly_repeat(
+	fly_data: Dictionary,
+	ingredient: IngredientData,
+	track_for_exit: bool,
+	remaining_flies: int
+) -> void:
 	_IngredientFlyUtil.play(
 		_fly_layer,
 		fly_data["texture"],
@@ -692,10 +727,18 @@ func _play_cauldron_fly_with_data(
 		fly_data["target_center"],
 		fly_data["size"],
 		func() -> void:
-			_finish_card_presentation(ingredient, track_for_exit),
+			if remaining_flies > 1:
+				_play_cauldron_fly_repeat(
+					fly_data,
+					ingredient,
+					track_for_exit,
+					remaining_flies - 1
+				)
+			else:
+				_finish_card_presentation(ingredient, track_for_exit),
 		func() -> void:
 			_play_cauldron_plop()
-			if track_for_exit:
+			if track_for_exit and remaining_flies == 1:
 				_try_play_pending_brew_exit_effects_after_plop()
 	)
 

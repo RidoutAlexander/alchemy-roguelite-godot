@@ -12,13 +12,22 @@ enum HandPhase { BAG, DRAWING, HAND, PLAYING }
 
 signal brew_updated(context: BrewContext)
 signal hand_draw_batch_started(drawn: Array)
-signal hand_card_played(context: BrewContext, ingredient: IngredientData, slot_index: int)
+signal hand_card_played(
+	context: BrewContext,
+	ingredient: IngredientData,
+	slot_index: int,
+	parrot_doubled: bool
+)
 signal hand_mulligan_started(
 	old_ingredient: IngredientData,
 	new_ingredient: IngredientData,
 	slot_index: int
 )
-signal ingredient_drawn(context: BrewContext, ingredient: IngredientData)
+signal ingredient_drawn(
+	context: BrewContext,
+	ingredient: IngredientData,
+	parrot_doubled: bool
+)
 signal frog_leg_escaped(ingredient: IngredientData)
 signal eyeball_puzzle_requested(reserved: Array)
 signal bat_wing_picker_requested(choices: Array)
@@ -171,6 +180,17 @@ func get_mulligans_remaining() -> int:
 	return maxi(0, _mulligan_allowance - _mulligans_used)
 
 
+func get_in_rhythm_double_hand_slots() -> Array[int]:
+	if _hand_phase != HandPhase.HAND:
+		return []
+	return _AuraEffects.in_rhythm_double_hand_slots(
+		_hand_slots,
+		context.cauldron_contents.size(),
+		context.current_aura,
+		HAND_SLOT_COUNT
+	)
+
+
 func get_bag_display_count() -> int:
 	if context.bag == null:
 		return 0
@@ -290,12 +310,12 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 
 	_bat_wing_choices.clear()
 	_bat_wing_picker_active = false
-	_apply_ingredient(selected, true)
+	var parrot_doubled := _apply_ingredient(selected, true)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
 			_resolve_explosion()
-	ingredient_drawn.emit(context, selected)
+	ingredient_drawn.emit(context, selected, parrot_doubled)
 	brew_updated.emit(context)
 
 
@@ -464,13 +484,13 @@ func _play_next_hand_card() -> void:
 	_hand_slots[_play_slot_cursor] = null
 	_play_slot_cursor += 1
 
-	_apply_ingredient(ingredient, true)
+	var parrot_doubled := _apply_ingredient(ingredient, true)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
 			_resolve_explosion()
 
-	hand_card_played.emit(context, ingredient, slot_index)
+	hand_card_played.emit(context, ingredient, slot_index, parrot_doubled)
 	brew_updated.emit(context)
 
 
@@ -493,18 +513,18 @@ func _draw_and_emit(_is_chain: bool) -> bool:
 			_resolve_bag_empty()
 		return false
 
-	_apply_ingredient(ingredient, true)
+	var parrot_doubled := _apply_ingredient(ingredient, true)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
 			_resolve_explosion()
 
-	ingredient_drawn.emit(context, ingredient)
+	ingredient_drawn.emit(context, ingredient, parrot_doubled)
 	brew_updated.emit(context)
 	return true
 
 
-func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> void:
+func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> bool:
 	if track_draw:
 		context.drawn_this_brew.append(ingredient)
 
@@ -564,9 +584,10 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> void:
 		_voodoo_doll_arms_copy = false
 
 	if not context.is_exploded():
-		return
+		return parrot_doubled_this_ingredient
 	if ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
 		_trigger_phoenix_save()
+	return parrot_doubled_this_ingredient
 
 
 func _try_frog_leg_save() -> bool:

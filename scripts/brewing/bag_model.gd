@@ -11,13 +11,33 @@ func set_master_bag(chips: Array) -> void:
 	_master_chips.clear()
 	for chip in chips:
 		if chip != null:
-			_master_chips.append(chip)
+			add_to_master_bag(chip)
 	reset_for_brew()
 
 
-func add_to_master_bag(ingredient: IngredientData) -> void:
-	if ingredient != null:
-		_master_chips.append(ingredient)
+func has_master_ingredient(ingredient_id: String) -> bool:
+	for chip in _master_chips:
+		if chip != null and chip.id == ingredient_id:
+			return true
+	return false
+
+
+func can_add_to_master_bag(ingredient: IngredientData) -> bool:
+	if ingredient == null:
+		return false
+	if (
+		ingredient.id == IngredientEffects.UNICORN_HORN_ID
+		and has_master_ingredient(ingredient.id)
+	):
+		return false
+	return true
+
+
+func add_to_master_bag(ingredient: IngredientData) -> bool:
+	if not can_add_to_master_bag(ingredient):
+		return false
+	_master_chips.append(ingredient)
+	return true
 
 
 func reset_for_brew(shuffle: bool = false) -> void:
