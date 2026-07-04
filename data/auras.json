@@ -63,15 +63,6 @@
     "gold_multiplier_percent": 200
   },
   {
-    "id": "ambidextrous",
-    "display_name": "Ambidextrous",
-    "description": "Ingredients are added to the cauldron 2 at a time",
-    "pool": "normal",
-    "explosion_limit_modifier": 0,
-    "score_multiplier_percent": 100,
-    "gold_multiplier_percent": 100
-  },
-  {
     "id": "in_rhythm",
     "display_name": "In Rhythm",
     "description": "every 3rd ingredient added to the cauldron has double score and explosiveness",

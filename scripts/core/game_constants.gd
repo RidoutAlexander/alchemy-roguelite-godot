@@ -12,7 +12,6 @@ const REROLL_COST := 2
 const BOSS_AURA_INTERVAL := 5
 const BOSS_AURA_WARNING := "You must complete the potion this round."
 const PRACTICE_BREW_AURA_ID := "practice brew"
-const AMBIDEXTROUS_AURA_ID := "ambidextrous"
 const IN_RHYTHM_AURA_ID := "in_rhythm"
 const THRESHOLD_START := 5
 const THRESHOLD_STEP_BASE := 1.5

@@ -15,6 +15,7 @@ signal frog_leg_escaped(ingredient: IngredientData)
 signal brew_completion_requested(outcome: int)
 signal eyeball_puzzle_requested(reserved: Array)
 signal bat_wing_picker_requested(choices: Array)
+signal bag_display_changed
 signal brew_resolved(resolution: Dictionary)
 signal game_over(comparison: Dictionary)
 
@@ -103,6 +104,10 @@ func can_end_brew() -> bool:
 
 func set_presentation_in_progress(active: bool) -> void:
 	_presentation_in_progress = active
+
+
+func notify_bag_display_changed() -> void:
+	bag_display_changed.emit()
 
 
 func try_draw_ingredient() -> void:

@@ -138,7 +138,7 @@ func _on_hand_draw_batch_started(drawn: Array) -> void:
 	if _player_hand != null:
 		_player_hand.visible = true
 		_player_hand.prepare_for_draw()
-	_set_hand_action_buttons_visible(false)
+	_set_play_undo_visible(false)
 	_play_next_hand_draw_animation()
 
 
@@ -155,6 +155,9 @@ func _play_next_hand_draw_animation() -> void:
 
 
 func _play_hand_draw_fly(ingredient: IngredientData, slot_index: int) -> void:
+	if GameManager.run != null:
+		GameManager.run.brew_session.consume_hand_draw_display_reserve()
+		GameManager.notify_bag_display_changed()
 	var fly_data := _hand_draw_fly_data_for(ingredient, slot_index)
 	if fly_data.is_empty():
 		_on_hand_draw_landed(ingredient, slot_index)
@@ -433,11 +436,18 @@ func _sync_hand_ui() -> void:
 	var session := GameManager.run.brew_session
 	var hand_phase := session.get_hand_phase()
 	var can_interact := hand_phase == BrewSession.HandPhase.HAND
+	var show_mulligan := _should_show_brew_mulligan()
+
+	_set_mulligan_visible(show_mulligan)
+	if show_mulligan:
+		_refresh_mulligan_label(session)
 
 	if hand_phase == BrewSession.HandPhase.DRAWING:
 		if _player_hand != null:
 			_player_hand.visible = true
-		_set_hand_action_buttons_visible(false)
+		_set_play_undo_visible(false)
+		if show_mulligan:
+			call_deferred("_align_mulligan_control")
 		return
 
 	if _player_hand != null:
@@ -452,17 +462,47 @@ func _sync_hand_ui() -> void:
 			can_interact
 		)
 
-	_set_hand_action_buttons_visible(can_interact)
+	_set_play_undo_visible(can_interact)
 	if _play_hand_button != null:
 		_play_hand_button.disabled = not GameManager.can_play_hand()
-	_refresh_hand_action_labels(session, can_interact)
+	if can_interact:
+		_refresh_undo_label(session)
 	if can_interact:
 		call_deferred("_align_hand_controls")
+	elif show_mulligan:
+		call_deferred("_align_mulligan_control")
 
 
 func _align_hand_controls() -> void:
 	_align_play_hand_button()
 	_align_hand_action_buttons()
+
+
+func _align_mulligan_control() -> void:
+	if _hand_mulligan_button == null or not _hand_mulligan_button.visible:
+		return
+	var origin := _get_hand_action_column_origin()
+	_position_hand_action_control(
+		origin.x,
+		origin.y,
+		_hand_mulligan_button,
+		_hand_mulligan_label
+	)
+
+
+func _get_hand_action_column_origin() -> Vector2:
+	var button_size := Vector2(160.0, 70.0) * PLAY_HAND_BUTTON_SCALE
+	if _play_hand_button != null and _play_hand_button.visible:
+		button_size = _play_hand_button.get_global_rect().size
+	if _player_hand != null:
+		var play_anchor := _player_hand.get_play_button_global_position(button_size)
+		return Vector2(
+			play_anchor.x + button_size.x + HAND_ACTION_LEFT_GAP + HAND_ACTION_EXTRA_OFFSET,
+			play_anchor.y
+		)
+	if _hand_mulligan_button != null:
+		return _hand_mulligan_button.global_position
+	return Vector2.ZERO
 
 
 func _align_play_hand_button() -> void:
@@ -475,19 +515,14 @@ func _align_play_hand_button() -> void:
 
 
 func _align_hand_action_buttons() -> void:
-	if _play_hand_button == null or not _play_hand_button.visible:
-		return
 	var show_undo := _hand_undo_button != null and _hand_undo_button.visible
 	var show_mulligan := _hand_mulligan_button != null and _hand_mulligan_button.visible
 	if not show_undo and not show_mulligan:
 		return
 
-	var base_y := _play_hand_button.get_global_rect().position.y
-	var action_left := (
-		_play_hand_button.get_global_rect().end.x
-		+ HAND_ACTION_LEFT_GAP
-		+ HAND_ACTION_EXTRA_OFFSET
-	)
+	var origin := _get_hand_action_column_origin()
+	var base_y := origin.y
+	var action_left := origin.x
 
 	if _hand_mulligan_button != null and _hand_mulligan_button.visible:
 		_position_hand_action_control(action_left, base_y, _hand_mulligan_button, _hand_mulligan_label)
@@ -530,36 +565,57 @@ func _hand_action_control_width(label: Label) -> float:
 	return maxf(HAND_ACTION_BUTTON_SIZE.x, label_width)
 
 
-func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
+func _should_show_brew_mulligan() -> bool:
+	if not visible or GameManager.run == null:
+		return false
+	return (
+		GameManager.run.brew_session.context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+	)
+
+
+func _set_play_undo_visible(show_controls: bool) -> void:
 	if _play_hand_button != null:
-		_play_hand_button.visible = visible_buttons
+		_play_hand_button.visible = show_controls
 	if _hand_undo_button != null:
-		_hand_undo_button.visible = visible_buttons
+		_hand_undo_button.visible = show_controls
 	if _hand_undo_label != null:
-		_hand_undo_label.visible = visible_buttons
+		_hand_undo_label.visible = show_controls
+
+
+func _set_mulligan_visible(show_controls: bool) -> void:
 	if _hand_mulligan_button != null:
-		_hand_mulligan_button.visible = visible_buttons
+		_hand_mulligan_button.visible = show_controls
 	if _hand_mulligan_label != null:
-		_hand_mulligan_label.visible = visible_buttons
+		_hand_mulligan_label.visible = show_controls
 
 
-func _refresh_hand_action_labels(session: BrewSession, can_interact: bool) -> void:
-	if not can_interact:
-		return
+func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
+	_set_play_undo_visible(visible_buttons)
+	_set_mulligan_visible(visible_buttons)
+
+
+func _refresh_undo_label(session: BrewSession) -> void:
 	var swaps_remaining := session.get_hand_swaps_remaining()
-	var mulligans_remaining := session.get_mulligans_remaining()
 	if _hand_undo_label != null:
 		_hand_undo_label.text = _format_undo_label(swaps_remaining)
 		_hand_undo_label.custom_minimum_size.x = maxf(
 			_hand_undo_label.get_minimum_size().x,
 			HAND_ACTION_LABEL_SIZE.x
 		)
-	if _hand_mulligan_label != null:
-		_hand_mulligan_label.text = "mulligan %d" % mulligans_remaining
 	if _hand_undo_button != null:
 		_hand_undo_button.disabled = false
+
+
+func _refresh_mulligan_label(session: BrewSession) -> void:
+	if _hand_mulligan_label != null:
+		_hand_mulligan_label.text = _format_mulligan_label(session.get_mulligans_remaining())
 	if _hand_mulligan_button != null:
 		_hand_mulligan_button.disabled = false
+
+
+func _format_mulligan_label(mulligans_remaining: int) -> String:
+	var noun := "mulligan" if mulligans_remaining == 1 else "mulligans"
+	return "Mulligan (%d %s left)" % [mulligans_remaining, noun]
 
 
 func _format_undo_label(swaps_remaining: int) -> String:

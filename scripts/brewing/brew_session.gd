@@ -36,6 +36,7 @@ var _mulligan_allowance: int = 1
 var _mulligans_used: int = 0
 var _play_slot_cursor: int = 0
 var _pending_hand_draw: Array = []
+var _hand_draw_display_reserve: int = 0
 
 var _chain_draws_remaining: int = 0
 var _eyeball_reserved: Array[IngredientData] = []
@@ -168,6 +169,20 @@ func get_hand_swaps_remaining() -> int:
 
 func get_mulligans_remaining() -> int:
 	return maxi(0, _mulligan_allowance - _mulligans_used)
+
+
+func get_bag_display_count() -> int:
+	if context.bag == null:
+		return 0
+	return context.bag.remaining_count() + _hand_draw_display_reserve
+
+
+func consume_hand_draw_display_reserve() -> void:
+	_hand_draw_display_reserve = maxi(0, _hand_draw_display_reserve - 1)
+
+
+func _reset_hand_draw_display_reserve() -> void:
+	_hand_draw_display_reserve = 0
 
 
 func can_undo_hand_swap() -> bool:
@@ -307,6 +322,7 @@ func try_draw_to_hand() -> bool:
 	_lucky_coin_in_current_hand = false
 	_reset_hand_slots()
 	_pending_hand_draw = drawn.duplicate()
+	_hand_draw_display_reserve = drawn.size()
 	hand_draw_batch_started.emit(drawn)
 	brew_updated.emit(context)
 	return true
@@ -315,6 +331,7 @@ func try_draw_to_hand() -> bool:
 func on_hand_draw_batch_finished() -> void:
 	if _hand_phase != HandPhase.DRAWING:
 		return
+	_reset_hand_draw_display_reserve()
 	for i in _pending_hand_draw.size():
 		var slot_index := _pending_hand_draw.size() - 1 - i
 		if slot_index >= 0 and slot_index < HAND_SLOT_COUNT:
@@ -710,6 +727,7 @@ func _reset_draw_flow_state() -> void:
 	_mulligans_used = 0
 	_play_slot_cursor = 0
 	_pending_hand_draw.clear()
+	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0
 	_eyeball_reserved.clear()
 	_eyeball_puzzle_active = false

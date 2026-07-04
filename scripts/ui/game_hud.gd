@@ -67,6 +67,7 @@ func _ready() -> void:
 	GameManager.brew_updated.connect(func(_ctx): _refresh_bag_remaining_count())
 	GameManager.ingredient_drawn.connect(func(_ctx, _ingredient): _refresh_bag_remaining_count())
 	GameManager.hand_draw_batch_started.connect(func(_drawn): _refresh_bag_remaining_count())
+	GameManager.bag_display_changed.connect(_refresh_bag_remaining_count)
 	GameManager.brew_resolved.connect(_refresh_brew)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.game_over.connect(_refresh_game_over)
@@ -249,7 +250,7 @@ func _refresh_bag_remaining_count() -> void:
 		return
 	if GameManager.current_phase != GamePhase.Phase.BREWING:
 		return
-	_bag_remaining_count_label.text = str(GameManager.run.bag.remaining_count())
+	_bag_remaining_count_label.text = str(GameManager.run.brew_session.get_bag_display_count())
 	call_deferred("_align_bag_remaining_count_label")
 
 
