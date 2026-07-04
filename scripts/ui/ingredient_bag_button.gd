@@ -1,7 +1,7 @@
 class_name IngredientBagButton
 extends TextureButton
 
-@export var label_text: String = "Add":
+@export var label_text: String = "Draw":
 	set(value):
 		label_text = value
 		_update_label()

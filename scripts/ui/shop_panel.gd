@@ -6,6 +6,7 @@ const SHOP_BAG_FLY_TARGET_GROUP := "shop_bag_fly_target"
 const BOOM_BERRY_REWARD_FLY_SIZE := Vector2(112.0, 112.0)
 const BOOM_BERRY_REWARD_NOTE_FADE_DELAY := 2.4
 const BOOM_BERRY_REWARD_NOTE_FADE_DURATION := 0.55
+const BAG_COUNT_LABEL_INSET := Vector2(0.0, 6.0)
 
 @export var bag_fly_target_path: NodePath = NodePath("BagTarget/BagIcon")
 
@@ -18,10 +19,12 @@ const BOOM_BERRY_REWARD_NOTE_FADE_DURATION := 0.55
 @onready var _boom_berry_reward_note: Label = $BagTarget/BoomBerryRewardNote
 @onready var _bag_target: Control = $BagTarget
 @onready var _bag_button: TextureButton = $BagTarget/BagButton
+@onready var _bag_count_label: Label = $BagTarget/BagCountLabel
 @onready var _bag_contents: BagContentsOverlay = $BagContentsOverlay
 
 var offer_cards: Array[IngredientCard] = []
 var _purchase_animations_pending: int = 0
+var _boss_reward_animation_active: bool = false
 var _boom_berry_reward_note_tween: Tween
 
 
@@ -56,9 +59,11 @@ func _gather_offer_cards() -> void:
 func _on_visibility_changed() -> void:
 	if visible:
 		refresh()
+		call_deferred("_align_bag_count_label")
 		call_deferred("_try_play_boss_boom_berry_reward")
 	else:
 		_hide_bag_contents()
+		_reset_shop_interaction_locks()
 
 
 func _on_bag_button_pressed() -> void:
@@ -71,6 +76,7 @@ func _on_bag_button_pressed() -> void:
 
 func _on_bag_contents_closed() -> void:
 	_set_offer_hover_enabled(true)
+	call_deferred("_align_bag_count_label")
 
 
 func _hide_bag_contents() -> void:
@@ -212,13 +218,13 @@ func _on_purchase_fly_finished(slot_index: int) -> void:
 func _try_play_boss_boom_berry_reward() -> void:
 	if not visible or GameManager.run == null:
 		return
-	if _purchase_animations_pending > 0:
+	if _boss_reward_animation_active:
 		return
 	if GameManager.run.pending_boss_boom_berry_reward_ids.is_empty():
 		_hide_boom_berry_reward_note()
 		return
 
-	while absf(offset_left) > 0.5:
+	while absf(offset_left) > 0.5 or _purchase_animations_pending > 0:
 		await get_tree().create_timer(0.05).timeout
 		if not is_inside_tree() or not visible:
 			return
@@ -226,8 +232,6 @@ func _try_play_boss_boom_berry_reward() -> void:
 			GameManager.run == null
 			or GameManager.run.pending_boss_boom_berry_reward_ids.is_empty()
 		):
-			return
-		if _purchase_animations_pending > 0:
 			return
 
 	var rewards := GameManager.run.take_pending_boss_boom_berry_reward()
@@ -238,8 +242,8 @@ func _try_play_boss_boom_berry_reward() -> void:
 
 
 func _play_boss_boom_berry_rewards(rewards: Array[IngredientData]) -> void:
+	_boss_reward_animation_active = true
 	_show_boom_berry_reward_note(rewards)
-	_purchase_animations_pending += 1
 
 	var target_center := _resolve_bag_fly_target_center()
 	var start_center := target_center + Vector2(-140.0, -260.0)
@@ -251,22 +255,56 @@ func _play_boss_boom_berry_rewards(rewards: Array[IngredientData]) -> void:
 		var texture: Texture2D = load(art_path)
 		if texture == null:
 			continue
-		var fly_finished := false
-		_spawn_boss_boom_berry_fly(
+		var flew := await _await_boss_boom_berry_fly(
 			texture,
 			start_center + Vector2(float(berry_index) * -18.0, float(berry_index) * -12.0),
-			target_center,
-			func() -> void:
-				fly_finished = true
+			target_center
 		)
-		while not fly_finished:
-			if not is_inside_tree():
-				return
-			await get_tree().process_frame
+		if not flew:
+			break
 		_refresh_bag_contents_if_open()
 
-	_purchase_animations_pending = maxi(0, _purchase_animations_pending - 1)
+	_finish_boss_boom_berry_rewards()
+
+
+func _await_boss_boom_berry_fly(
+	texture: Texture2D,
+	start_center: Vector2,
+	target_center: Vector2
+) -> bool:
+	if not is_inside_tree() or not visible:
+		return false
+
+	var fly_finished := false
+	_spawn_boss_boom_berry_fly(
+		texture,
+		start_center,
+		target_center,
+		func() -> void:
+			fly_finished = true
+	)
+	while not fly_finished:
+		if not is_inside_tree() or not visible:
+			return false
+		await get_tree().process_frame
+	return true
+
+
+func _finish_boss_boom_berry_rewards() -> void:
+	_boss_reward_animation_active = false
 	_schedule_boom_berry_reward_note_fade()
+	_restore_shop_offers()
+
+
+func _restore_shop_offers() -> void:
+	var bag_open := _bag_contents != null and _bag_contents.is_open()
+	_set_offer_hover_enabled(not bag_open)
+	refresh()
+
+
+func _reset_shop_interaction_locks() -> void:
+	_boss_reward_animation_active = false
+	_purchase_animations_pending = 0
 
 
 func _spawn_boss_boom_berry_fly(
@@ -374,6 +412,21 @@ func _schedule_boom_berry_reward_note_fade() -> void:
 	)
 
 
+func _align_bag_count_label() -> void:
+	if _bag_count_label == null or _bag_button == null or not visible:
+		return
+	var label_size := _bag_count_label.get_minimum_size()
+	label_size.x = maxf(label_size.x, 28.0)
+	label_size.y = maxf(label_size.y, 24.0)
+	_bag_count_label.custom_minimum_size = label_size
+	_bag_count_label.size = label_size
+	var bag_rect := _bag_button.get_rect()
+	_bag_count_label.position = Vector2(
+		bag_rect.position.x + (bag_rect.size.x - label_size.x) * 0.5,
+		bag_rect.end.y + BAG_COUNT_LABEL_INSET.y
+	)
+
+
 func _bounce_bag_target() -> void:
 	if _bag_target == null:
 		return
@@ -412,6 +465,9 @@ func refresh_stats_only() -> void:
 	if GameManager.run == null:
 		return
 	var run := GameManager.run
+	if _bag_count_label != null:
+		_bag_count_label.text = str(run.bag.master_count())
+		call_deferred("_align_bag_count_label")
 	if _gold_counter != null:
 		_gold_counter.set_amount(run.gold)
 	if _reroll_button != null:

@@ -35,6 +35,10 @@ func remaining_count() -> int:
 	return _working_chips.size() + _forced_draw_queue.size()
 
 
+func master_count() -> int:
+	return _master_chips.size()
+
+
 func master_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for chip in _master_chips:

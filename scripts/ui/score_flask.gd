@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 		_display_fill = target_fill
 
 	if ctx.score <= 0 and _is_complete:
-		_set_complete_state(false)
+		_is_complete = false
 
 	_set_particle_effects_enabled(ctx.score > 0)
 	if _liquid.has_method("set_fill_level"):
@@ -77,7 +77,7 @@ func _process(delta: float) -> void:
 		should_complete = ctx.score > 0
 	if should_complete != _is_complete:
 		_is_complete = should_complete
-		_set_complete_state(_is_complete, is_boss)
+	_refresh_complete_presentation(is_boss)
 
 
 func _update_score_label(score: int, threshold: int, is_boss: bool) -> void:
@@ -143,13 +143,23 @@ func _update_meniscus_spawner() -> void:
 	)
 
 
-func _set_complete_state(active: bool, is_boss: bool = true) -> void:
+func _is_hand_phase_blocking_stop() -> bool:
+	var run := GameManager.run
+	if run == null:
+		return false
+	return run.brew_session.is_hand_interaction_blocked()
+
+
+func _refresh_complete_presentation(is_boss: bool) -> void:
+	var show_cta := _is_complete and not _is_hand_phase_blocking_stop()
 	if _complete_label != null:
-		_complete_label.visible = active
-		_complete_label.text = "Complete Potion" if is_boss else "Stop Brewing"
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if active else Control.CURSOR_ARROW
-	if active:
-		_start_pulse()
+		_complete_label.visible = show_cta
+		if show_cta:
+			_complete_label.text = "Complete Potion" if is_boss else "Stop Brewing"
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if show_cta else Control.CURSOR_ARROW
+	if show_cta:
+		if _pulse_tween == null or not _pulse_tween.is_valid():
+			_start_pulse()
 	else:
 		_stop_pulse()
 

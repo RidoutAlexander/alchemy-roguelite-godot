@@ -49,6 +49,7 @@ layout_mode = 2
 theme_override_constants/margin_bottom = 100
 
 [node name="Panel" type="PanelContainer" parent="Layout/PanelOffset"]
+clip_contents = true
 layout_mode = 2
 mouse_filter = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")

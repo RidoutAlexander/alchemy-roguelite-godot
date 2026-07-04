@@ -111,6 +111,22 @@ texture_normal = ExtResource("5_bag")
 ignore_texture_size = true
 stretch_mode = 5
 
+[node name="BagCountLabel" type="Label" parent="BagTarget"]
+layout_mode = 0
+offset_left = 58.0
+offset_top = 196.0
+offset_right = 126.0
+offset_bottom = 224.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("12_font")
+theme_override_font_sizes/font_size = 28
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="GoldCounter" parent="." unique_id=380044565 instance=ExtResource("6_gold_display")]
 anchors_preset = 0
 offset_left = 620.0

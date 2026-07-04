@@ -229,7 +229,7 @@ offset_bottom = 318.0
 scale = Vector2(1.1, 1.1)
 label_text = "Play"
 
-[node name="HandUndoButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("23_hand_undo")]
+[node name="HandSwapButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("23_hand_undo")]
 z_index = 13
 visible = false
 offset_left = 580.0
@@ -237,7 +237,7 @@ offset_top = 300.0
 offset_right = 668.0
 offset_bottom = 388.0
 
-[node name="HandUndoLabel" type="Label" parent="PhaseSwipeHost/BrewPanel"]
+[node name="HandSwapLabel" type="Label" parent="PhaseSwipeHost/BrewPanel"]
 z_index = 13
 visible = false
 offset_right = 88.0
@@ -248,7 +248,7 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 22
-text = "undo"
+text = "swap 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -271,7 +271,7 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 22
-text = "mulligan"
+text = "mulligan 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 

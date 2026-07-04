@@ -195,9 +195,12 @@ func _play_phase_swipe(phase: int) -> void:
 		func() -> void:
 			_is_swiping = false
 			_active_phase = phase
+			_apply_phase_visibility(phase)
 			if phase == GamePhase.Phase.BREWING:
 				_refresh_brew_input_state()
 				_refresh_brew()
+			elif phase == GamePhase.Phase.SHOP and _shop_panel != null:
+				_shop_panel.refresh_stats_only()
 	)
 
 

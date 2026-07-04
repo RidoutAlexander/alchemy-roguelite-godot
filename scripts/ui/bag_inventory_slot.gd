@@ -79,5 +79,15 @@ func get_ingredient() -> IngredientData:
 	return get_meta("ingredient") as IngredientData
 
 
+func get_count() -> int:
+	return _pending_count
+
+
+func set_count_visible(show_count: bool) -> void:
+	_resolve_nodes()
+	if _count_label != null:
+		_count_label.visible = show_count and _show_count
+
+
 func _store_ingredient(ingredient: IngredientData) -> void:
 	set_meta("ingredient", ingredient)

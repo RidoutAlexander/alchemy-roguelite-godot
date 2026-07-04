@@ -162,6 +162,14 @@ func can_swap_hand() -> bool:
 	return _hand_phase == HandPhase.HAND and _hand_swaps_used < _hand_swap_allowance
 
 
+func get_hand_swaps_remaining() -> int:
+	return maxi(0, _hand_swap_allowance - _hand_swaps_used)
+
+
+func get_mulligans_remaining() -> int:
+	return maxi(0, _mulligan_allowance - _mulligans_used)
+
+
 func can_undo_hand_swap() -> bool:
 	return _hand_phase == HandPhase.HAND and not _hand_undo_stack.is_empty()
 

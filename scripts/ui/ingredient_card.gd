@@ -22,6 +22,7 @@ signal hand_hover_changed(hovered: bool)
 const CARD_TINT_SHADER := preload("res://shaders/card_rarity_tint.gdshader")
 
 const HOVER_SCALE := 1.08
+const PICKER_SELECT_SCALE := 1.04
 const HAND_HOVER_SCALE := 1.12
 const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
@@ -211,8 +212,11 @@ func bind_picker_card(ingredient: IngredientData) -> void:
 	_choice_mode = false
 	_picker_selected = false
 	_puzzle_drag_enabled = false
+	_hover_enabled = false
+	_is_hovered = false
 	bind_preview(ingredient)
 	apply_puzzle_layout()
+	_apply_picker_visual_pivot()
 	sync_picker_input()
 
 
@@ -225,13 +229,13 @@ func set_picker_selected(selected: bool) -> void:
 		return
 	_picker_selected = selected
 	if selected:
-		_is_hovered = true
+		_is_hovered = false
 		set_process(false)
 		if _visual_root != null:
-			_visual_root.scale = Vector2.ONE * HOVER_SCALE
+			_visual_root.scale = Vector2.ONE * PICKER_SELECT_SCALE
 	else:
 		_is_hovered = false
-		set_process(true)
+		set_process(false)
 		_reset_visual_scale()
 
 
@@ -247,9 +251,10 @@ func sync_picker_input() -> void:
 	disabled = false
 	focus_mode = Control.FOCUS_NONE
 	action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
-	_hover_enabled = true
-	if not _picker_selected:
-		set_process(true)
+	_hover_enabled = false
+	_is_hovered = false
+	set_process(false)
+	_reset_visual_scale()
 
 
 func apply_puzzle_layout() -> void:
@@ -565,12 +570,20 @@ func _is_cursor_over_card() -> bool:
 	return get_global_rect().has_point(get_global_mouse_position())
 
 
+func _apply_picker_visual_pivot() -> void:
+	if _visual_root == null:
+		return
+	_visual_root.pivot_offset = Vector2(_visual_root.size.x * 0.5, _visual_root.size.y)
+
+
 func _process(delta: float) -> void:
 	if _hand_mode:
 		var hovered := _is_cursor_over_card()
 		if hovered != _is_hovered:
 			_is_hovered = hovered
 			hand_hover_changed.emit(hovered)
+		return
+	if _picker_mode:
 		return
 	if _picker_selected or not _hover_enabled or _is_animating or _visual_root == null:
 		return

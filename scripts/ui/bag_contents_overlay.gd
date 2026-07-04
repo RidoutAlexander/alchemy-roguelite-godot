@@ -16,11 +16,14 @@ const GRID_COLUMNS := 5
 @onready var _grid: GridContainer = $Panel/Content/Scroll/Grid
 @onready var _preview_layer: CanvasLayer = $PreviewLayer
 @onready var _preview_card: IngredientCard = $PreviewLayer/PreviewCard
+@onready var _count_overlay_layer: CanvasLayer = $CountOverlayLayer
+@onready var _hover_count_label: Label = $CountOverlayLayer/HoverCountLabel
 
 var _mode: DisplayMode = DisplayMode.BAG_STACKS
 var _bag: BagModel
 var _cauldron_contents: Array = []
 var _hovered_ingredient: IngredientData
+var _hovered_slot: BagInventorySlot
 var _preview_rest_position: Vector2 = Vector2.ZERO
 
 
@@ -35,6 +38,8 @@ func _ready() -> void:
 		_grid.columns = GRID_COLUMNS
 	if _preview_layer != null:
 		_preview_layer.visible = false
+	if _count_overlay_layer != null:
+		_count_overlay_layer.visible = false
 	if _preview_card != null:
 		_preview_card.scale = Vector2.ONE * PREVIEW_SCALE
 		_preview_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -65,8 +70,10 @@ func _process(_delta: float) -> void:
 		not _preview_layer.visible
 		or _hovered_ingredient == null
 		or _hovered_ingredient.id != ingredient.id
+		or _hovered_slot != hovered_slot
 	)
 	_hovered_ingredient = ingredient
+	_hovered_slot = hovered_slot
 
 	if needs_bind:
 		_preview_card.bind_preview(ingredient)
@@ -74,6 +81,7 @@ func _process(_delta: float) -> void:
 		_preview_card.visible = true
 
 	_align_preview_to_slot(hovered_slot)
+	_update_hover_count(hovered_slot)
 
 
 func _find_hovered_slot() -> BagInventorySlot:
@@ -149,6 +157,8 @@ func hide_overlay() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_process(false)
 	_hide_preview()
+	_clear_grid()
+	_hide_canvas_layers()
 	overlay_closed.emit()
 
 
@@ -177,9 +187,9 @@ func _rebuild_grid() -> void:
 	if _grid == null:
 		return
 	_hovered_ingredient = null
+	_hovered_slot = null
 	_hide_preview()
-	for child in _grid.get_children():
-		child.queue_free()
+	_clear_grid()
 
 	match _mode:
 		DisplayMode.BAG_STACKS:
@@ -230,9 +240,60 @@ func _add_slot(ingredient: IngredientData, count: int, show_count: bool) -> void
 	slot.bind_entry(ingredient, count, show_count)
 
 
-func _hide_preview() -> void:
-	_hovered_ingredient = null
+func _clear_grid() -> void:
+	if _grid == null:
+		return
+	for child in _grid.get_children():
+		child.queue_free()
+
+
+func _hide_canvas_layers() -> void:
 	if _preview_layer != null:
 		_preview_layer.visible = false
+	if _count_overlay_layer != null:
+		_count_overlay_layer.visible = false
 	if _preview_card != null:
 		_preview_card.visible = false
+		_preview_card.position = _preview_rest_position
+
+
+func _update_hover_count(slot: BagInventorySlot) -> void:
+	if _count_overlay_layer == null or _hover_count_label == null or slot == null:
+		return
+	if _mode != DisplayMode.BAG_STACKS:
+		_hide_hover_count()
+		return
+	var count := slot.get_count()
+	if count <= 0:
+		_hide_hover_count()
+		return
+	slot.set_count_visible(false)
+	_hover_count_label.text = str(count)
+	var label_size := _hover_count_label.get_minimum_size()
+	label_size.x = maxf(label_size.x, 20.0)
+	label_size.y = maxf(label_size.y, 20.0)
+	_hover_count_label.custom_minimum_size = label_size
+	_hover_count_label.size = label_size
+	var art_center := _preview_card.get_art_global_center()
+	_hover_count_label.global_position = Vector2(
+		art_center.x - label_size.x * 0.5,
+		art_center.y - _preview_card.get_global_rect().size.y * 0.5 - label_size.y - 6.0
+	)
+	_hover_count_label.visible = true
+	_count_overlay_layer.visible = true
+
+
+func _hide_hover_count() -> void:
+	if _hover_count_label != null:
+		_hover_count_label.visible = false
+	if _count_overlay_layer != null:
+		_count_overlay_layer.visible = false
+	if _hovered_slot != null:
+		_hovered_slot.set_count_visible(true)
+
+
+func _hide_preview() -> void:
+	_hovered_ingredient = null
+	_hide_hover_count()
+	_hovered_slot = null
+	_hide_canvas_layers()

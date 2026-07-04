@@ -111,6 +111,7 @@ func show_picker(ingredients: Array) -> void:
 	)
 	_configure_slots_for_picker(ingredients.size())
 	_populate_slots(ingredients, false)
+	_reset_picker_card_states()
 	if _done_button != null:
 		_done_button.visible = true
 		_done_button.disabled = true
@@ -186,6 +187,18 @@ func _wire_puzzle_card(card: IngredientCard) -> void:
 func _wire_picker_card(card: IngredientCard) -> void:
 	if not card.picker_card_pressed.is_connected(_on_picker_card_pressed):
 		card.picker_card_pressed.connect(_on_picker_card_pressed)
+
+
+func _reset_picker_card_states() -> void:
+	for slot in _order_slots:
+		if not slot.visible:
+			continue
+		var card := slot.get_card()
+		if card == null:
+			continue
+		card.set_picker_selected(false)
+		if card.has_method("sync_picker_input"):
+			card.sync_picker_input()
 
 
 func _on_picker_card_pressed(card: IngredientCard) -> void:

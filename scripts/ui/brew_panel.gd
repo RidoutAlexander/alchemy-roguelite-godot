@@ -13,6 +13,7 @@ const PLOP_PITCH_MIN := 0.7
 const PLOP_PITCH_MAX := 1.3
 const PLAY_HAND_BUTTON_SCALE := 1.1
 const HAND_ACTION_LEFT_GAP := 30.0
+const HAND_ACTION_EXTRA_OFFSET := 100.0
 const HAND_ACTION_BUTTON_SIZE := Vector2(88.0, 88.0)
 const HAND_ACTION_LABEL_SIZE := Vector2(88.0, 24.0)
 const HAND_ACTION_LABEL_GAP := 4.0
@@ -30,8 +31,8 @@ const HAND_ACTION_GROUP_GAP := 8.0
 @onready var _cauldron_contents: BagContentsOverlay = $CauldronContentsOverlay
 @onready var _player_hand: PlayerHandRow = $PlayerHandRow
 @onready var _play_hand_button: WoodenButton = $PlayHandButton
-@onready var _hand_undo_button: ShopRerollButton = $HandUndoButton
-@onready var _hand_undo_label: Label = $HandUndoLabel
+@onready var _hand_swap_button: ShopRerollButton = $HandSwapButton
+@onready var _hand_swap_label: Label = $HandSwapLabel
 @onready var _hand_mulligan_button: ShopRerollButton = $HandMulliganButton
 @onready var _hand_mulligan_label: Label = $HandMulliganLabel
 @onready var _eyeball_puzzle: EyeballPuzzleOverlay = $"../../EyeballPuzzleOverlay"
@@ -72,8 +73,8 @@ func _ready() -> void:
 		_cauldron_button.pressed.connect(_on_cauldron_button_pressed)
 	if _play_hand_button != null and not _play_hand_button.pressed.is_connected(_on_play_hand_pressed):
 		_play_hand_button.pressed.connect(_on_play_hand_pressed)
-	if _hand_undo_button != null and not _hand_undo_button.pressed.is_connected(_on_hand_undo_pressed):
-		_hand_undo_button.pressed.connect(_on_hand_undo_pressed)
+	if _hand_swap_button != null and not _hand_swap_button.pressed.is_connected(_on_hand_swap_pressed):
+		_hand_swap_button.pressed.connect(_on_hand_swap_pressed)
 	if _hand_mulligan_button != null and not _hand_mulligan_button.pressed.is_connected(
 		_on_hand_mulligan_pressed
 	):
@@ -228,12 +229,18 @@ func _on_play_hand_pressed() -> void:
 	GameManager.try_play_hand()
 
 
-func _on_hand_undo_pressed() -> void:
-	GameManager.try_undo_hand_swap()
+func _on_hand_swap_pressed() -> void:
+	if GameManager.run == null:
+		return
+	if GameManager.run.brew_session.get_hand_swaps_remaining() <= 0:
+		_shake_hand_action_button(_hand_swap_button)
 
 
 func _on_hand_mulligan_pressed() -> void:
 	if _player_hand == null:
+		return
+	if not _can_use_mulligan_now():
+		_shake_hand_action_button(_hand_mulligan_button)
 		return
 	GameManager.try_mulligan(_player_hand.get_selected_slot())
 
@@ -251,6 +258,11 @@ func _on_hand_mulligan_started(
 
 
 func _on_hand_swap_requested(from_slot: int, to_slot: int) -> void:
+	if GameManager.run == null:
+		return
+	if GameManager.run.brew_session.get_hand_swaps_remaining() <= 0:
+		_shake_hand_action_button(_hand_swap_button)
+		return
 	GameManager.try_swap_hand_slots(from_slot, to_slot)
 
 
@@ -435,27 +447,14 @@ func _sync_hand_ui() -> void:
 		_player_hand.refresh_hand(
 			session.get_hand_slots(),
 			can_interact,
-			session.can_swap_hand()
+			can_interact
 		)
 
 	_set_hand_action_buttons_visible(can_interact)
 	if _play_hand_button != null:
 		_play_hand_button.disabled = not GameManager.can_play_hand()
-	var selected_slot := _player_hand.get_selected_slot() if _player_hand != null else -1
-	var show_undo := can_interact and session.can_undo_hand_swap()
-	var show_mulligan := can_interact and selected_slot >= 0 and session.can_mulligan()
-
-	if _hand_undo_button != null:
-		_hand_undo_button.visible = show_undo
-		_hand_undo_button.disabled = not show_undo
-	if _hand_undo_label != null:
-		_hand_undo_label.visible = show_undo
-	if _hand_mulligan_button != null:
-		_hand_mulligan_button.visible = show_mulligan
-		_hand_mulligan_button.disabled = not show_mulligan
-	if _hand_mulligan_label != null:
-		_hand_mulligan_label.visible = show_mulligan
-	if can_interact or show_undo or show_mulligan:
+	_refresh_hand_action_labels(session, can_interact)
+	if can_interact:
 		call_deferred("_align_hand_controls")
 
 
@@ -476,42 +475,85 @@ func _align_play_hand_button() -> void:
 func _align_hand_action_buttons() -> void:
 	if _play_hand_button == null or not _play_hand_button.visible:
 		return
-	var show_undo := _hand_undo_button != null and _hand_undo_button.visible
+	var show_swap := _hand_swap_button != null and _hand_swap_button.visible
 	var show_mulligan := _hand_mulligan_button != null and _hand_mulligan_button.visible
-	if not show_undo and not show_mulligan:
+	if not show_swap and not show_mulligan:
 		return
 
-	var action_left := _play_hand_button.get_global_rect().end.x + HAND_ACTION_LEFT_GAP
-	var cursor_y := _play_hand_button.get_global_rect().position.y
+	var base_y := _play_hand_button.get_global_rect().position.y
+	var action_left := (
+		_play_hand_button.get_global_rect().end.x
+		+ HAND_ACTION_LEFT_GAP
+		+ HAND_ACTION_EXTRA_OFFSET
+	)
 
 	if _hand_mulligan_button != null and _hand_mulligan_button.visible:
-		if _hand_mulligan_label != null:
-			_hand_mulligan_label.global_position = Vector2(action_left, cursor_y)
-			_hand_mulligan_label.size = HAND_ACTION_LABEL_SIZE
-			cursor_y += HAND_ACTION_LABEL_SIZE.y + HAND_ACTION_LABEL_GAP
-		_hand_mulligan_button.global_position = Vector2(action_left, cursor_y)
-		cursor_y += HAND_ACTION_BUTTON_SIZE.y + HAND_ACTION_GROUP_GAP
+		_position_hand_action_control(action_left, base_y, _hand_mulligan_button, _hand_mulligan_label)
+		action_left += HAND_ACTION_BUTTON_SIZE.x + HAND_ACTION_GROUP_GAP
 
-	if _hand_undo_button != null and _hand_undo_button.visible:
-		if _hand_undo_label != null:
-			_hand_undo_label.global_position = Vector2(action_left, cursor_y)
-			_hand_undo_label.size = HAND_ACTION_LABEL_SIZE
-			cursor_y += HAND_ACTION_LABEL_SIZE.y + HAND_ACTION_LABEL_GAP
-		_hand_undo_button.global_position = Vector2(action_left, cursor_y)
+	if _hand_swap_button != null and _hand_swap_button.visible:
+		_position_hand_action_control(action_left, base_y, _hand_swap_button, _hand_swap_label)
+
+
+func _position_hand_action_control(
+	left: float,
+	top: float,
+	button: ShopRerollButton,
+	label: Label
+) -> void:
+	if label != null:
+		label.global_position = Vector2(left, top)
+		label.size = HAND_ACTION_LABEL_SIZE
+	var button_top := top + HAND_ACTION_LABEL_SIZE.y + HAND_ACTION_LABEL_GAP
+	if button != null:
+		button.global_position = Vector2(left, button_top)
 
 
 func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
 	if _play_hand_button != null:
 		_play_hand_button.visible = visible_buttons
-	if not visible_buttons:
-		if _hand_undo_button != null:
-			_hand_undo_button.visible = false
-		if _hand_undo_label != null:
-			_hand_undo_label.visible = false
-		if _hand_mulligan_button != null:
-			_hand_mulligan_button.visible = false
-		if _hand_mulligan_label != null:
-			_hand_mulligan_label.visible = false
+	if _hand_swap_button != null:
+		_hand_swap_button.visible = visible_buttons
+	if _hand_swap_label != null:
+		_hand_swap_label.visible = visible_buttons
+	if _hand_mulligan_button != null:
+		_hand_mulligan_button.visible = visible_buttons
+	if _hand_mulligan_label != null:
+		_hand_mulligan_label.visible = visible_buttons
+
+
+func _refresh_hand_action_labels(session: BrewSession, can_interact: bool) -> void:
+	if not can_interact:
+		return
+	var swaps_remaining := session.get_hand_swaps_remaining()
+	var mulligans_remaining := session.get_mulligans_remaining()
+	if _hand_swap_label != null:
+		_hand_swap_label.text = "swap %d" % swaps_remaining
+	if _hand_mulligan_label != null:
+		_hand_mulligan_label.text = "mulligan %d" % mulligans_remaining
+	if _hand_swap_button != null:
+		_hand_swap_button.disabled = false
+	if _hand_mulligan_button != null:
+		_hand_mulligan_button.disabled = false
+
+
+func _can_use_mulligan_now() -> bool:
+	if GameManager.run == null or _player_hand == null:
+		return false
+	var session := GameManager.run.brew_session
+	if session.get_mulligans_remaining() <= 0:
+		return false
+	var selected_slot := _player_hand.get_selected_slot()
+	if selected_slot < 0:
+		return false
+	if session.get_hand_slot(selected_slot) == null:
+		return false
+	return GameManager.can_mulligan()
+
+
+func _shake_hand_action_button(button: ShopRerollButton) -> void:
+	if button != null:
+		button.shake()
 
 
 func _play_cauldron_explosion() -> void:
