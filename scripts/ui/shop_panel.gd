@@ -35,6 +35,8 @@ func _ready() -> void:
 		_reroll_button.pressed.connect(_on_reroll_pressed)
 	if _bag_button != null and not _bag_button.pressed.is_connected(_on_bag_button_pressed):
 		_bag_button.pressed.connect(_on_bag_button_pressed)
+	if _bag_contents != null and not _bag_contents.overlay_closed.is_connected(_on_bag_contents_closed):
+		_bag_contents.overlay_closed.connect(_on_bag_contents_closed)
 
 	for card in offer_cards:
 		card.offer_pressed.connect(_on_offer_pressed)
@@ -65,6 +67,10 @@ func _on_bag_button_pressed() -> void:
 	_bag_contents.toggle(GameManager.run.bag)
 	_set_offer_hover_enabled(not _bag_contents.is_open())
 	_play_shop_select_pop()
+
+
+func _on_bag_contents_closed() -> void:
+	_set_offer_hover_enabled(true)
 
 
 func _hide_bag_contents() -> void:

@@ -8,6 +8,7 @@ extends Control
 @onready var _continue_button: WoodenButton = $ContinueButton
 @onready var _easy_button: WoodenButton = $EasyButton
 @onready var _hard_button: WoodenButton = $HardButton
+@onready var _exit_button: WoodenButton = $ExitButton
 
 var _intro_playing: bool = false
 var _difficulty_picker_open: bool = false
@@ -31,6 +32,8 @@ func _ready() -> void:
 		_easy_button.pressed.connect(_on_easy_pressed)
 	if _hard_button != null and not _hard_button.pressed.is_connected(_on_hard_pressed):
 		_hard_button.pressed.connect(_on_hard_pressed)
+	if _exit_button != null and not _exit_button.pressed.is_connected(_on_exit_pressed):
+		_exit_button.pressed.connect(_on_exit_pressed)
 
 	visibility_changed.connect(_on_visibility_changed)
 	_bind_intro_video_stream()
@@ -58,6 +61,8 @@ func _sync_editor_presentation() -> void:
 		_easy_button.visible = false
 	if _hard_button != null:
 		_hard_button.visible = false
+	if _exit_button != null:
+		_exit_button.visible = true
 	if _background != null:
 		_background.visible = true
 	if _intro_video != null:
@@ -80,6 +85,8 @@ func _reset_intro_state() -> void:
 	_stop_intro_media()
 	if _play_button != null:
 		_play_button.visible = true
+	if _exit_button != null:
+		_exit_button.visible = true
 	_refresh_continue()
 
 
@@ -148,6 +155,8 @@ func _play_intro_then_start_new_run() -> void:
 		_play_button.visible = false
 	if _continue_button != null:
 		_continue_button.visible = false
+	if _exit_button != null:
+		_exit_button.visible = false
 	if _background != null:
 		_background.visible = false
 
@@ -173,6 +182,10 @@ func _on_intro_clip_finished() -> void:
 
 func _on_continue_pressed() -> void:
 	await _start_game_scene(false)
+
+
+func _on_exit_pressed() -> void:
+	get_tree().quit()
 
 
 func _start_game_scene(new_run: bool) -> void:

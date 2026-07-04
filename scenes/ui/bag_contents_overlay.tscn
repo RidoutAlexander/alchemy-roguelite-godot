@@ -23,12 +23,12 @@ corner_radius_bottom_left = 12
 [node name="BagContentsOverlay" type="Control" unique_id=857951980]
 z_index = 100
 layout_mode = 3
-anchor_right = 0.58
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 20.0
-offset_bottom = -78.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_script")
 
 [node name="InputBlocker" type="ColorRect" parent="." unique_id=900000001]
@@ -42,15 +42,16 @@ color = Color(0, 0, 0, 0.01)
 
 [node name="Panel" type="PanelContainer" parent="." unique_id=1841494498]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
+anchors_preset = -1
+anchor_right = 0.58
 anchor_bottom = 1.0
 offset_left = 12.0
-offset_top = 12.0
+offset_top = 20.0
 offset_right = -12.0
-offset_bottom = -12.0
+offset_bottom = -78.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="Content" type="VBoxContainer" parent="Panel" unique_id=396701183]

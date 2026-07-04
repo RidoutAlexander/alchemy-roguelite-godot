@@ -20,6 +20,7 @@
 [ext_resource type="AudioStream" uid="uid://bw0amfuurs636" path="res://assets/audio/boiling_water_loop.mp3" id="18_boiling_water"]
 [ext_resource type="AudioStream" uid="uid://coq7qbw3lffg3" path="res://assets/audio/cauldron_explosion.mp3" id="19_cauldron_explosion"]
 [ext_resource type="PackedScene" uid="uid://dmjonbvqoqxi7" path="res://scenes/ui/eyeball_puzzle_overlay.tscn" id="20_eyeball_puzzle"]
+[ext_resource type="PackedScene" uid="uid://cr5syaod6s2ge" path="res://scenes/ui/bag_contents_overlay.tscn" id="21_cauldron_contents"]
 
 [node name="Game" type="Control" unique_id=403037050]
 custom_minimum_size = Vector2(1024, 576)
@@ -124,26 +125,48 @@ offset_right = 653.0
 offset_bottom = 267.0
 scale = Vector2(0.89229774, 0.6760991)
 
+[node name="CauldronTarget" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=134015391]
+z_index = 8
+anchors_preset = 0
+offset_left = 350.0
+offset_top = 165.0
+offset_right = 690.0
+offset_bottom = 300.0
+
+[node name="CauldronButton" type="Button" parent="PhaseSwipeHost/BrewPanel/CauldronTarget" unique_id=320928668]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+mouse_default_cursor_shape = 2
+flat = true
+
+[node name="CauldronContentsOverlay" parent="PhaseSwipeHost/BrewPanel" unique_id=1270252000 instance=ExtResource("21_cauldron_contents")]
+layout_mode = 1
+
 [node name="GoldCounter" parent="PhaseSwipeHost/BrewPanel" unique_id=1257235171 instance=ExtResource("10_gold_display")]
 anchors_preset = 0
-offset_left = 638.0
-offset_top = 36.0
-offset_right = 802.0
-offset_bottom = 88.0
+offset_left = 841.0
+offset_top = 26.0
+offset_right = 1005.0
+offset_bottom = 78.0
 
 [node name="LivesDisplay" parent="PhaseSwipeHost/BrewPanel" unique_id=1884570556 instance=ExtResource("15_lives_display")]
 anchors_preset = 0
-offset_left = 770.0
-offset_top = 36.0
-offset_right = 938.0
-offset_bottom = 88.0
+offset_left = 662.0
+offset_top = 23.0
+offset_right = 830.0
+offset_bottom = 75.0
 
 [node name="ExplosivenessCounter" parent="PhaseSwipeHost/BrewPanel" unique_id=1523366666 instance=ExtResource("16_explosiveness_display")]
 anchors_preset = 0
-offset_left = 49.0
-offset_top = 25.0
-offset_right = 197.0
-offset_bottom = 77.0
+offset_left = 123.0
+offset_top = 196.0
+offset_right = 271.0
+offset_bottom = 248.0
 
 [node name="LevelAuraBanner" parent="PhaseSwipeHost/BrewPanel" unique_id=1743272553 instance=ExtResource("7_level_banner")]
 layout_mode = 1
@@ -158,17 +181,17 @@ grow_horizontal = 0
 
 [node name="ScoreFlask" parent="PhaseSwipeHost/BrewPanel" unique_id=882441203 instance=ExtResource("9_score_flask")]
 anchors_preset = 0
-offset_left = 730.0
-offset_top = 96.0
-offset_right = 876.0
-offset_bottom = 406.0
+offset_left = 3.0
+offset_top = 38.0
+offset_right = 149.0
+offset_bottom = 348.0
 
 [node name="GoldRewardDisplay" parent="PhaseSwipeHost/BrewPanel" unique_id=1155486730 instance=ExtResource("11_gold_reward")]
 anchors_preset = 0
-offset_left = 836.0
-offset_top = 133.0
-offset_right = 956.0
-offset_bottom = 185.0
+offset_left = 140.0
+offset_top = 106.0
+offset_right = 260.0
+offset_bottom = 158.0
 
 [node name="AddIngredientButton" parent="PhaseSwipeHost/BrewPanel" unique_id=616607972 instance=ExtResource("8_bag_button")]
 offset_left = -56.0
@@ -180,10 +203,10 @@ scale = Vector2(0.77496696, 0.77496696)
 [node name="DrawnCardPreviewHost" type="Control" parent="PhaseSwipeHost/BrewPanel" unique_id=1571212444]
 z_index = 20
 anchors_preset = 0
-offset_left = 40.0
-offset_top = 120.0
-offset_right = 208.0
-offset_bottom = 324.0
+offset_left = 729.0
+offset_top = 135.0
+offset_right = 897.0
+offset_bottom = 339.0
 mouse_filter = 2
 script = ExtResource("14_preview_host")
 

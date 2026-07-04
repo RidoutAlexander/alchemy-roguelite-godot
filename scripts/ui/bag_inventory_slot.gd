@@ -8,6 +8,7 @@ const ART_SIZE := Vector2(72.0, 72.0)
 
 var _pending_ingredient: IngredientData
 var _pending_count: int = 0
+var _show_count: bool = true
 
 
 func _ready() -> void:
@@ -16,9 +17,10 @@ func _ready() -> void:
 	_refresh_display()
 
 
-func bind_entry(ingredient: IngredientData, count: int) -> void:
+func bind_entry(ingredient: IngredientData, count: int, show_count: bool = true) -> void:
 	_pending_ingredient = ingredient
 	_pending_count = count
+	_show_count = show_count
 	_store_ingredient(ingredient)
 	_refresh_display()
 
@@ -28,6 +30,7 @@ func _refresh_display() -> void:
 		return
 	_resolve_nodes()
 	if _count_label != null:
+		_count_label.visible = _show_count
 		_count_label.text = str(maxi(1, _pending_count))
 	_apply_art(_pending_ingredient)
 	call_deferred("_sync_art_layout")

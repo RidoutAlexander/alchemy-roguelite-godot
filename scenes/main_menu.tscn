@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://dwi4y1k6kfynp" path="res://scripts/ui/main_menu.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="2_button"]
 [ext_resource type="Texture2D" uid="uid://4nvb5h351pb5" path="res://assets/main_menu/main_menu_background.jpg" id="3_main_menu_bg"]
-[ext_resource type="AudioStream" path="res://assets/main_menu/intro_audio.ogg" id="4_intro_audio"]
+[ext_resource type="AudioStream" uid="uid://osniyks051ge" path="res://assets/main_menu/intro_audio.ogg" id="4_intro_audio"]
 
 [node name="MainMenu" type="Control" unique_id=1873062893]
 layout_mode = 3
@@ -41,9 +41,8 @@ expand = true
 [node name="IntroAudio" type="AudioStreamPlayer" parent="." unique_id=2104791592]
 stream = ExtResource("4_intro_audio")
 volume_db = 21.5
-bus = &"Master"
 
-[node name="EasyButton" parent="." instance=ExtResource("2_button")]
+[node name="EasyButton" parent="." unique_id=943269469 instance=ExtResource("2_button")]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -60,7 +59,7 @@ grow_vertical = 2
 scale = Vector2(0.42, 0.42)
 label_text = "Easy"
 
-[node name="HardButton" parent="." instance=ExtResource("2_button")]
+[node name="HardButton" parent="." unique_id=547916550 instance=ExtResource("2_button")]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -108,3 +107,19 @@ grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.56023484, 0.56023484)
 label_text = "Continue"
+
+[node name="ExitButton" parent="." unique_id=406835696 instance=ExtResource("2_button")]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -208.0
+offset_top = 69.99997
+offset_right = 192.0
+offset_bottom = 370.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.56023484, 0.56023484)
+label_text = "Exit Game"

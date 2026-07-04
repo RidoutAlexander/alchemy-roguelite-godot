@@ -18,6 +18,7 @@ tools/ffmpeg/extract/
 # OS / editor
 .DS_Store
 Thumbs.db
+~$*.xlsx
 *.swp
 *~
 .vscode/

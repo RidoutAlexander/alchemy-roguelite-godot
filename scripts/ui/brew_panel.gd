@@ -23,6 +23,8 @@ const PLOP_PITCH_MAX := 1.3
 @onready var _cauldron_plop_player: AudioStreamPlayer = $CauldronPlopPlayer
 @onready var _boiling_water_player: AudioStreamPlayer = $BoilingWaterPlayer
 @onready var _cauldron_explosion_player: AudioStreamPlayer = $CauldronExplosionPlayer
+@onready var _cauldron_button: BaseButton = $CauldronTarget/CauldronButton
+@onready var _cauldron_contents: BagContentsOverlay = $CauldronContentsOverlay
 @onready var _eyeball_puzzle: EyeballPuzzleOverlay = $"../../EyeballPuzzleOverlay"
 
 var _brew_exit_animations_pending: int = 0
@@ -51,12 +53,42 @@ func _ready() -> void:
 	if _eyeball_puzzle != null:
 		_eyeball_puzzle.completed.connect(_on_eyeball_puzzle_completed)
 		_eyeball_puzzle.picker_completed.connect(_on_bat_wing_picker_completed)
+	if _cauldron_button != null and not _cauldron_button.pressed.is_connected(_on_cauldron_button_pressed):
+		_cauldron_button.pressed.connect(_on_cauldron_button_pressed)
+	visibility_changed.connect(_on_visibility_changed)
 	visibility_changed.connect(_sync_brew_ambience)
 	_sync_brew_ambience()
 	set_process(true)
 
 
+func _on_visibility_changed() -> void:
+	if not visible:
+		_hide_cauldron_contents()
+
+
+func _on_cauldron_button_pressed() -> void:
+	if _cauldron_contents == null or GameManager.run == null:
+		return
+	var ctx := GameManager.run.brew_session.context
+	_cauldron_contents.toggle_cauldron(ctx.cauldron_contents)
+
+
+func _hide_cauldron_contents() -> void:
+	if _cauldron_contents != null:
+		_cauldron_contents.hide_overlay()
+
+
+func _refresh_cauldron_contents_if_open() -> void:
+	if _cauldron_contents == null or GameManager.run == null:
+		return
+	if not _cauldron_contents.is_open():
+		return
+	var ctx := GameManager.run.brew_session.context
+	_cauldron_contents.show_cauldron_contents(ctx.cauldron_contents)
+
+
 func _on_brew_updated(ctx: BrewContext) -> void:
+	_refresh_cauldron_contents_if_open()
 	if ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
 		_brew_ambience_suppressed = false
 		if ctx.score <= 0:
@@ -78,6 +110,7 @@ func _on_brew_updated(ctx: BrewContext) -> void:
 func _on_ingredient_drawn(ctx: BrewContext, ingredient: IngredientData) -> void:
 	if ingredient == null:
 		return
+	_refresh_cauldron_contents_if_open()
 	GameManager.set_presentation_in_progress(true)
 	_show_preview(ingredient)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
