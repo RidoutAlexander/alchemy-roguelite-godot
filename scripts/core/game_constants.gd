@@ -10,6 +10,7 @@ const SHOP_SLOT_COUNT := 4
 const SHOP_RARITY_WEIGHTS := [5, 4, 3, 2, 1]
 const REROLL_COST := 2
 const BOSS_AURA_INTERVAL := 5
+const MIN_BOSS_THRESHOLD := 1
 const BOSS_AURA_WARNING := "You must complete the potion this round."
 const PRACTICE_BREW_AURA_ID := "practice brew"
 const IN_RHYTHM_AURA_ID := "in_rhythm"
@@ -23,6 +24,12 @@ const HIGH_SCORE_KEY := "alchemy_roguelite_highscores"
 
 static func is_boss_level(level: int) -> bool:
 	return level > 0 and level % BOSS_AURA_INTERVAL == 0
+
+
+static func clamp_threshold_for_level(level: int, threshold: int) -> int:
+	if is_boss_level(level):
+		return maxi(MIN_BOSS_THRESHOLD, threshold)
+	return threshold
 
 
 static func boss_number(level: int) -> int:

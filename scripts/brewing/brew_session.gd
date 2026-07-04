@@ -77,8 +77,9 @@ func start_brew(
 	context.threshold = base_threshold
 	if GameConstants.is_boss_level(level):
 		context.threshold += maxi(0, boss_threshold_penalty)
-		context.threshold = maxi(0, context.threshold - maxi(0, boss_threshold_discount))
+		context.threshold -= maxi(0, boss_threshold_discount)
 	context.threshold = _AuraEffects.apply_threshold_modifier(context.threshold, aura)
+	context.threshold = GameConstants.clamp_threshold_for_level(level, context.threshold)
 	context.current_aura = aura
 	context.bag = bag
 	context.score = 0
