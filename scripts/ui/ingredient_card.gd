@@ -103,14 +103,34 @@ func get_ingredient() -> IngredientData:
 	return _ingredient
 
 
-func bind_hand_card(ingredient: IngredientData, slot_index: int, drag_enabled: bool) -> void:
+func bind_hand_card(
+	ingredient: IngredientData,
+	slot_index: int,
+	drag_enabled: bool,
+	display_point_value: int = -1,
+	display_explosive_value: int = -1
+) -> void:
 	_reset_mode_flags()
 	_hand_mode = true
 	_hand_slot_index = slot_index
 	_hand_drag_enabled = drag_enabled
 	bind_preview(ingredient)
+	if display_point_value >= 0:
+		update_hand_stat_display(display_point_value, display_explosive_value)
 	_apply_hand_layout()
 	_sync_hand_input()
+
+
+func update_hand_stat_display(point_value: int, explosive_value: int) -> void:
+	if not is_node_ready() or not _hand_mode:
+		return
+	_points_value.text = "%d" % point_value
+	if explosive_value > 0:
+		_explosive_value.text = "%d" % explosive_value
+		$VisualRoot/StatsRow/ExplosiveStat.visible = true
+	else:
+		_explosive_value.text = ""
+		$VisualRoot/StatsRow/ExplosiveStat.visible = false
 
 
 func clear_hand_card() -> void:

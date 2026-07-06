@@ -55,6 +55,9 @@ KNOWN_SOURCES: dict[str, Path] = {
     "lucky_coin": Path(
         r"C:\Users\ridou\Downloads\grok-82488574-8be3-4b6d-9583-8d813230dc83.jpg"
     ),
+    "fish_bones": Path(
+        r"C:\Users\ridou\Downloads\grok-32fa159a-c20d-487b-bf35-2770d3c03705.jpg"
+    ),
 }
 
 
@@ -130,6 +133,63 @@ def interior_art_mask(rgb: np.ndarray) -> np.ndarray:
                 queue.append((ny, nx))
 
     return interior | subject | outline
+
+
+def backdrop_color_from_corners(rgb: np.ndarray) -> np.ndarray:
+    height, width = rgb.shape[:2]
+    corners = np.array(
+        [
+            rgb[0, 0],
+            rgb[0, width - 1],
+            rgb[height - 1, 0],
+            rgb[height - 1, width - 1],
+        ],
+        dtype=np.float32,
+    )
+    return corners.mean(axis=0)
+
+
+def is_strict_backdrop_pixel(
+    rgb: np.ndarray,
+    backdrop: np.ndarray,
+    *,
+    tolerance: int = 3,
+    max_delta: int = 8,
+) -> np.ndarray:
+    """Match only the flat exterior JPG/checkerboard shade, not bone highlights."""
+    dist = np.abs(rgb.astype(np.float32) - backdrop[None, None, :]).max(axis=2)
+    delta = rgb.max(axis=2) - rgb.min(axis=2)
+    return (dist <= tolerance) & (delta < max_delta)
+
+
+def build_opaque_mask_fish_bones(rgb: np.ndarray) -> np.ndarray:
+    """Keep every interior pixel opaque; clear only edge-connected backdrop matte."""
+    backdrop = backdrop_color_from_corners(rgb)
+    exterior_matte = is_strict_backdrop_pixel(rgb, backdrop)
+    exterior = flood_mask_from_edges(exterior_matte)
+    interior = interior_art_mask(rgb)
+    return interior | ~exterior
+
+
+def clean_strict_backdrop_fringe(
+    data: np.ndarray,
+    source_rgb: np.ndarray,
+    *,
+    tolerance: int = 5,
+    depth: int = 3,
+) -> None:
+    """Remove backdrop-colored halo pixels touching transparent exterior only."""
+    backdrop = backdrop_color_from_corners(source_rgb)
+    backdrop_mask = is_strict_backdrop_pixel(
+        source_rgb,
+        backdrop,
+        tolerance=tolerance,
+        max_delta=10,
+    )
+    alpha = data[:, :, 3]
+    transparent = alpha == 0
+    border = dilate(transparent, depth) & ~transparent & (alpha > 0)
+    data[border & backdrop_mask, 3] = 0
 
 
 def is_exterior_matte(rgb: np.ndarray) -> np.ndarray:
@@ -594,6 +654,14 @@ def seal_subject_interior(data: np.ndarray, source_rgb: np.ndarray) -> None:
 
 def build_rgba(image: Image.Image, art_name: str = "") -> np.ndarray:
     rgb = np.array(image.convert("RGB"))
+    if art_name == "fish_bones":
+        opaque = build_opaque_mask_fish_bones(rgb)
+        rgba = np.zeros((rgb.shape[0], rgb.shape[1], 4), dtype=np.uint8)
+        rgba[:, :, :3] = rgb
+        rgba[:, :, 3] = np.where(opaque, 255, 0).astype(np.uint8)
+        clean_strict_backdrop_fringe(rgba, rgb)
+        return rgba
+
     opaque = build_opaque_mask(rgb)
 
     rgba = np.zeros((rgb.shape[0], rgb.shape[1], 4), dtype=np.uint8)
@@ -671,25 +739,41 @@ def prepare_ingredient_art(source: Path, output: Path, import_godot: bool = True
     cropped_rgb = _crop_rgb(source_rgb, data.shape[:2])
     leg_gap: np.ndarray | None = None
     spider_glare: np.ndarray | None = None
-    if art_name == "spider":
+    if art_name == "fish_bones":
+        clean_strict_backdrop_fringe(data, cropped_rgb)
+    elif art_name == "spider":
         leg_gap, _ = spider_leg_gap_mask(cropped_rgb)
         _, spider_glare = spider_glare_mask(cropped_rgb)
-    scrub_silhouette_edge(
-        data,
-        cropped_rgb,
-        preserve_transparent=leg_gap,
-        preserve_opaque=spider_glare,
-        depths=(3, 2, 1),
-    )
-    fill_interior_matte(
-        data,
-        cropped_rgb,
-        preserve_transparent=leg_gap,
-        only_transparent=True,
-        skip_near_silhouette=False,
-    )
-    if art_name == "spider":
+        scrub_silhouette_edge(
+            data,
+            cropped_rgb,
+            preserve_transparent=leg_gap,
+            preserve_opaque=spider_glare,
+            depths=(3, 2, 1),
+        )
+        fill_interior_matte(
+            data,
+            cropped_rgb,
+            preserve_transparent=leg_gap,
+            only_transparent=True,
+            skip_near_silhouette=False,
+        )
         fill_spider_glare(data, cropped_rgb)
+    else:
+        scrub_silhouette_edge(
+            data,
+            cropped_rgb,
+            preserve_transparent=leg_gap,
+            preserve_opaque=spider_glare,
+            depths=(3, 2, 1),
+        )
+        fill_interior_matte(
+            data,
+            cropped_rgb,
+            preserve_transparent=leg_gap,
+            only_transparent=True,
+            skip_near_silhouette=False,
+        )
     Image.fromarray(data, "RGBA").save(output)
     ensure_ingredient_import_settings(output)
 

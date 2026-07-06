@@ -81,6 +81,7 @@ static func _parse_aura(row: Dictionary) -> AuraData:
 		str(row.get("display_name", aura_id)),
 		str(row.get("description", "")),
 		POOL_MAP[pool_key],
+		int(row.get("pool_unlock_level", 1)),
 		int(row.get("explosion_limit_modifier", 0)),
 		int(row.get("score_multiplier_percent", 100)),
 		int(row.get("gold_multiplier_percent", 100))

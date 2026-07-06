@@ -30,10 +30,10 @@ func find_aura(aura_id: String) -> AuraData:
 	return auras.get(aura_id)
 
 
-func auras_for_pool(pool: AuraData.Pool) -> Array:
+func auras_for_pool(pool: AuraData.Pool, level: int = 1) -> Array:
 	var result: Array = []
 	for aura in auras.values():
-		if aura.pool == pool:
+		if aura.pool == pool and level >= aura.pool_unlock_level:
 			result.append(aura)
 	return result
 

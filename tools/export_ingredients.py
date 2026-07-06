@@ -37,6 +37,7 @@ AURA_HEADERS = [
     "display_name",
     "description",
     "pool",
+    "pool_unlock_level",
     "explosion_limit_modifier",
     "score_multiplier_percent",
     "gold_multiplier_percent",
@@ -60,6 +61,7 @@ DEFAULT_AURAS = [
         "Explosion limit +1 this level.",
         "normal",
         1,
+        1,
         100,
         100,
     ],
@@ -68,6 +70,7 @@ DEFAULT_AURAS = [
         "Gold Rush",
         "Gold earned +25% this level.",
         "normal",
+        1,
         0,
         100,
         125,
@@ -77,6 +80,7 @@ DEFAULT_AURAS = [
         "Shaky Hands",
         "Explosion limit -1 this level.",
         "normal",
+        1,
         -1,
         100,
         100,
@@ -86,6 +90,7 @@ DEFAULT_AURAS = [
         "Overpressure",
         "Boss: explosion limit -2.",
         "boss",
+        1,
         -2,
         100,
         100,
@@ -95,6 +100,7 @@ DEFAULT_AURAS = [
         "Stingy Market",
         "Boss: gold earned -25%.",
         "boss",
+        1,
         0,
         100,
         75,
@@ -397,7 +403,7 @@ def _style_aura_sheet(sheet) -> None:
     pool_validation = DataValidation(type="list", formula1='"normal,boss"', allow_blank=False)
     pool_validation.add(f"D2:D{max(sheet.max_row, 200)}")
     sheet.add_data_validation(pool_validation)
-    widths = [18, 20, 44, 10, 22, 22, 22]
+    widths = [18, 20, 44, 10, 18, 22, 22, 22]
     for idx, width in enumerate(widths, start=1):
         sheet.column_dimensions[chr(64 + idx)].width = width
 
@@ -419,9 +425,14 @@ def ensure_auras_sheet(wb) -> bool:
                     str(sheet.cell(row_idx, columns.get("display_name", 2)).value or "").strip(),
                     _description_from_cell(sheet.cell(row_idx, columns.get("description", 3))),
                     str(sheet.cell(row_idx, columns.get("pool", 4)).value or "normal").strip().lower(),
-                    sheet.cell(row_idx, columns.get("explosion_limit_modifier", 5)).value or 0,
-                    sheet.cell(row_idx, columns.get("score_multiplier_percent", 6)).value or 100,
-                    sheet.cell(row_idx, columns.get("gold_multiplier_percent", 7)).value or 100,
+                    (
+                        sheet.cell(row_idx, columns["pool_unlock_level"]).value
+                        if "pool_unlock_level" in columns
+                        else 1
+                    ),
+                    sheet.cell(row_idx, columns.get("explosion_limit_modifier", 6)).value or 0,
+                    sheet.cell(row_idx, columns.get("score_multiplier_percent", 7)).value or 100,
+                    sheet.cell(row_idx, columns.get("gold_multiplier_percent", 8)).value or 100,
                 ]
             )
         if not rows:
@@ -625,6 +636,16 @@ def export_workbook() -> None:
         pool = str(aura_sheet.cell(row_index, aura_columns["pool"]).value).strip().lower()
         if pool not in {"normal", "boss"}:
             raise ValueError(f"Auras row {row_index} ('{aura_id}'): pool must be 'normal' or 'boss'.")
+        pool_unlock_level = _parse_int(
+            aura_sheet.cell(row_index, aura_columns["pool_unlock_level"]).value,
+            "pool_unlock_level",
+            row_index,
+            aura_id,
+        )
+        if pool_unlock_level < 1:
+            raise ValueError(
+                f"Auras row {row_index} ('{aura_id}'): pool_unlock_level must be >= 1."
+            )
         explosion_mod = _parse_int(
             aura_sheet.cell(row_index, aura_columns["explosion_limit_modifier"]).value,
             "explosion_limit_modifier",
@@ -649,6 +670,7 @@ def export_workbook() -> None:
                 "display_name": str(aura_sheet.cell(row_index, aura_columns["display_name"]).value).strip(),
                 "description": _description_from_cell(aura_sheet.cell(row_index, aura_columns["description"])),
                 "pool": pool,
+                "pool_unlock_level": pool_unlock_level,
                 "explosion_limit_modifier": explosion_mod,
                 "score_multiplier_percent": score_mult,
                 "gold_multiplier_percent": gold_mult,

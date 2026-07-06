@@ -194,7 +194,12 @@ func _on_hand_card_played(
 	if _player_hand != null:
 		_player_hand.hide_slot_for_fly(slot_index)
 	var brew_ended := _ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	var fly_count := GameManager.run.brew_session.last_play_fly_count
+	var session := GameManager.run.brew_session
+	if session.last_play_fairy_poof:
+		session.last_play_fairy_poof = false
+		_play_fairy_poof_hand(ingredient, slot_index, brew_ended)
+		return
+	var fly_count := session.last_play_fly_count
 	_play_hand_card_fly(ingredient, slot_index, brew_ended, fly_count)
 
 
@@ -208,7 +213,12 @@ func _on_ingredient_drawn(
 	_refresh_cauldron_contents_if_open()
 	GameManager.set_presentation_in_progress(true)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	var fly_count := GameManager.run.brew_session.last_play_fly_count
+	var session := GameManager.run.brew_session
+	if session.last_play_fairy_poof:
+		session.last_play_fairy_poof = false
+		_play_fairy_poof_draw(ingredient, brew_ended)
+		return
+	var fly_count := session.last_play_fly_count
 	_play_cauldron_fly(ingredient, brew_ended, fly_count)
 
 
@@ -473,7 +483,8 @@ func _sync_hand_ui() -> void:
 			session.get_hand_slots(),
 			can_interact,
 			can_interact,
-			session.get_in_rhythm_double_hand_slots()
+			session.get_in_rhythm_double_hand_slots(),
+			session.get_hand_display_stats()
 		)
 
 	_set_play_undo_visible(can_interact)
@@ -672,6 +683,46 @@ func _play_cauldron_plop() -> void:
 	_cauldron_plop_player.pitch_scale = randf_range(PLOP_PITCH_MIN, PLOP_PITCH_MAX)
 	_cauldron_plop_player.stop()
 	_cauldron_plop_player.play()
+
+
+func _play_fairy_poof_hand(
+	ingredient: IngredientData,
+	slot_index: int,
+	track_for_exit: bool
+) -> void:
+	var fly_data := _hand_play_fly_data_for(ingredient, slot_index)
+	_play_fairy_poof_with_data(fly_data, ingredient, track_for_exit)
+
+
+func _play_fairy_poof_draw(ingredient: IngredientData, track_for_exit: bool) -> void:
+	var fly_data := _bag_to_cauldron_fly_data(ingredient)
+	if not fly_data.is_empty():
+		fly_data["target_center"] = fly_data["start_center"]
+	_play_fairy_poof_with_data(fly_data, ingredient, track_for_exit)
+
+
+func _play_fairy_poof_with_data(
+	fly_data: Dictionary,
+	ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	if track_for_exit:
+		_brew_exit_animations_pending += 1
+
+	if fly_data.is_empty():
+		GameManager.present_card_stats()
+		_finish_card_presentation(ingredient, track_for_exit)
+		return
+
+	_IngredientFlyUtil.play_poof(
+		_fly_layer,
+		fly_data.get("texture"),
+		fly_data["start_center"],
+		fly_data.get("size", FLY_ART_SIZE),
+		func() -> void:
+			GameManager.present_card_stats()
+			_finish_card_presentation(ingredient, track_for_exit)
+	)
 
 
 func _play_hand_card_fly(

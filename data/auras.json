@@ -4,6 +4,7 @@
     "display_name": "Stable Brew",
     "description": "Explosion limit +1 this level.",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 1,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -13,6 +14,7 @@
     "display_name": "Gold Rush",
     "description": "Gold earned +25% this level.",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 125
@@ -22,6 +24,7 @@
     "display_name": "Shaky Hands",
     "description": "Explosion limit -1 this level.",
     "pool": "boss",
+    "pool_unlock_level": 5,
     "explosion_limit_modifier": -1,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -31,6 +34,7 @@
     "display_name": "Volatile Brew",
     "description": "Explosion limit -2.",
     "pool": "boss",
+    "pool_unlock_level": 9,
     "explosion_limit_modifier": -2,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -40,6 +44,7 @@
     "display_name": "Stingy",
     "description": "Gold earned -25%.",
     "pool": "boss",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 75
@@ -49,6 +54,7 @@
     "display_name": "Low Expectations",
     "description": "Threshold reduced by 15%",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 85,
     "gold_multiplier_percent": 100
@@ -58,6 +64,7 @@
     "display_name": "Under Pressure",
     "description": "Increase threshold and gold gain by 15%",
     "pool": "boss",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 115,
     "gold_multiplier_percent": 115
@@ -67,6 +74,7 @@
     "display_name": "In Rhythm",
     "description": "every 3rd ingredient added to the cauldron has double score and explosiveness",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -76,6 +84,7 @@
     "display_name": "Practice Brew",
     "description": "You may restart the brew at anypoint before it explodes",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -85,6 +94,7 @@
     "display_name": "Regular Brew",
     "description": "Nothing special",
     "pool": "normal",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
@@ -94,6 +104,7 @@
     "display_name": "Regular Boss",
     "description": "Nothing special",
     "pool": "boss",
+    "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100

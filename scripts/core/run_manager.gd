@@ -25,6 +25,10 @@ var _aura_selector: AuraSelector
 var _shop_service: ShopService
 
 
+func find_ingredient(ingredient_id: String) -> IngredientData:
+	return _content.find_ingredient(ingredient_id)
+
+
 func _init(content: DefaultContent) -> void:
 	_content = content
 	brew_session = BrewSession.new()

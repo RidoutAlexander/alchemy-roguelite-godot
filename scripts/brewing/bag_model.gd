@@ -40,6 +40,13 @@ func add_to_master_bag(ingredient: IngredientData) -> bool:
 	return true
 
 
+func grant_ingredient_during_brew(ingredient: IngredientData) -> bool:
+	if not add_to_master_bag(ingredient):
+		return false
+	_working_chips.append(ingredient)
+	return true
+
+
 func reset_for_brew(shuffle: bool = false) -> void:
 	_working_chips = _master_chips.duplicate()
 	_forced_draw_queue.clear()
@@ -144,6 +151,33 @@ func take_random(count: int) -> Array[IngredientData]:
 		picked.append(_working_chips[index])
 		_working_chips.remove_at(index)
 	return picked
+
+
+func take_random_excluding_id(excluded_id: String, count: int = 1) -> Array[IngredientData]:
+	var pool: Array[IngredientData] = []
+	for chip in _working_chips:
+		if chip != null and chip.id != excluded_id:
+			pool.append(chip)
+
+	if pool.is_empty():
+		return take_random(count)
+
+	var picked: Array[IngredientData] = []
+	var slots := mini(count, pool.size())
+	for _i in slots:
+		var index := randi_range(0, pool.size() - 1)
+		var chosen: IngredientData = pool[index]
+		pool.remove_at(index)
+		_remove_working_chip(chosen)
+		picked.append(chosen)
+	return picked
+
+
+func _remove_working_chip(chip: IngredientData) -> void:
+	for i in _working_chips.size():
+		if _working_chips[i] == chip:
+			_working_chips.remove_at(i)
+			return
 
 
 func return_to_bag(ingredients: Array) -> void:

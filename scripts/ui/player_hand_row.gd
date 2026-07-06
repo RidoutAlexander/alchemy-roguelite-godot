@@ -123,7 +123,8 @@ func refresh_hand(
 	slots: Array,
 	interaction_enabled: bool,
 	swap_enabled: bool = true,
-	in_rhythm_shake_slots: Array = []
+	in_rhythm_shake_slots: Array = [],
+	hand_display_stats: Array = []
 ) -> void:
 	_interaction_enabled = interaction_enabled
 	_swap_enabled = swap_enabled and interaction_enabled
@@ -138,7 +139,12 @@ func refresh_hand(
 		_press_position = Vector2.INF
 	for slot_index in HAND_SLOT_COUNT:
 		var ingredient = slots[slot_index] if slot_index < slots.size() else null
-		_bind_slot(slot_index, ingredient)
+		var display_stats = (
+			hand_display_stats[slot_index]
+			if slot_index < hand_display_stats.size()
+			else null
+		)
+		_bind_slot(slot_index, ingredient, display_stats)
 	if (
 		_selected_slot >= 0
 		and (
@@ -198,12 +204,16 @@ func is_slot_suppressed(slot_index: int) -> bool:
 	return _suppressed_slots.has(slot_index)
 
 
-func reveal_slot(slot_index: int, ingredient: IngredientData) -> void:
+func reveal_slot(
+	slot_index: int,
+	ingredient: IngredientData,
+	display_stats: Variant = null
+) -> void:
 	_suppressed_slots.erase(slot_index)
-	_bind_slot(slot_index, ingredient)
+	_bind_slot(slot_index, ingredient, display_stats)
 
 
-func _bind_slot(slot_index: int, ingredient: IngredientData) -> void:
+func _bind_slot(slot_index: int, ingredient: IngredientData, display_stats: Variant = null) -> void:
 	if slot_index < 0 or slot_index >= _slot_cards.size():
 		return
 	var card := _slot_cards[slot_index]
@@ -213,7 +223,16 @@ func _bind_slot(slot_index: int, ingredient: IngredientData) -> void:
 		card.visible = false
 		card.clear_hand_card()
 		return
-	card.bind_hand_card(ingredient, slot_index, false)
+	if display_stats is Dictionary:
+		card.bind_hand_card(
+			ingredient,
+			slot_index,
+			false,
+			int(display_stats.get("point_value", ingredient.point_value)),
+			int(display_stats.get("explosive_value", ingredient.explosive_value))
+		)
+	else:
+		card.bind_hand_card(ingredient, slot_index, false)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.visible = not _suppressed_slots.has(slot_index)
 	_apply_slot_z_index(slot_index)

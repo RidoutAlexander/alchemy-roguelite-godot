@@ -13,11 +13,11 @@ func _init(content: DefaultContent) -> void:
 func pick_aura_for_level(level: int, last_aura_id: String) -> AuraData:
 	var pool := AuraData.Pool.BOSS if level % GameConstants.BOSS_AURA_INTERVAL == 0 else AuraData.Pool.NORMAL
 	var candidates: Array = []
-	for aura in _content.auras_for_pool(pool):
+	for aura in _content.auras_for_pool(pool, level):
 		if aura.id != last_aura_id:
 			candidates.append(aura)
 	if candidates.is_empty():
-		candidates = _content.auras_for_pool(pool)
+		candidates = _content.auras_for_pool(pool, level)
 	if candidates.is_empty():
 		return null
 	_shuffle_candidates(candidates)
