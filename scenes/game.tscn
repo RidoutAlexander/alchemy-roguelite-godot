@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://tuusxj8a6emi"]
 
 [ext_resource type="Script" uid="uid://covvq82fxvua8" path="res://scripts/ui/game_hud.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/brew_stat_popups.gd" id="24_brew_stat_popups"]
 [ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="2_button"]
 [ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="3_font"]
 [ext_resource type="PackedScene" uid="uid://bgpkp1ft6krc7" path="res://scenes/ui/shop_panel.tscn" id="4_shop"]
@@ -65,6 +66,9 @@ theme_override_font_sizes/font_size = 28
 text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="BrewStatPopups" type="Node" parent="HudOverlayLayer"]
+script = ExtResource("24_brew_stat_popups")
 
 [node name="PhaseSwipeHost" type="Control" parent="." unique_id=1475295315]
 clip_children = 1
@@ -282,6 +286,21 @@ offset_right = 1014.0
 offset_bottom = 538.0
 scale = Vector2(0.4607092, 0.4607092)
 label_text = "Save and Quit"
+
+[node name="DevModeCheckbox" type="CheckBox" parent="PhaseSwipeHost/BrewPanel"]
+offset_left = 744.0
+offset_top = 542.0
+offset_right = 1014.0
+offset_bottom = 572.0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 18
+text = "Developer Mode"
+
+[node name="DevHandPickerLayer" type="CanvasLayer" parent="."]
+layer = 15
+follow_viewport_enabled = true
+
+[node name="DevHandPickerOverlay" parent="DevHandPickerLayer" instance=ExtResource("21_cauldron_contents")]
 
 [node name="ShopPanel" parent="PhaseSwipeHost" unique_id=1760442899 instance=ExtResource("4_shop")]
 visible = false

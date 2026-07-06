@@ -6,15 +6,32 @@ const ART_SIZE := Vector2(72.0, 72.0)
 @onready var _art: TextureRect = $Art
 @onready var _count_label: Label = $CountLabel
 
+signal slot_gui_input(event: InputEvent)
+
 var _pending_ingredient: IngredientData
 var _pending_count: int = 0
 var _show_count: bool = true
+var _interactive: bool = false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(_sync_art_layout)
+	if not gui_input.is_connected(_on_gui_input):
+		gui_input.connect(_on_gui_input)
 	_refresh_display()
+
+
+func set_interactive(enabled: bool) -> void:
+	_interactive = enabled
+	mouse_filter = Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
+
+
+func _on_gui_input(event: InputEvent) -> void:
+	if not _interactive:
+		return
+	slot_gui_input.emit(event)
+	accept_event()
 
 
 func bind_entry(ingredient: IngredientData, count: int, show_count: bool = true) -> void:

@@ -15,6 +15,7 @@ const DRAG_START_DISTANCE := 8.0
 const HOVER_Z_BOOST := 20
 const HAND_HOVER_RISE := 28.0
 const HAND_HOVER_SCALE := 1.12
+const HAND_HOVER_PAD_BOTTOM := 16.0
 const MIDDLE_SLOT_INDEX := 2
 const PLAY_BUTTON_GAP := 12.0
 const RHYTHM_SHAKE_OFFSET := Vector2(5.0, 2.0)
@@ -325,29 +326,37 @@ func _apply_slot_z_index(slot_index: int) -> void:
 		return
 	if _selected_slot == slot_index:
 		card.z_index = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index + 10
-	elif _hover_slot == slot_index and _dragging_card == null:
+	elif _hover_slot == slot_index:
 		card.z_index = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index
 	else:
 		card.z_index = slot_index
 
 
 func _update_hover_process() -> void:
-	var should_process := _interaction_enabled and _dragging_card == null
-	set_process(should_process)
+	set_process(_interaction_enabled)
 	set_process_input(_interaction_enabled)
 
 
 func _process(delta: float) -> void:
 	if _dragging_card != null:
 		_dragging_card.global_position = _mouse_global_position() + _drag_grab_offset
+		if _dragging_card.has_method("update_hand_hover"):
+			_dragging_card.update_hand_hover(true, delta)
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_finish_card_drag()
+			return
+		_update_hand_hover_states(delta)
 		return
 
+	_update_hand_hover_states(delta)
+
+
+func _update_hand_hover_states(delta: float) -> void:
+	var exclude_slot := _drag_source_slot if _dragging_card != null else -1
 	var mouse_point := _mouse_global_position()
-	var hovered_slot := _topmost_slot_at(mouse_point) if _interaction_enabled else -1
-	if _selected_slot >= 0:
-		hovered_slot = -1
+	var hovered_slot := (
+		_topmost_slot_at(mouse_point, exclude_slot) if _interaction_enabled else -1
+	)
 	if hovered_slot != _hover_slot:
 		var previous := _hover_slot
 		_hover_slot = hovered_slot
@@ -355,12 +364,16 @@ func _process(delta: float) -> void:
 			_apply_slot_z_index(previous)
 		if _hover_slot >= 0:
 			_apply_slot_z_index(_hover_slot)
+		if _selected_slot >= 0:
+			_apply_slot_z_index(_selected_slot)
 
 	for slot_index in _slot_cards.size():
+		if _dragging_card != null and slot_index == _drag_source_slot:
+			continue
 		var card := _slot_cards[slot_index]
 		if card == null or not card.visible:
 			continue
-		card.update_hand_hover(slot_index == _hover_slot or slot_index == _selected_slot, delta)
+		card.update_hand_hover(slot_index == _hover_slot, delta)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -427,6 +440,14 @@ func _begin_drag_from_slot(slot_index: int) -> void:
 	_drag_grab_offset = global_pos - _mouse_global_position()
 	_dragging_card = card
 	_hover_slot = -1
+	for other_slot in _slot_cards.size():
+		if other_slot == slot_index:
+			continue
+		var slot_card := _slot_cards[other_slot]
+		if slot_card == null:
+			continue
+		if slot_card.has_method("update_hand_hover"):
+			slot_card.update_hand_hover(false, 1.0)
 	_stop_rhythm_shake(slot_index)
 	set_process(true)
 	set_process_input(true)
@@ -471,16 +492,47 @@ func _return_card_to_slot(card: IngredientCard, slot_index: int) -> void:
 		_slot_cards[slot_index] = card
 
 
-func _topmost_slot_at(global_point: Vector2) -> int:
-	for slot_index in range(HAND_SLOT_COUNT - 1, -1, -1):
+func _slot_hover_hit_rect(slot_index: int, card: IngredientCard) -> Rect2:
+	if card == null:
+		return Rect2()
+
+	var hit_rect := (
+		card.get_hand_hit_rect() if card.has_method("get_hand_hit_rect") else card.get_global_rect()
+	)
+	if slot_index >= 0 and slot_index < _slot_anchors.size():
+		var anchor := _slot_anchors[slot_index]
+		if anchor != null:
+			hit_rect = hit_rect.merge(anchor.get_global_rect())
+
+	var pad_top := HAND_HOVER_RISE * CARD_SCALE * HAND_HOVER_SCALE
+	hit_rect.position.y -= pad_top
+	hit_rect.size.y += pad_top + HAND_HOVER_PAD_BOTTOM
+	return hit_rect
+
+
+func _topmost_slot_at(global_point: Vector2, exclude_slot: int = -1) -> int:
+	var best_slot := -1
+	var best_z := -1
+
+	for slot_index in HAND_SLOT_COUNT:
+		if slot_index == exclude_slot:
+			continue
 		if slot_index >= _slot_cards.size():
 			continue
 		var card := _slot_cards[slot_index]
 		if card == null or not card.visible:
 			continue
-		if card.get_global_rect().has_point(global_point):
-			return slot_index
-	return -1
+		if _dragging_card != null and slot_index == _drag_source_slot:
+			continue
+		var hit_rect := _slot_hover_hit_rect(slot_index, card)
+		if not hit_rect.has_point(global_point):
+			continue
+		var card_z := card.z_index
+		if card_z > best_z or (card_z == best_z and slot_index > best_slot):
+			best_z = card_z
+			best_slot = slot_index
+
+	return best_slot
 
 
 func _best_slot_for_card(card: IngredientCard) -> int:

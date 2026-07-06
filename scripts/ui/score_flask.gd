@@ -25,8 +25,13 @@ func _ready() -> void:
 	_pulse_container.scale = Vector2.ONE
 	_pulse_container.pivot_offset = _pulse_container.size * 0.5
 	resized.connect(_on_resized)
+	GameManager.brew_stats_presented.connect(_on_brew_stats_presented)
 	_on_resized()
 	set_process(true)
+
+
+func _on_brew_stats_presented(_ctx: BrewContext) -> void:
+	_force_refresh()
 
 
 func _on_resized() -> void:
@@ -39,17 +44,12 @@ func _on_resized() -> void:
 func _process(delta: float) -> void:
 	if _liquid == null or _pulse_container == null:
 		return
-	var ctx := GameManager.run.brew_session.context
+	var session := GameManager.run.brew_session
+	var ctx := session.context
 	if ctx == null or ctx.current_aura == null:
 		return
 
-	var is_boss := ctx.is_boss_level()
-	_update_score_label(ctx.score, ctx.threshold, is_boss)
-
-	var target_fill := 0.0
-	if ctx.threshold > 0:
-		target_fill = clampf(float(ctx.score) / float(ctx.threshold), 0.0, 1.0)
-
+	var target_fill := _target_fill_for_session(session, ctx)
 	if target_fill <= 0.0:
 		_display_fill = 0.0
 	elif target_fill > _display_fill:
@@ -57,10 +57,38 @@ func _process(delta: float) -> void:
 	else:
 		_display_fill = target_fill
 
-	if ctx.score <= 0 and _is_complete:
+	_apply_fill_visuals(session, ctx)
+
+
+func _force_refresh() -> void:
+	if _liquid == null or _pulse_container == null:
+		return
+	var session := GameManager.run.brew_session
+	var ctx := session.context
+	if ctx == null or ctx.current_aura == null:
+		return
+	_apply_fill_visuals(session, ctx)
+
+
+func _target_fill_for_session(session: BrewSession, ctx: BrewContext) -> float:
+	if ctx.threshold <= 0:
+		return 0.0
+	return clampf(
+		float(session.presented_score) / float(ctx.threshold),
+		0.0,
+		1.0
+	)
+
+
+func _apply_fill_visuals(session: BrewSession, ctx: BrewContext) -> void:
+	var is_boss := ctx.is_boss_level()
+	var display_score := session.presented_score
+	_update_score_label(display_score, ctx.threshold, is_boss, session)
+
+	if display_score <= 0 and _is_complete:
 		_is_complete = false
 
-	_set_particle_effects_enabled(ctx.score > 0)
+	_set_particle_effects_enabled(display_score > 0)
 	if _liquid.has_method("set_fill_level"):
 		_liquid.set_fill_level(_display_fill)
 	else:
@@ -72,15 +100,20 @@ func _process(delta: float) -> void:
 
 	var should_complete := false
 	if is_boss:
-		should_complete = ctx.score >= ctx.threshold and _display_fill >= 0.985
+		should_complete = display_score >= ctx.threshold and _display_fill >= 0.985
 	else:
-		should_complete = ctx.score > 0
+		should_complete = display_score > 0
 	if should_complete != _is_complete:
 		_is_complete = should_complete
 	_refresh_complete_presentation(is_boss)
 
 
-func _update_score_label(score: int, threshold: int, is_boss: bool) -> void:
+func _update_score_label(
+	score: int,
+	threshold: int,
+	is_boss: bool,
+	session: BrewSession
+) -> void:
 	if _score_label == null:
 		return
 	var display_score := maxi(0, score)
@@ -94,9 +127,8 @@ func _update_score_label(score: int, threshold: int, is_boss: bool) -> void:
 	if run != null:
 		var boss_penalty := run.boss_threshold_penalty
 		var boss_discount := run.boss_threshold_discount
-		var ctx := run.brew_session.context
-		if ctx != null:
-			boss_discount += ctx.boss_threshold_discount_gained
+		if session != null:
+			boss_discount += session.presented_boss_threshold_discount_gained
 		modifier_suffix = _format_boss_threshold_modifier_suffix(boss_penalty, boss_discount)
 
 	_score_label.text = "%d/%d%s" % [display_score, display_threshold, modifier_suffix]

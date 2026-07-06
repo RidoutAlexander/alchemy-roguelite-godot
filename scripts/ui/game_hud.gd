@@ -10,6 +10,9 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 @onready var _brew_explosiveness_counter: ExplosivenessDisplay = (
 	$PhaseSwipeHost/BrewPanel/ExplosivenessCounter
 )
+@onready var _brew_score_flask: Control = $PhaseSwipeHost/BrewPanel/ScoreFlask
+@onready var _brew_gold_reward_display: Control = $PhaseSwipeHost/BrewPanel/GoldRewardDisplay
+@onready var _brew_stat_popups: BrewStatPopups = $HudOverlayLayer/BrewStatPopups
 @onready var _level_aura_banner: Control = $PhaseSwipeHost/BrewPanel/LevelAuraBanner
 @onready var _level_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/LevelLabel
 @onready var _aura_name_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraNameLabel
@@ -23,6 +26,8 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 
 const BAG_REMAINING_COUNT_INSET := Vector2(0.0, 6.0)
 @onready var _save_and_quit_button: BaseButton = $PhaseSwipeHost/BrewPanel/SaveAndQuitButton
+@onready var _dev_mode_checkbox: CheckBox = $PhaseSwipeHost/BrewPanel/DevModeCheckbox
+@onready var _dev_hand_picker: BagContentsOverlay = $DevHandPickerLayer/DevHandPickerOverlay
 @onready var _main_menu_button: BaseButton = $GameOverPanel/MainMenuButton
 @onready var _gameplay_music_player: AudioStreamPlayer = $GameplayMusicPlayer
 
@@ -59,10 +64,21 @@ func _ready() -> void:
 		_on_practice_restart_pressed
 	):
 		_practice_restart_button.pressed.connect(_on_practice_restart_pressed)
+	if _dev_mode_checkbox != null:
+		_dev_mode_checkbox.button_pressed = GameManager.is_dev_mode_enabled()
+		if not _dev_mode_checkbox.toggled.is_connected(_on_dev_mode_toggled):
+			_dev_mode_checkbox.toggled.connect(_on_dev_mode_toggled)
+	if _dev_hand_picker != null:
+		if not _dev_hand_picker.dev_hand_picker_completed.is_connected(
+			_on_dev_hand_picker_completed
+		):
+			_dev_hand_picker.dev_hand_picker_completed.connect(_on_dev_hand_picker_completed)
 
 	GameManager.phase_changed.connect(_on_phase_changed)
+	GameManager.dev_hand_picker_requested.connect(_on_dev_hand_picker_requested)
 	GameManager.run_changed.connect(_on_run_changed)
 	GameManager.brew_updated.connect(func(_ctx): _refresh_brew())
+	GameManager.brew_stats_presented.connect(func(_ctx): _refresh_brew())
 	GameManager.brew_updated.connect(func(_ctx): _refresh_brew_input_state())
 	GameManager.brew_updated.connect(func(_ctx): _refresh_bag_remaining_count())
 	GameManager.ingredient_drawn.connect(func(_ctx, _ingredient): _refresh_bag_remaining_count())
@@ -71,6 +87,13 @@ func _ready() -> void:
 	GameManager.brew_resolved.connect(_refresh_brew)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.game_over.connect(_refresh_game_over)
+
+	if _brew_stat_popups != null:
+		_brew_stat_popups.configure(
+			_brew_score_flask,
+			_brew_explosiveness_counter,
+			_brew_gold_reward_display
+		)
 
 	call_deferred("_initialize_hud")
 	_start_gameplay_music()
@@ -240,7 +263,11 @@ func _refresh_brew() -> void:
 	if _brew_gold_counter != null:
 		_brew_gold_counter.set_amount(run.gold)
 	if _brew_explosiveness_counter != null:
-		_brew_explosiveness_counter.set_values(ctx.explosiveness, ctx.explosion_limit)
+		var session := GameManager.run.brew_session
+		_brew_explosiveness_counter.set_values(
+			session.presented_explosiveness,
+			ctx.explosion_limit
+		)
 	_refresh_practice_restart_button()
 	_refresh_rhythm_aura_shake(ctx)
 
@@ -333,6 +360,20 @@ func _stop_rhythm_aura_shake() -> void:
 
 func _on_practice_restart_pressed() -> void:
 	GameManager.try_practice_restart()
+
+
+func _on_dev_mode_toggled(enabled: bool) -> void:
+	GameManager.set_dev_mode_enabled(enabled)
+
+
+func _on_dev_hand_picker_requested() -> void:
+	if _dev_hand_picker == null or _dev_hand_picker.is_open():
+		return
+	_dev_hand_picker.show_dev_hand_picker(GameManager.get_all_ingredients())
+
+
+func _on_dev_hand_picker_completed(selection: Array) -> void:
+	GameManager.try_draw_dev_hand(selection)
 
 
 func _refresh_practice_restart_button() -> void:

@@ -3,6 +3,7 @@ extends Node
 signal phase_changed(phase: int)
 signal run_changed
 signal brew_updated(context: BrewContext)
+signal brew_stats_presented(context: BrewContext)
 signal hand_draw_batch_started(drawn: Array)
 signal hand_card_played(
 	context: BrewContext,
@@ -25,6 +26,7 @@ signal brew_completion_requested(outcome: int)
 signal eyeball_puzzle_requested(reserved: Array)
 signal bat_wing_picker_requested(choices: Array)
 signal bag_display_changed
+signal dev_hand_picker_requested
 signal brew_resolved(resolution: Dictionary)
 signal game_over(comparison: Dictionary)
 
@@ -36,6 +38,7 @@ var _content := DefaultContent.create()
 var run: RunManager = RunManager.new(_content)
 var _brew_transition_pending: bool = false
 var _presentation_in_progress: bool = false
+var _dev_mode_enabled: bool = false
 
 
 func _ready() -> void:
@@ -80,6 +83,18 @@ func enter_brewing() -> void:
 	_enter_brewing()
 
 
+func is_dev_mode_enabled() -> bool:
+	return _dev_mode_enabled
+
+
+func set_dev_mode_enabled(enabled: bool) -> void:
+	_dev_mode_enabled = enabled
+
+
+func get_all_ingredients() -> Array:
+	return _content.all_ingredients()
+
+
 func can_press_bag() -> bool:
 	return (
 		current_phase == GamePhase.Phase.BREWING
@@ -122,7 +137,19 @@ func notify_bag_display_changed() -> void:
 func try_draw_ingredient() -> void:
 	if not can_press_bag():
 		return
+	if _dev_mode_enabled:
+		dev_hand_picker_requested.emit()
+		return
 	run.brew_session.try_draw_to_hand()
+	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		_request_brew_completion()
+
+
+func try_draw_dev_hand(ingredients: Array) -> void:
+	if not can_press_bag():
+		return
+	if not run.brew_session.try_draw_custom_hand_to_hand(ingredients):
+		return
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		_request_brew_completion()
 
@@ -189,14 +216,26 @@ func notify_hand_draw_batch_finished() -> void:
 	_sync_hand_completion()
 
 
+func present_card_stats() -> void:
+	var session := run.brew_session
+	session.advance_presented_stats()
+	brew_stats_presented.emit(session.context)
+
+
 func notify_card_presentation_finished() -> void:
 	_presentation_in_progress = false
+	call_deferred("_continue_after_card_presentation")
+
+
+func _continue_after_card_presentation() -> void:
 	var session := run.brew_session
 	if session.get_hand_phase() == BrewSession.HandPhase.PLAYING:
 		session.on_hand_play_presentation_finished()
 		_sync_hand_completion()
 		return
 	if session.try_advance_chain_draw():
+		return
+	if session.try_begin_parrot_repeat_play():
 		return
 	_sync_hand_completion()
 

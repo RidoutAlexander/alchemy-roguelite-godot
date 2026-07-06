@@ -54,9 +54,25 @@ var _bat_wing_choices: Array[IngredientData] = []
 var _bat_wing_picker_active: bool = false
 var _unicorn_cures_next_explosive: bool = false
 var _parrot_doubles_next: bool = false
+var _parrot_repeat_pending: bool = false
+var _parrot_repeat_ingredient: IngredientData = null
+var _parrot_repeat_from_hand: bool = false
+var _parrot_repeat_hand_slot: int = -1
 var _voodoo_doll_arms_copy: bool = false
 var _practice_restart_used: bool = false
 var _frog_leg_save_pending: bool = false
+
+var presented_score: int = 0
+var presented_explosiveness: int = 0
+var presented_gold_gained_this_brew: int = 0
+var presented_boss_threshold_discount_gained: int = 0
+var _presented_stat_snapshots: Array = []
+var last_presented_stat_deltas: Dictionary = {
+	"score": 0,
+	"explosiveness": 0,
+	"gold_reward": 0,
+}
+var last_play_fly_count: int = 1
 
 
 func _init() -> void:
@@ -93,6 +109,8 @@ func start_brew(
 	context.gold_gained_this_brew = 0
 	context.boss_threshold_discount_gained = 0
 	context.free_shop_rerolls_gained = 0
+	_clear_presented_stat_snapshots()
+	_reset_presented_stats()
 	_practice_restart_used = false
 	_mulligan_allowance = 1
 	_mulligans_used = 0
@@ -126,6 +144,8 @@ func try_practice_restart() -> bool:
 	context.gold_gained_this_brew = 0
 	context.boss_threshold_discount_gained = 0
 	context.free_shop_rerolls_gained = 0
+	_clear_presented_stat_snapshots()
+	_reset_presented_stats()
 	_reset_draw_flow_state()
 	context.bag.reset_for_brew()
 	context.bag.shuffle_working_deck()
@@ -296,7 +316,7 @@ func complete_eyeball_puzzle(_ordered: Array = []) -> void:
 	_eyeball_puzzle_active = false
 	brew_updated.emit(context)
 	if _hand_phase == HandPhase.PLAYING:
-		_play_next_hand_card()
+		_continue_hand_play_resolution()
 
 
 func complete_bat_wing_picker(selected: IngredientData) -> void:
@@ -335,6 +355,26 @@ func try_draw_to_hand() -> bool:
 		_resolve_bag_empty()
 		return false
 
+	return _begin_hand_draw(drawn, drawn.size())
+
+
+func try_draw_custom_hand_to_hand(ingredients: Array) -> bool:
+	if not can_press_bag():
+		return false
+	if ingredients.size() != HAND_DRAW_COUNT:
+		return false
+
+	var drawn: Array[IngredientData] = []
+	for item in ingredients:
+		if item is IngredientData:
+			drawn.append(item)
+	if drawn.size() != HAND_DRAW_COUNT:
+		return false
+
+	return _begin_hand_draw(drawn, 0)
+
+
+func _begin_hand_draw(drawn: Array[IngredientData], bag_display_reserve: int) -> bool:
 	_hand_phase = HandPhase.DRAWING
 	_hand_undo_stack.clear()
 	_hand_swap_allowance = 1 + _bonus_swap_next_hand
@@ -343,7 +383,7 @@ func try_draw_to_hand() -> bool:
 	_lucky_coin_in_current_hand = false
 	_reset_hand_slots()
 	_pending_hand_draw = drawn.duplicate()
-	_hand_draw_display_reserve = drawn.size()
+	_hand_draw_display_reserve = bag_display_reserve
 	hand_draw_batch_started.emit(drawn)
 	brew_updated.emit(context)
 	return true
@@ -383,7 +423,7 @@ func swap_hand_slots(from_slot: int, to_slot: int) -> bool:
 	if _hand_slots[from_slot] == null and _hand_slots[to_slot] == null:
 		return false
 
-	_hand_undo_stack.append(_hand_slots.duplicate())
+	_hand_undo_stack.append(Vector2i(from_slot, to_slot))
 	var tmp = _hand_slots[from_slot]
 	_hand_slots[from_slot] = _hand_slots[to_slot]
 	_hand_slots[to_slot] = tmp
@@ -395,7 +435,14 @@ func swap_hand_slots(from_slot: int, to_slot: int) -> bool:
 func undo_hand_swap() -> bool:
 	if not can_undo_hand_swap():
 		return false
-	_hand_slots = _hand_undo_stack.pop_back()
+	var swap: Vector2i = _hand_undo_stack.pop_back()
+	var from_slot := swap.x
+	var to_slot := swap.y
+	if not _is_valid_hand_slot(from_slot) or not _is_valid_hand_slot(to_slot):
+		return false
+	var tmp = _hand_slots[from_slot]
+	_hand_slots[from_slot] = _hand_slots[to_slot]
+	_hand_slots[to_slot] = tmp
 	_hand_swaps_used = maxi(0, _hand_swaps_used - 1)
 	brew_updated.emit(context)
 	return true
@@ -437,6 +484,14 @@ func on_hand_play_presentation_finished() -> void:
 		return
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return
+	_continue_hand_play_resolution()
+
+
+func try_begin_parrot_repeat_play() -> bool:
+	return _try_begin_parrot_repeat_play()
+
+
+func _continue_hand_play_resolution() -> void:
 	if needs_bat_wing_picker():
 		begin_bat_wing_picker()
 		bat_wing_picker_requested.emit(get_bat_wing_choices())
@@ -446,6 +501,8 @@ func on_hand_play_presentation_finished() -> void:
 		eyeball_puzzle_requested.emit(get_eyeball_preview())
 		return
 	if try_advance_chain_draw():
+		return
+	if _try_begin_parrot_repeat_play():
 		return
 	_play_next_hand_card()
 
@@ -485,7 +542,7 @@ func _play_next_hand_card() -> void:
 	_hand_slots[_play_slot_cursor] = null
 	_play_slot_cursor += 1
 
-	var parrot_doubled := _apply_ingredient(ingredient, true)
+	var parrot_doubled := _apply_ingredient(ingredient, true, true, slot_index)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
@@ -525,17 +582,77 @@ func _draw_and_emit(_is_chain: bool) -> bool:
 	return true
 
 
-func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> bool:
+func _apply_ingredient(
+	ingredient: IngredientData,
+	track_draw: bool,
+	from_hand_play: bool = false,
+	hand_slot_index: int = -1
+) -> bool:
+	var parrot_doubled_this_ingredient := _parrot_doubles_next
+	if parrot_doubled_this_ingredient:
+		_parrot_doubles_next = false
+
+	last_play_fly_count = 1
+	_apply_ingredient_play(ingredient, track_draw)
+	enqueue_presented_stat_snapshot()
+
+	if (
+		parrot_doubled_this_ingredient
+		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+		and not context.is_exploded()
+	):
+		_parrot_repeat_pending = true
+		_parrot_repeat_ingredient = ingredient
+		_parrot_repeat_from_hand = from_hand_play
+		_parrot_repeat_hand_slot = hand_slot_index
+
+	if context.is_exploded() and ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
+		_trigger_phoenix_save()
+	return parrot_doubled_this_ingredient
+
+
+func _try_begin_parrot_repeat_play() -> bool:
+	if not _parrot_repeat_pending:
+		return false
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS or context.is_exploded():
+		_clear_parrot_repeat()
+		return false
+
+	var ingredient: IngredientData = _parrot_repeat_ingredient
+	var from_hand := _parrot_repeat_from_hand
+	var slot_index := _parrot_repeat_hand_slot
+	_clear_parrot_repeat()
+
+	last_play_fly_count = 1
+	_apply_ingredient_play(ingredient, false)
+	enqueue_presented_stat_snapshot()
+
+	if context.is_exploded():
+		_chain_draws_remaining = 0
+		if not _try_frog_leg_save():
+			_resolve_explosion()
+
+	if from_hand:
+		hand_card_played.emit(context, ingredient, slot_index, true)
+	else:
+		ingredient_drawn.emit(context, ingredient, true)
+	brew_updated.emit(context)
+	return true
+
+
+func _clear_parrot_repeat() -> void:
+	_parrot_repeat_pending = false
+	_parrot_repeat_ingredient = null
+	_parrot_repeat_from_hand = false
+	_parrot_repeat_hand_slot = -1
+
+
+func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> void:
 	if track_draw:
 		context.drawn_this_brew.append(ingredient)
 
 	var point_value := ingredient.point_value
 	var explosive_add := ingredient.explosive_value
-	var parrot_doubled_this_ingredient := _parrot_doubles_next
-	if parrot_doubled_this_ingredient:
-		point_value *= 2
-		explosive_add *= 2
-		_parrot_doubles_next = false
 	if _AuraEffects.in_rhythm_doubles_ingredient(
 		context.cauldron_contents.size(),
 		context.current_aura
@@ -550,29 +667,25 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> bool:
 	context.explosiveness += explosive_add
 
 	var effect := IngredientEffects.apply(ingredient, context)
-	var bonus_multiplier := 2 if parrot_doubled_this_ingredient else 1
-	var bonus_score_added := 0
 	if effect.bonus_score > 0:
-		bonus_score_added = effect.bonus_score * bonus_multiplier
-		context.score += bonus_score_added
+		context.score += effect.bonus_score
+	if effect.bonus_gold > 0:
+		context.gold_gained_this_brew += effect.bonus_gold
+	if effect.boss_threshold_discount > 0:
+		context.boss_threshold_discount_gained += effect.boss_threshold_discount
+
 	if effect.chain_draws > 0:
 		_chain_draws_remaining = effect.chain_draws
 	if effect.reserve_for_eyeball > 0:
 		_eyeball_reserved = context.bag.peek_upcoming_draws(EYEBALL_PEEK_COUNT)
 	if effect.cures_next_explosive:
 		_unicorn_cures_next_explosive = true
-	if effect.doubles_next_ingredient:
+	if ingredient.id == IngredientEffects.PARROT_ID:
 		_parrot_doubles_next = true
-	if effect.bonus_gold > 0:
-		context.gold_gained_this_brew += effect.bonus_gold * bonus_multiplier
-	if effect.boss_threshold_discount > 0:
-		context.boss_threshold_discount_gained += (
-			effect.boss_threshold_discount * bonus_multiplier
-		)
 	if effect.free_shop_rerolls > 0:
-		context.free_shop_rerolls_gained += effect.free_shop_rerolls * bonus_multiplier
+		context.free_shop_rerolls_gained += effect.free_shop_rerolls
 	if effect.extra_mulligans > 0:
-		_mulligan_allowance += effect.extra_mulligans * bonus_multiplier
+		_mulligan_allowance += effect.extra_mulligans
 	if effect.explosion_limit_bonus > 0:
 		context.explosion_limit += effect.explosion_limit_bonus
 	if effect.bat_wing_pick_count > 0:
@@ -581,12 +694,6 @@ func _apply_ingredient(ingredient: IngredientData, track_draw: bool) -> bool:
 		_voodoo_doll_arms_copy = true
 	else:
 		_try_consume_voodoo_copy(ingredient)
-
-	if not context.is_exploded():
-		return parrot_doubled_this_ingredient
-	if ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
-		_trigger_phoenix_save()
-	return parrot_doubled_this_ingredient
 
 
 func _try_frog_leg_save() -> bool:
@@ -710,9 +817,76 @@ func _resolve_bag_empty() -> void:
 
 
 func _finalize_brew() -> void:
+	_clear_presented_stat_snapshots()
+	sync_presented_stats_from_context()
 	_reset_draw_flow_state()
 	context.bag.reset_for_brew()
 	brew_updated.emit(context)
+
+
+func _reset_presented_stats() -> void:
+	presented_score = context.score
+	presented_explosiveness = context.explosiveness
+	presented_gold_gained_this_brew = context.gold_gained_this_brew
+	presented_boss_threshold_discount_gained = context.boss_threshold_discount_gained
+	_reset_presented_stat_deltas()
+
+
+func sync_presented_stats_from_context() -> void:
+	_reset_presented_stats()
+
+
+func enqueue_presented_stat_snapshot() -> void:
+	_presented_stat_snapshots.append(
+		{
+			"score": context.score,
+			"explosiveness": context.explosiveness,
+			"gold_gained": context.gold_gained_this_brew,
+			"boss_discount": context.boss_threshold_discount_gained,
+		}
+	)
+
+
+func get_last_presented_stat_deltas() -> Dictionary:
+	return last_presented_stat_deltas.duplicate()
+
+
+func advance_presented_stats() -> void:
+	var previous_score := presented_score
+	var previous_explosiveness := presented_explosiveness
+	var previous_gold_reward := calculate_display_gold_reward()
+
+	if _presented_stat_snapshots.is_empty():
+		sync_presented_stats_from_context()
+		_reset_presented_stat_deltas()
+		return
+
+	var snapshot: Dictionary = _presented_stat_snapshots.pop_front()
+	presented_score = int(snapshot.get("score", context.score))
+	presented_explosiveness = int(snapshot.get("explosiveness", context.explosiveness))
+	presented_gold_gained_this_brew = int(
+		snapshot.get("gold_gained", context.gold_gained_this_brew)
+	)
+	presented_boss_threshold_discount_gained = int(
+		snapshot.get("boss_discount", context.boss_threshold_discount_gained)
+	)
+	last_presented_stat_deltas = {
+		"score": presented_score - previous_score,
+		"explosiveness": presented_explosiveness - previous_explosiveness,
+		"gold_reward": calculate_display_gold_reward() - previous_gold_reward,
+	}
+
+
+func _reset_presented_stat_deltas() -> void:
+	last_presented_stat_deltas = {
+		"score": 0,
+		"explosiveness": 0,
+		"gold_reward": 0,
+	}
+
+
+func _clear_presented_stat_snapshots() -> void:
+	_presented_stat_snapshots.clear()
 
 
 func _reset_hand_slots() -> void:
@@ -774,14 +948,28 @@ func _reset_draw_flow_state() -> void:
 	_bat_wing_picker_active = false
 	_unicorn_cures_next_explosive = false
 	_parrot_doubles_next = false
+	_clear_parrot_repeat()
 	_voodoo_doll_arms_copy = false
 	_frog_leg_save_pending = false
 
 
 func calculate_gold_reward() -> int:
-	var score := context.score
+	return _calculate_gold_reward_from(
+		context.score,
+		context.gold_gained_this_brew
+	)
+
+
+func calculate_display_gold_reward() -> int:
+	return _calculate_gold_reward_from(
+		presented_score,
+		presented_gold_gained_this_brew
+	)
+
+
+func _calculate_gold_reward_from(score: int, bonus_gold: int) -> int:
 	var base_reward := score if score <= 14 else 14 + int((score - 14) / 2)
-	var total := base_reward + context.gold_gained_this_brew
+	var total := base_reward + bonus_gold
 	if _gloom_weed_doubles_gold():
 		total *= 2
 	return _AuraEffects.apply_gold_multiplier(total, context.current_aura)

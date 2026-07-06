@@ -56,11 +56,11 @@
   {
     "id": "under_pressure",
     "display_name": "Under Pressure",
-    "description": "Threshold increased by 50% and gold gained is double",
+    "description": "Increase threshold and gold gain by 15%",
     "pool": "boss",
     "explosion_limit_modifier": 0,
-    "score_multiplier_percent": 150,
-    "gold_multiplier_percent": 200
+    "score_multiplier_percent": 115,
+    "gold_multiplier_percent": 115
   },
   {
     "id": "in_rhythm",

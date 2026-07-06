@@ -2,14 +2,18 @@ class_name BagContentsOverlay
 extends Control
 
 signal overlay_closed
+signal dev_hand_picker_completed(selection: Array)
 
-enum DisplayMode { BAG_STACKS, CAULDRON_SEQUENCE }
+enum DisplayMode { BAG_STACKS, CAULDRON_SEQUENCE, DEV_HAND_PICKER }
+
+const DEV_HAND_PICK_COUNT := 5
 
 const _SLOT_SCENE := preload("res://scenes/ui/bag_inventory_slot.tscn")
 const PREVIEW_SCALE := 0.38
 const GRID_COLUMNS := 5
 
 @onready var _input_blocker: ColorRect = $InputBlocker
+@onready var _panel: PanelContainer = $Panel
 @onready var _title_label: Label = $Panel/Content/Title
 @onready var _empty_label: Label = $Panel/Content/EmptyLabel
 @onready var _scroll: ScrollContainer = $Panel/Content/Scroll
@@ -18,10 +22,17 @@ const GRID_COLUMNS := 5
 @onready var _preview_card: IngredientCard = $PreviewLayer/PreviewCard
 @onready var _count_overlay_layer: CanvasLayer = $CountOverlayLayer
 @onready var _hover_count_label: Label = $CountOverlayLayer/HoverCountLabel
+@onready var _footer: HBoxContainer = $Panel/Content/Footer
+@onready var _selection_label: Label = $Panel/Content/Footer/SelectionLabel
+@onready var _done_button: Button = $Panel/Content/Footer/DoneButton
 
 var _mode: DisplayMode = DisplayMode.BAG_STACKS
 var _bag: BagModel
 var _cauldron_contents: Array = []
+var _dev_catalog: Array[IngredientData] = []
+var _dev_selection_counts: Dictionary = {}
+var _dev_selection_order: Array[IngredientData] = []
+var _dev_slot_by_id: Dictionary = {}
 var _hovered_ingredient: IngredientData
 var _hovered_slot: BagInventorySlot
 var _preview_rest_position: Vector2 = Vector2.ZERO
@@ -48,12 +59,17 @@ func _ready() -> void:
 		var vbar := _scroll.get_v_scroll_bar()
 		if vbar != null and not vbar.value_changed.is_connected(_on_scroll_changed):
 			vbar.value_changed.connect(_on_scroll_changed)
+	if _done_button != null and not _done_button.pressed.is_connected(_on_done_button_pressed):
+		_done_button.pressed.connect(_on_done_button_pressed)
+	_set_footer_visible(false)
 	set_process(false)
 	_hide_preview()
 
 
 func _process(_delta: float) -> void:
 	if not visible or _grid == null:
+		return
+	if _mode == DisplayMode.DEV_HAND_PICKER:
 		return
 
 	var hovered_slot := _find_hovered_slot()
@@ -110,6 +126,8 @@ func _on_scroll_changed(_value: float) -> void:
 func _on_blocker_gui_input(event: InputEvent) -> void:
 	if not visible:
 		return
+	if _mode == DisplayMode.DEV_HAND_PICKER:
+		return
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
@@ -139,6 +157,7 @@ func show_inventory(bag: BagModel) -> void:
 	_bag = bag
 	_cauldron_contents.clear()
 	_set_copy("Your Bag", "Your bag is empty.")
+	_set_footer_visible(false)
 	_open()
 
 
@@ -147,6 +166,28 @@ func show_cauldron_contents(contents: Array) -> void:
 	_bag = null
 	_cauldron_contents = contents.duplicate()
 	_set_copy("Your Cauldron", "Your cauldron is empty.")
+	_set_footer_visible(false)
+	_open()
+
+
+func show_dev_hand_picker(ingredients: Array) -> void:
+	_mode = DisplayMode.DEV_HAND_PICKER
+	_bag = null
+	_cauldron_contents.clear()
+	_dev_catalog.clear()
+	_dev_selection_counts.clear()
+	_dev_selection_order.clear()
+	_dev_slot_by_id.clear()
+	for item in ingredients:
+		if item is IngredientData:
+			_dev_catalog.append(item)
+	_dev_catalog.sort_custom(
+		func(a: IngredientData, b: IngredientData) -> bool:
+			return a.display_name < b.display_name
+	)
+	_set_copy("Developer Hand", "")
+	_set_footer_visible(true)
+	_update_dev_selection_ui()
 	_open()
 
 
@@ -156,9 +197,16 @@ func hide_overlay() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_process(false)
+	set_process_input(false)
+	_configure_mode_input()
 	_hide_preview()
 	_clear_grid()
 	_hide_canvas_layers()
+	_set_footer_visible(false)
+	_dev_catalog.clear()
+	_dev_selection_counts.clear()
+	_dev_selection_order.clear()
+	_dev_slot_by_id.clear()
 	overlay_closed.emit()
 
 
@@ -173,7 +221,68 @@ func _open() -> void:
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_process(true)
+	_configure_mode_input()
 	_hide_preview()
+
+
+func _configure_mode_input() -> void:
+	if _mode == DisplayMode.DEV_HAND_PICKER:
+		if _input_blocker != null:
+			_input_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if _panel != null:
+			_panel.z_index = 1
+			_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		set_process_input(true)
+	else:
+		if _input_blocker != null:
+			_input_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+		if _panel != null:
+			_panel.z_index = 0
+		set_process_input(false)
+
+
+func _input(event: InputEvent) -> void:
+	if not visible or _mode != DisplayMode.DEV_HAND_PICKER:
+		return
+	if not event is InputEventMouseButton:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if not mouse_event.pressed:
+		return
+
+	var mouse_pos := mouse_event.global_position
+	if _is_dev_ui_control_at(mouse_pos):
+		return
+
+	var ingredient := _find_dev_ingredient_at(mouse_pos)
+	if ingredient == null:
+		return
+
+	_on_dev_slot_gui_input(ingredient, event)
+	get_viewport().set_input_as_handled()
+
+
+func _is_dev_ui_control_at(mouse_pos: Vector2) -> bool:
+	if _done_button != null and _done_button.visible:
+		if _done_button.get_global_rect().has_point(mouse_pos):
+			return true
+	if _scroll != null:
+		var vbar := _scroll.get_v_scroll_bar()
+		if vbar != null and vbar.get_global_rect().has_point(mouse_pos):
+			return true
+	return false
+
+
+func _find_dev_ingredient_at(mouse_pos: Vector2) -> IngredientData:
+	if _grid == null:
+		return null
+	for child in _grid.get_children():
+		var slot := child as BagInventorySlot
+		if slot == null:
+			continue
+		if slot.get_global_rect().has_point(mouse_pos):
+			return slot.get_ingredient()
+	return null
 
 
 func _set_copy(title: String, empty_message: String) -> void:
@@ -196,6 +305,8 @@ func _rebuild_grid() -> void:
 			_rebuild_bag_grid()
 		DisplayMode.CAULDRON_SEQUENCE:
 			_rebuild_cauldron_grid()
+		DisplayMode.DEV_HAND_PICKER:
+			_rebuild_dev_hand_picker_grid()
 
 
 func _rebuild_bag_grid() -> void:
@@ -232,17 +343,36 @@ func _set_scroll_visible(show_scroll: bool, show_empty: bool) -> void:
 		_scroll.visible = show_scroll
 
 
-func _add_slot(ingredient: IngredientData, count: int, show_count: bool) -> void:
+func _rebuild_dev_hand_picker_grid() -> void:
+	var has_entries := not _dev_catalog.is_empty()
+	_set_scroll_visible(has_entries, not has_entries)
+	for ingredient in _dev_catalog:
+		if ingredient == null:
+			continue
+		var selected_count := int(_dev_selection_counts.get(ingredient.id, 0))
+		_add_slot(ingredient, selected_count, selected_count > 0, true)
+
+
+func _add_slot(
+	ingredient: IngredientData,
+	count: int,
+	show_count: bool,
+	interactive: bool = false
+) -> void:
 	var slot := _SLOT_SCENE.instantiate() as BagInventorySlot
 	if slot == null:
 		return
 	_grid.add_child(slot)
 	slot.bind_entry(ingredient, count, show_count)
+	slot.set_interactive(false)
+	if interactive:
+		_dev_slot_by_id[ingredient.id] = slot
 
 
 func _clear_grid() -> void:
 	if _grid == null:
 		return
+	_dev_slot_by_id.clear()
 	for child in _grid.get_children():
 		child.queue_free()
 
@@ -297,3 +427,89 @@ func _hide_preview() -> void:
 	_hide_hover_count()
 	_hovered_slot = null
 	_hide_canvas_layers()
+
+
+func _set_footer_visible(visible_footer: bool) -> void:
+	if _footer != null:
+		_footer.visible = visible_footer
+
+
+func _dev_selection_total() -> int:
+	var total := 0
+	for count in _dev_selection_counts.values():
+		total += int(count)
+	return total
+
+
+func _update_dev_selection_ui() -> void:
+	var total := _dev_selection_total()
+	if _title_label != null:
+		_title_label.text = "Developer Hand (%d/%d)" % [total, DEV_HAND_PICK_COUNT]
+	if _selection_label != null:
+		_selection_label.text = (
+			"Left click to add, right click to remove."
+			if total < DEV_HAND_PICK_COUNT
+			else "Hand ready. Click Done."
+		)
+	if _done_button != null:
+		_done_button.disabled = total != DEV_HAND_PICK_COUNT
+	for ingredient_id in _dev_slot_by_id.keys():
+		var slot: BagInventorySlot = _dev_slot_by_id[ingredient_id]
+		if slot == null:
+			continue
+		var count := int(_dev_selection_counts.get(ingredient_id, 0))
+		slot.bind_entry(slot.get_ingredient(), count, count > 0)
+
+
+func _on_dev_slot_gui_input(ingredient: IngredientData, event: InputEvent) -> void:
+	if _mode != DisplayMode.DEV_HAND_PICKER or ingredient == null:
+		return
+	if not event is InputEventMouseButton:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if not mouse_event.pressed:
+		return
+
+	var ingredient_id := ingredient.id
+	var current := int(_dev_selection_counts.get(ingredient_id, 0))
+	if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+		if _dev_selection_total() >= DEV_HAND_PICK_COUNT:
+			return
+		_dev_selection_counts[ingredient_id] = current + 1
+		_dev_selection_order.append(ingredient)
+	elif mouse_event.button_index == MOUSE_BUTTON_RIGHT:
+		if current <= 0:
+			return
+		if current == 1:
+			_dev_selection_counts.erase(ingredient_id)
+		else:
+			_dev_selection_counts[ingredient_id] = current - 1
+		_remove_last_dev_selection(ingredient)
+	else:
+		return
+
+	_update_dev_selection_ui()
+
+
+func _on_done_button_pressed() -> void:
+	if _mode != DisplayMode.DEV_HAND_PICKER:
+		return
+	if _dev_selection_total() != DEV_HAND_PICK_COUNT:
+		return
+
+	if _dev_selection_order.size() != DEV_HAND_PICK_COUNT:
+		return
+
+	var selection := _dev_selection_order.duplicate()
+	hide_overlay()
+	dev_hand_picker_completed.emit(selection)
+
+
+func _remove_last_dev_selection(ingredient: IngredientData) -> void:
+	if ingredient == null:
+		return
+	for i in range(_dev_selection_order.size() - 1, -1, -1):
+		var entry: IngredientData = _dev_selection_order[i]
+		if entry != null and entry.id == ingredient.id:
+			_dev_selection_order.remove_at(i)
+			return

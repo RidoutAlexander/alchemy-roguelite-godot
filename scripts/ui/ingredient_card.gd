@@ -24,6 +24,7 @@ const CARD_TINT_SHADER := preload("res://shaders/card_rarity_tint.gdshader")
 const HOVER_SCALE := 1.08
 const PICKER_SELECT_SCALE := 1.04
 const HAND_HOVER_SCALE := 1.12
+const HAND_SELECTED_SCALE := 1.22
 const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
 const HAND_CARD_SCALE := 0.34
@@ -133,16 +134,30 @@ func is_hand_selected() -> bool:
 	return _hand_selected
 
 
+func get_hand_hit_rect() -> Rect2:
+	var hit_rect := get_global_rect()
+	if _visual_root != null:
+		hit_rect = hit_rect.merge(_visual_root.get_global_rect())
+	return hit_rect
+
+
 func update_hand_hover(hovered: bool, delta: float) -> void:
 	if not _hand_mode or _visual_root == null:
 		return
-	var highlighted := hovered or _hand_selected
-	var target_scale := HAND_HOVER_SCALE if highlighted else 1.0
-	var target_rise := -HAND_HOVER_RISE if highlighted else 0.0
+	var target_scale := _hand_target_scale(hovered)
+	var target_rise := -HAND_HOVER_RISE if hovered or _hand_selected else 0.0
 	var next_scale := lerpf(_visual_root.scale.x, target_scale, SCALE_SPEED * delta)
 	_visual_root.scale = Vector2.ONE * next_scale
 	_hand_hover_offset = lerpf(_hand_hover_offset, target_rise, SCALE_SPEED * delta)
 	_visual_root.position.y = _hand_hover_offset
+
+
+func _hand_target_scale(hovered: bool) -> float:
+	if _hand_selected:
+		return HAND_SELECTED_SCALE
+	if hovered:
+		return HAND_HOVER_SCALE
+	return 1.0
 
 
 func _apply_hand_layout() -> void:
@@ -163,7 +178,7 @@ func _snap_hand_highlight(active: bool) -> void:
 	if _visual_root == null:
 		return
 	if active:
-		_visual_root.scale = Vector2.ONE * HAND_HOVER_SCALE
+		_visual_root.scale = Vector2.ONE * _hand_target_scale(false)
 		_hand_hover_offset = -HAND_HOVER_RISE
 	else:
 		_visual_root.scale = Vector2.ONE

@@ -91,6 +91,28 @@ theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 5
 
+[node name="Footer" type="HBoxContainer" parent="Panel/Content"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SelectionLabel" type="Label" parent="Panel/Content/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.78, 0.74, 0.62, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+text = "Left click to add, right click to remove."
+vertical_alignment = 1
+
+[node name="DoneButton" type="Button" parent="Panel/Content/Footer"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 22
+disabled = true
+text = "Done"
+
 [node name="PreviewLayer" type="CanvasLayer" parent="." unique_id=711457697]
 layer = 60
 visible = false

@@ -15,9 +15,9 @@ const BOSS_AURA_WARNING := "You must complete the potion this round."
 const PRACTICE_BREW_AURA_ID := "practice brew"
 const IN_RHYTHM_AURA_ID := "in_rhythm"
 const THRESHOLD_START := 5
-const THRESHOLD_STEP_BASE := 1.5
-const EASY_THRESHOLD_STEP := 1
-const THRESHOLD_LEVEL_GROWTH_MULTIPLIER := 1.03
+const THRESHOLD_STEP_BASE := 3
+const EASY_THRESHOLD_STEP := 2
+const THRESHOLD_LEVEL_GROWTH_MULTIPLIER := 1.06
 const SAVE_FILE_NAME := "alchemy_roguelite_run.json"
 const HIGH_SCORE_KEY := "alchemy_roguelite_highscores"
 

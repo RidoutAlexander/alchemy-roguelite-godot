@@ -124,7 +124,7 @@ func _on_brew_updated(_ctx: BrewContext) -> void:
 	_sync_hand_ui()
 	if _ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
 		_brew_ambience_suppressed = false
-		if _ctx.score <= 0:
+		if GameManager.run.brew_session.presented_score <= 0:
 			_boiling_fill_display = 0.0
 			if _cauldron_liquid != null:
 				_reset_cauldron_liquid()
@@ -194,7 +194,8 @@ func _on_hand_card_played(
 	if _player_hand != null:
 		_player_hand.hide_slot_for_fly(slot_index)
 	var brew_ended := _ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	_play_hand_card_fly(ingredient, slot_index, brew_ended, 2 if parrot_doubled else 1)
+	var fly_count := GameManager.run.brew_session.last_play_fly_count
+	_play_hand_card_fly(ingredient, slot_index, brew_ended, fly_count)
 
 
 func _on_ingredient_drawn(
@@ -207,7 +208,8 @@ func _on_ingredient_drawn(
 	_refresh_cauldron_contents_if_open()
 	GameManager.set_presentation_in_progress(true)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
-	_play_cauldron_fly(ingredient, brew_ended, 2 if parrot_doubled else 1)
+	var fly_count := GameManager.run.brew_session.last_play_fly_count
+	_play_cauldron_fly(ingredient, brew_ended, fly_count)
 
 
 func _on_eyeball_puzzle_requested(reserved: Array) -> void:
@@ -416,7 +418,8 @@ func _set_cauldron_activity(level: float) -> void:
 func _score_fill_ratio(ctx: BrewContext) -> float:
 	if ctx.threshold <= 0:
 		return 0.0
-	return clampf(float(ctx.score) / float(ctx.threshold), 0.0, 1.0)
+	var display_score := GameManager.run.brew_session.presented_score
+	return clampf(float(display_score) / float(ctx.threshold), 0.0, 1.0)
 
 
 func _apply_boiling_pitch(fill_ratio: float) -> void:
@@ -700,6 +703,7 @@ func _play_cauldron_fly_with_data(
 		if track_for_exit:
 			_on_brew_exit_animation_finished()
 			_try_play_pending_brew_exit_effects()
+		GameManager.present_card_stats()
 		_finish_card_presentation(ingredient, track_for_exit)
 		return
 
@@ -738,6 +742,7 @@ func _play_cauldron_fly_repeat(
 				_finish_card_presentation(ingredient, track_for_exit),
 		func() -> void:
 			_play_cauldron_plop()
+			GameManager.present_card_stats()
 			if track_for_exit and remaining_flies == 1:
 				_try_play_pending_brew_exit_effects_after_plop()
 	)
