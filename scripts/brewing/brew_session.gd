@@ -40,7 +40,9 @@ var _hand_start_slots: Array = []
 var _hand_undo_stack: Array = []
 var _hand_swap_allowance: int = 1
 var _hand_swaps_used: int = 0
-var _bonus_swap_hands_remaining: int = 0
+var _stirring_spoon_hands_remaining: int = 0
+var _juggling_club_hands_remaining: int = 0
+var _lucky_coin_swap_hands_remaining: int = 0
 var _next_hand_draw_count: int = HAND_DRAW_COUNT
 var _lucky_coin_in_current_hand: bool = false
 var _mulligan_allowance: int = 1
@@ -94,7 +96,8 @@ func start_brew(
 	explosion_limit_bonus: int = 0,
 	boss_threshold_penalty: int = 0,
 	boss_threshold_discount: int = 0,
-	difficulty: int = GameDifficulty.Mode.HARD
+	difficulty: int = GameDifficulty.Mode.HARD,
+	extra_mulligans: int = 0
 ) -> void:
 	context.level = level
 	var base_threshold := ThresholdCalculator.get_threshold_for_level(level, difficulty)
@@ -120,12 +123,14 @@ func start_brew(
 	_clear_presented_stat_snapshots()
 	_reset_presented_stats()
 	_practice_restart_used = false
-	_mulligan_allowance = 1
-	_mulligans_used = 0
-	_bonus_swap_hands_remaining = 0
+	_stirring_spoon_hands_remaining = 0
+	_juggling_club_hands_remaining = 0
+	_lucky_coin_swap_hands_remaining = 0
 	_next_hand_draw_count = HAND_DRAW_COUNT
 	_lucky_coin_in_current_hand = false
 	_reset_draw_flow_state()
+	_mulligan_allowance = 1 + maxi(0, extra_mulligans)
+	_mulligans_used = 0
 	bag.reset_for_brew(true)
 	brew_updated.emit(context)
 
@@ -310,6 +315,58 @@ func is_frog_leg_save_pending() -> bool:
 	return _frog_leg_save_pending
 
 
+func get_persistent_effect_entries() -> Array[BrewPersistentEffects.EffectEntry]:
+	return BrewPersistentEffects.collect(self)
+
+
+func get_ice_cube_shields_remaining() -> int:
+	return _ice_cube_shields_remaining
+
+
+func get_growth_potion_doubles_remaining() -> int:
+	return _growth_potion_doubles_remaining
+
+
+func get_chain_draws_remaining() -> int:
+	return _chain_draws_remaining
+
+
+func get_poison_apple_pending() -> Array:
+	return _poison_apple_pending
+
+
+func get_booberry_count_this_hand() -> int:
+	return _booberry_count_this_hand
+
+
+func get_stirring_spoon_hands_remaining() -> int:
+	return _stirring_spoon_hands_remaining
+
+
+func get_juggling_club_hands_remaining() -> int:
+	return _juggling_club_hands_remaining
+
+
+func get_next_hand_draw_count() -> int:
+	return _next_hand_draw_count
+
+
+func has_unicorn_cures_next_explosive() -> bool:
+	return _unicorn_cures_next_explosive
+
+
+func has_parrot_doubles_next() -> bool:
+	return _parrot_doubles_next
+
+
+func has_fairy_vanish_next_ingredient() -> bool:
+	return _fairy_vanish_next_ingredient
+
+
+func has_voodoo_doll_arms_copy() -> bool:
+	return _voodoo_doll_arms_copy
+
+
 func complete_frog_leg_save() -> void:
 	if not _frog_leg_save_pending:
 		return
@@ -399,12 +456,10 @@ func try_draw_custom_hand_to_hand(ingredients: Array) -> bool:
 
 
 func _begin_hand_draw(drawn: Array[IngredientData], bag_display_reserve: int) -> bool:
+	_tick_poison_apple_on_new_hand()
 	_hand_phase = HandPhase.DRAWING
 	_hand_undo_stack.clear()
-	var bonus_swap := 1 if _bonus_swap_hands_remaining > 0 else 0
-	if _bonus_swap_hands_remaining > 0:
-		_bonus_swap_hands_remaining -= 1
-	_hand_swap_allowance = 1 + bonus_swap
+	_hand_swap_allowance = 1 + _compute_and_consume_hand_swap_bonus()
 	_hand_swaps_used = 0
 	_lucky_coin_in_current_hand = false
 	_reset_hand_slots()
@@ -580,8 +635,10 @@ func _play_next_hand_card() -> void:
 
 
 func _finish_hand_play() -> void:
+	var explosiveness_before := context.explosiveness
 	_apply_booberry_end_of_hand_penalty()
-	_apply_poison_apple_delayed_explosiveness()
+	if context.explosiveness != explosiveness_before:
+		enqueue_presented_stat_snapshot()
 	_resolve_lucky_coin_hand_effect()
 	_reset_hand_slots()
 	_hand_start_slots.clear()
@@ -724,16 +781,18 @@ func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> voi
 		point_value *= 2
 		explosive_add *= 2
 	context.score += point_value
-	if _unicorn_cures_next_explosive:
+	var unicorn_blocks_explosive := _unicorn_cures_next_explosive
+	if unicorn_blocks_explosive:
 		if explosive_add > 0:
 			explosive_add = 0
 		_unicorn_cures_next_explosive = false
-	if _ice_cube_shields_remaining > 0:
+	if _ice_cube_shields_remaining > 0 and explosive_add > 0:
 		if context.explosiveness + explosive_add >= context.explosion_limit:
 			explosive_add = 0
 		_ice_cube_shields_remaining -= 1
 	if (
 		ingredient.id == IngredientEffects.CHICKEN_ID
+		and explosive_add > 0
 		and context.explosiveness + explosive_add >= context.explosion_limit
 	):
 		explosive_add = 0
@@ -744,7 +803,9 @@ func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> voi
 		context.score += effect.bonus_score
 	if effect.bonus_explosiveness > 0:
 		var bonus_explosive := effect.bonus_explosiveness
-		if _ice_cube_shields_remaining > 0:
+		if unicorn_blocks_explosive:
+			bonus_explosive = 0
+		if _ice_cube_shields_remaining > 0 and bonus_explosive > 0:
 			if context.explosiveness + bonus_explosive >= context.explosion_limit:
 				bonus_explosive = 0
 			_ice_cube_shields_remaining -= 1
@@ -779,7 +840,10 @@ func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> voi
 		if granted != null:
 			context.bag.grant_ingredient_during_brew(granted)
 	if effect.bonus_swap_hands > 0:
-		_bonus_swap_hands_remaining += effect.bonus_swap_hands
+		if ingredient.id == IngredientEffects.STIRRING_SPOON_ID:
+			_stirring_spoon_hands_remaining += effect.bonus_swap_hands
+		elif ingredient.id == IngredientEffects.JUGGLING_CLUB_ID:
+			_juggling_club_hands_remaining += effect.bonus_swap_hands
 	if effect.vanish_next_ingredient:
 		_fairy_vanish_next_ingredient = true
 	if effect.poison_apple_delay_scheduled:
@@ -818,7 +882,7 @@ func _apply_booberry_end_of_hand_penalty() -> void:
 	_booberry_count_this_hand = 0
 
 
-func _apply_poison_apple_delayed_explosiveness() -> void:
+func _tick_poison_apple_on_new_hand() -> void:
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		_poison_apple_pending.clear()
 		return
@@ -842,10 +906,34 @@ func _apply_poison_apple_delayed_explosiveness() -> void:
 	if not triggered:
 		return
 
-	enqueue_presented_stat_snapshot()
 	if context.is_exploded():
 		if not _try_frog_leg_save():
 			_resolve_explosion()
+
+
+func _compute_and_consume_hand_swap_bonus() -> int:
+	var spoon_active := _stirring_spoon_hands_remaining > 0
+	var juggling_active := _juggling_club_hands_remaining > 0
+	var lucky_active := _lucky_coin_swap_hands_remaining > 0
+
+	var bonus := 0
+	if spoon_active:
+		bonus += 1
+	if juggling_active:
+		bonus += 1
+	if lucky_active:
+		bonus += 1
+	if spoon_active and juggling_active:
+		bonus += 1
+
+	if spoon_active:
+		_stirring_spoon_hands_remaining -= 1
+	if juggling_active:
+		_juggling_club_hands_remaining -= 1
+	if lucky_active:
+		_lucky_coin_swap_hands_remaining -= 1
+
+	return bonus
 
 
 func _try_vanish_ingredient_from_fairy(
@@ -1005,6 +1093,10 @@ func sync_presented_stats_from_context() -> void:
 	_reset_presented_stats()
 
 
+func has_pending_stat_snapshots() -> bool:
+	return not _presented_stat_snapshots.is_empty()
+
+
 func enqueue_presented_stat_snapshot() -> void:
 	_presented_stat_snapshots.append(
 		{
@@ -1093,7 +1185,7 @@ func _resolve_lucky_coin_hand_effect() -> void:
 	if _hand_swaps_used <= 0:
 		context.gold_gained_this_brew += 2
 	else:
-		_bonus_swap_hands_remaining += 1
+		_lucky_coin_swap_hands_remaining += 1
 	_lucky_coin_in_current_hand = false
 
 
@@ -1103,7 +1195,9 @@ func _reset_draw_flow_state() -> void:
 	_hand_undo_stack.clear()
 	_hand_swap_allowance = 1
 	_hand_swaps_used = 0
-	_bonus_swap_hands_remaining = 0
+	_stirring_spoon_hands_remaining = 0
+	_juggling_club_hands_remaining = 0
+	_lucky_coin_swap_hands_remaining = 0
 	_next_hand_draw_count = HAND_DRAW_COUNT
 	_lucky_coin_in_current_hand = false
 	_mulligan_allowance = 1

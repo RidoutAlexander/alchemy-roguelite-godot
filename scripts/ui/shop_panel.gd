@@ -13,6 +13,9 @@ const BAG_COUNT_LABEL_INSET := Vector2(0.0, 6.0)
 @onready var _gold_counter: GoldDisplay = $GoldCounter
 @onready var _reroll_button: ShopRerollButton = $RerollButton
 @onready var _reroll_cost: GoldCostBadge = $RerollCost
+@onready var _buy_mulligan_button: ShopRerollButton = $BuyMulliganButton
+@onready var _buy_mulligan_cost: ShopButtonCostOverlay = $BuyMulliganCost
+@onready var _shop_gold_popups: ShopGoldSpentPopups = $ShopGoldPopups
 @onready var leave_shop_button: WoodenButton = $LeaveShopButton
 @onready var _fly_layer: CanvasLayer = $FlyLayer
 @onready var _shop_select_pop_player: AudioStreamPlayer = $ShopSelectPopPlayer
@@ -36,6 +39,10 @@ func _ready() -> void:
 		push_error("ShopPanel: LeaveShopButton not found")
 	if _reroll_button != null and not _reroll_button.pressed.is_connected(_on_reroll_pressed):
 		_reroll_button.pressed.connect(_on_reroll_pressed)
+	if _buy_mulligan_button != null and not _buy_mulligan_button.pressed.is_connected(
+		_on_buy_mulligan_pressed
+	):
+		_buy_mulligan_button.pressed.connect(_on_buy_mulligan_pressed)
 	if _bag_button != null and not _bag_button.pressed.is_connected(_on_bag_button_pressed):
 		_bag_button.pressed.connect(_on_bag_button_pressed)
 	if _bag_contents != null and not _bag_contents.overlay_closed.is_connected(_on_bag_contents_closed):
@@ -108,11 +115,33 @@ func _play_shop_select_pop() -> void:
 func _on_reroll_pressed() -> void:
 	if _purchase_animations_pending > 0:
 		return
+	var run := GameManager.run
+	if run == null:
+		return
+	var spent: int = run.get_shop_reroll_cost()
 	if GameManager.try_reroll_shop():
 		_play_shop_select_pop()
+		_show_gold_spent(spent)
 		refresh()
 	elif _gold_counter != null:
 		_gold_counter.shake()
+
+
+func _on_buy_mulligan_pressed() -> void:
+	if _purchase_animations_pending > 0:
+		return
+	var run := GameManager.run
+	if run == null:
+		return
+	var spent: int = run.get_shop_mulligan_cost()
+	if GameManager.try_buy_shop_mulligan():
+		_play_shop_select_pop()
+		_show_gold_spent(spent)
+		refresh()
+	elif _gold_counter != null:
+		_gold_counter.shake()
+		if _buy_mulligan_button != null:
+			_buy_mulligan_button.shake()
 
 
 func _on_offer_pressed(slot_index: int) -> void:
@@ -123,7 +152,7 @@ func _on_offer_pressed(slot_index: int) -> void:
 		return
 	if slot_index < 0 or slot_index >= run.current_shop_offers.size():
 		return
-	var offer = run.current_shop_offers[slot_index]
+	var offer: ShopService.ShopOffer = run.current_shop_offers[slot_index]
 	if offer == null:
 		return
 	if run.gold < offer.price:
@@ -136,12 +165,14 @@ func _on_offer_pressed(slot_index: int) -> void:
 	var card := offer_cards[slot_index]
 	var fly_data := card.capture_fly_data()
 
+	var spent: int = offer.price
 	_purchase_animations_pending += 1
 	if not GameManager.try_purchase_offer(slot_index):
 		_purchase_animations_pending = maxi(0, _purchase_animations_pending - 1)
 		return
 
 	_play_shop_select_pop()
+	_show_gold_spent(spent)
 	refresh_stats_only()
 	card.hide_for_purchase()
 	_start_purchase_fly(slot_index, fly_data)
@@ -476,3 +507,22 @@ func refresh_stats_only() -> void:
 			_reroll_cost.set_cost(reroll_cost)
 		_reroll_button.disabled = reroll_cost > 0 and run.gold < reroll_cost
 		_reroll_button.modulate = Color(0.55, 0.55, 0.55, 1.0) if _reroll_button.disabled else Color.WHITE
+	_refresh_buy_mulligan_controls(run)
+
+
+func _refresh_buy_mulligan_controls(run: RunManager) -> void:
+	if _buy_mulligan_cost != null:
+		_buy_mulligan_cost.set_cost(run.get_shop_mulligan_cost())
+	if _buy_mulligan_button == null:
+		return
+	var mulligan_cost := run.get_shop_mulligan_cost()
+	_buy_mulligan_button.disabled = run.gold < mulligan_cost
+	_buy_mulligan_button.modulate = (
+		Color(0.55, 0.55, 0.55, 1.0) if _buy_mulligan_button.disabled else Color.WHITE
+	)
+
+
+func _show_gold_spent(amount: int) -> void:
+	if _shop_gold_popups == null or _gold_counter == null:
+		return
+	_shop_gold_popups.show_spent(amount, _gold_counter)

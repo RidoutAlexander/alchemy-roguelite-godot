@@ -12,6 +12,9 @@
 [ext_resource type="PackedScene" uid="uid://cn2p7ghly6x2s" path="res://scenes/ui/gold_cost_badge.tscn" id="11_reroll_cost"]
 [ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="12_font"]
 [ext_resource type="PackedScene" uid="uid://bagcontentsoverlay01" path="res://scenes/ui/bag_contents_overlay.tscn" id="13_bag_contents"]
+[ext_resource type="Script" path="res://scripts/ui/shop_gold_spent_popups.gd" id="14_shop_gold_popups"]
+[ext_resource type="Script" uid="uid://c8k2mulligancost" path="res://scripts/ui/shop_button_cost_overlay.gd" id="15_cost_overlay"]
+[ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="16_gold_icon"]
 
 [node name="ShopPanel" type="Control" unique_id=1019768551]
 layout_mode = 3
@@ -215,6 +218,72 @@ offset_left = 586.0
 offset_top = 176.0
 offset_right = 658.0
 offset_bottom = 220.0
+
+[node name="BuyMulliganCost" type="Control" parent="."]
+z_index = 5
+custom_minimum_size = Vector2(40, 36)
+layout_mode = 0
+offset_left = 723.0
+offset_top = 241.0
+offset_right = 763.0
+offset_bottom = 277.0
+mouse_filter = 2
+script = ExtResource("15_cost_overlay")
+
+[node name="CoinIcon" type="TextureRect" parent="BuyMulliganCost"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("16_gold_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AmountLabel" type="Label" parent="BuyMulliganCost"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("12_font")
+theme_override_font_sizes/font_size = 26
+text = "5"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BuyMulliganButton" parent="." instance=ExtResource("10_reroll_button")]
+z_index = 5
+offset_left = 767.0
+offset_top = 215.0
+offset_right = 855.0
+offset_bottom = 303.0
+
+[node name="BuyMulliganLabel" type="Label" parent="."]
+z_index = 5
+layout_mode = 0
+offset_left = 863.0
+offset_top = 241.0
+offset_right = 1005.0
+offset_bottom = 277.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("12_font")
+theme_override_font_sizes/font_size = 22
+text = "Buy Mulligan"
+vertical_alignment = 1
+
+[node name="ShopGoldPopups" type="Node" parent="."]
+script = ExtResource("14_shop_gold_popups")
 
 [node name="BagContentsOverlay" parent="." instance=ExtResource("13_bag_contents")]
 z_index = 100

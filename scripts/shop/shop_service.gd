@@ -15,15 +15,14 @@ func _init(content: DefaultContent) -> void:
 func generate_offers(
 	_level: int,
 	gold: int,
-	slot_count: int = GameConstants.SHOP_SLOT_COUNT,
-	owned_ingredient_ids: Array[String] = []
+	slot_count: int = GameConstants.SHOP_SLOT_COUNT
 ) -> Array:
 	var offers: Array = []
 	offers.resize(slot_count)
 	for slot_index in slot_count:
 		offers[slot_index] = null
 
-	var affordable := _affordable_ingredients(gold, owned_ingredient_ids)
+	var affordable := _affordable_ingredients(gold)
 	if affordable.is_empty():
 		return offers
 
@@ -51,24 +50,15 @@ func _excluding_offered(candidates: Array, offered_ids: Dictionary) -> Array:
 	return available
 
 
-func _affordable_ingredients(gold: int, owned_ingredient_ids: Array[String]) -> Array:
+func _affordable_ingredients(gold: int) -> Array:
 	var affordable: Array = []
 	for ingredient in _content.all_ingredients():
 		if ingredient == null or not ingredient.shop_available:
 			continue
 		if ingredient.shop_cost > gold:
 			continue
-		if _is_shadow_banned_from_shop(ingredient.id, owned_ingredient_ids):
-			continue
 		affordable.append(ingredient)
 	return affordable
-
-
-func _is_shadow_banned_from_shop(ingredient_id: String, owned_ingredient_ids: Array[String]) -> bool:
-	return (
-		ingredient_id == IngredientEffects.UNICORN_HORN_ID
-		and owned_ingredient_ids.has(ingredient_id)
-	)
 
 
 func _rarity_weight(ingredient: IngredientData) -> int:

@@ -17,6 +17,7 @@ var current_aura: AuraData
 var current_shop_offers: Array = []
 var pending_boss_boom_berry_reward_ids: Array[String] = []
 var free_shop_rerolls: int = 0
+var pending_extra_mulligans: int = 0
 var bag := BagModel.new()
 var brew_session: BrewSession
 
@@ -53,6 +54,7 @@ func start_new_run(difficulty: int = GameDifficulty.Mode.HARD) -> void:
 	current_shop_offers.clear()
 	pending_boss_boom_berry_reward_ids.clear()
 	free_shop_rerolls = 0
+	pending_extra_mulligans = 0
 	bag.set_master_bag(_content.flatten_starter_bag())
 
 
@@ -66,6 +68,7 @@ func load_from_save(data: Dictionary) -> void:
 	)
 	boss_threshold_discount = int(data.get("bossThresholdDiscount", 0))
 	free_shop_rerolls = int(data.get("freeShopRerolls", 0))
+	pending_extra_mulligans = int(data.get("pendingExtraMulligans", 0))
 	total_run_score = int(data.get("totalRunScore", 0))
 	best_single_brew_this_run = int(data.get("bestSingleBrewThisRun", 0))
 	deepest_level_reached = int(data.get("deepestLevelReached", 0))
@@ -99,7 +102,6 @@ func load_from_save(data: Dictionary) -> void:
 		offer.ingredient = ingredient
 		offer.price = int(offer_data.get("price", ingredient.shop_cost))
 		current_shop_offers.append(offer)
-	_strip_shadow_banned_shop_offers()
 
 
 func to_save_data() -> Dictionary:
@@ -121,6 +123,7 @@ func to_save_data() -> Dictionary:
 		"bossThresholdPenalty": boss_threshold_penalty,
 		"bossThresholdDiscount": boss_threshold_discount,
 		"freeShopRerolls": free_shop_rerolls,
+		"pendingExtraMulligans": pending_extra_mulligans,
 		"bagIngredientIds": bag.master_ids(),
 		"lastAuraId": last_aura_id,
 		"lockedLevelAuraId": locked_level_aura_id,
@@ -137,6 +140,8 @@ func begin_brew() -> void:
 	current_aura = _pick_aura_for_brew()
 	if current_aura != null:
 		last_aura_id = current_aura.id
+	var extra_mulligans := pending_extra_mulligans
+	pending_extra_mulligans = 0
 	brew_session.start_brew(
 		current_level,
 		current_aura,
@@ -144,7 +149,8 @@ func begin_brew() -> void:
 		0,
 		boss_threshold_penalty,
 		boss_threshold_discount,
-		difficulty_mode
+		difficulty_mode,
+		extra_mulligans
 	)
 
 
@@ -195,8 +201,7 @@ func prepare_shop_for_current_level() -> void:
 	current_shop_offers = _shop_service.generate_offers(
 		current_level,
 		gold,
-		GameConstants.SHOP_SLOT_COUNT,
-		bag.master_ids()
+		GameConstants.SHOP_SLOT_COUNT
 	)
 
 
@@ -204,6 +209,18 @@ func get_shop_reroll_cost() -> int:
 	if free_shop_rerolls > 0:
 		return 0
 	return GameConstants.REROLL_COST
+
+
+func get_shop_mulligan_cost() -> int:
+	return GameConstants.SHOP_MULLIGAN_COST
+
+
+func try_buy_shop_mulligan() -> bool:
+	if gold < GameConstants.SHOP_MULLIGAN_COST:
+		return false
+	gold -= GameConstants.SHOP_MULLIGAN_COST
+	pending_extra_mulligans += 1
+	return true
 
 
 func try_reroll_shop() -> bool:
@@ -216,8 +233,7 @@ func try_reroll_shop() -> bool:
 	current_shop_offers = _shop_service.generate_offers(
 		current_level,
 		gold,
-		GameConstants.SHOP_SLOT_COUNT,
-		bag.master_ids()
+		GameConstants.SHOP_SLOT_COUNT
 	)
 	return true
 
@@ -248,7 +264,6 @@ func try_purchase_offer(index: int) -> bool:
 	gold -= offer.price
 	bag.add_to_master_bag(offer.ingredient)
 	current_shop_offers[index] = null
-	_strip_shadow_banned_shop_offers()
 	return true
 
 
@@ -278,17 +293,6 @@ func _grant_boss_boom_berry_reward() -> void:
 	if granted_ids.is_empty():
 		return
 	pending_boss_boom_berry_reward_ids = granted_ids
-
-
-func _strip_shadow_banned_shop_offers() -> void:
-	if not bag.has_master_ingredient(IngredientEffects.UNICORN_HORN_ID):
-		return
-	for i in current_shop_offers.size():
-		var offer = current_shop_offers[i]
-		if offer == null:
-			continue
-		if offer.ingredient.id == IngredientEffects.UNICORN_HORN_ID:
-			current_shop_offers[i] = null
 
 
 func _clear_locked_level_aura() -> void:

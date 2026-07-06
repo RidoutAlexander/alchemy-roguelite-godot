@@ -24,6 +24,7 @@
 [ext_resource type="PackedScene" uid="uid://cr5syaod6s2ge" path="res://scenes/ui/bag_contents_overlay.tscn" id="21_cauldron_contents"]
 [ext_resource type="PackedScene" uid="uid://playerhandrow01" path="res://scenes/ui/player_hand_row.tscn" id="22_player_hand"]
 [ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="23_hand_undo"]
+[ext_resource type="PackedScene" path="res://scenes/ui/brew_persistent_effects_display.tscn" id="25_persistent_effects"]
 
 [node name="Game" type="Control" unique_id=403037050]
 custom_minimum_size = Vector2(1024, 576)
@@ -181,6 +182,13 @@ offset_top = 23.0
 offset_right = 830.0
 offset_bottom = 75.0
 
+[node name="PersistentEffectsDisplay" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("25_persistent_effects")]
+z_index = 6
+offset_left = 662.0
+offset_top = 82.0
+offset_right = 950.0
+offset_bottom = 230.0
+
 [node name="ExplosivenessCounter" parent="PhaseSwipeHost/BrewPanel" unique_id=1523366666 instance=ExtResource("16_explosiveness_display")]
 anchors_preset = 0
 offset_left = 123.0
@@ -288,9 +296,9 @@ scale = Vector2(0.4607092, 0.4607092)
 label_text = "Save and Quit"
 
 [node name="DevModeCheckbox" type="CheckBox" parent="PhaseSwipeHost/BrewPanel"]
-offset_left = 744.0
+offset_left = 819.0
 offset_top = 542.0
-offset_right = 1014.0
+offset_right = 1089.0
 offset_bottom = 572.0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 18

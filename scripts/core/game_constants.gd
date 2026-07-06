@@ -9,6 +9,7 @@ const DEFAULT_EXPLOSION_LIMIT := 8
 const SHOP_SLOT_COUNT := 4
 const SHOP_RARITY_WEIGHTS := [5, 4, 3, 2, 1]
 const REROLL_COST := 2
+const SHOP_MULLIGAN_COST := 5
 const BOSS_AURA_INTERVAL := 5
 const MIN_BOSS_THRESHOLD := 1
 const BOSS_AURA_WARNING := "You must complete the potion this round."

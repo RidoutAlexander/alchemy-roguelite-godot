@@ -23,14 +23,7 @@ func has_master_ingredient(ingredient_id: String) -> bool:
 
 
 func can_add_to_master_bag(ingredient: IngredientData) -> bool:
-	if ingredient == null:
-		return false
-	if (
-		ingredient.id == IngredientEffects.UNICORN_HORN_ID
-		and has_master_ingredient(ingredient.id)
-	):
-		return false
-	return true
+	return ingredient != null
 
 
 func add_to_master_bag(ingredient: IngredientData) -> bool:

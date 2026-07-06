@@ -305,6 +305,14 @@ func try_reroll_shop() -> bool:
 	return rerolled
 
 
+func try_buy_shop_mulligan() -> bool:
+	var purchased := run.try_buy_shop_mulligan()
+	if purchased:
+		run_changed.emit()
+		_save_at_shop()
+	return purchased
+
+
 func try_purchase_offer(index: int) -> bool:
 	var purchased := run.try_purchase_offer(index)
 	if purchased:
@@ -372,6 +380,18 @@ func _set_phase(phase: int) -> void:
 
 func _on_brew_updated(context: BrewContext) -> void:
 	brew_updated.emit(context)
+	_try_present_pending_end_of_hand_stats()
+
+
+func _try_present_pending_end_of_hand_stats() -> void:
+	if _presentation_in_progress:
+		return
+	var session := run.brew_session
+	if session.get_hand_phase() != BrewSession.HandPhase.BAG:
+		return
+	if not session.has_pending_stat_snapshots():
+		return
+	present_card_stats()
 
 
 func _on_hand_draw_batch_started(drawn: Array) -> void:
