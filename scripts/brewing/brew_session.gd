@@ -252,16 +252,14 @@ func get_hand_display_stats(slots_override: Array = []) -> Array:
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
 	if not slots_override.is_empty():
 		return slots_override
-	return _hand_slots
+	return _hand_slots.duplicate()
 
 
 func _compute_hand_display_stats(slots_override: Array = []) -> Array:
 	var slots := _resolve_display_hand_slots(slots_override)
-	var severed_reference := (
-		_hand_start_slots
-		if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty()
-		else slots
-	)
+	var severed_layout_slots: Array = []
+	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+		severed_layout_slots = _hand_start_slots
 	return IngredientEffects.compute_hand_display_stats(
 		slots,
 		context.cauldron_contents,
@@ -269,7 +267,7 @@ func _compute_hand_display_stats(slots_override: Array = []) -> Array:
 		HAND_SLOT_COUNT,
 		_growth_potion_doubles_remaining,
 		_build_hand_display_modifiers(),
-		severed_reference
+		severed_layout_slots
 	)
 
 
@@ -767,16 +765,7 @@ func _apply_ingredient(
 		_parrot_doubles_next = false
 
 	last_play_fly_count = 1
-	_apply_ingredient_play(ingredient, track_draw)
-	if from_hand_play and hand_slot_index >= 0:
-		if ingredient.id == IngredientEffects.SEVERED_RIGHT_HAND_ID:
-			var left_bonus := _count_hand_ingredients_to_left_from_start(hand_slot_index)
-			if left_bonus > 0:
-				context.score += left_bonus
-		elif ingredient.id == IngredientEffects.SEVERED_LEFT_HAND_ID:
-			var right_bonus := _count_hand_ingredients_to_right(hand_slot_index)
-			if right_bonus > 0:
-				context.score += right_bonus
+	_apply_ingredient_play(ingredient, track_draw, from_hand_play, hand_slot_index)
 	enqueue_presented_stat_snapshot()
 
 	if (
@@ -846,22 +835,39 @@ func _count_hand_ingredients_to_right(slot_index: int) -> int:
 	return count
 
 
-func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> void:
+func _apply_ingredient_play(
+	ingredient: IngredientData,
+	track_draw: bool,
+	from_hand_play: bool = false,
+	hand_slot_index: int = -1
+) -> void:
 	if track_draw:
 		context.drawn_this_brew.append(ingredient)
 
-	var point_value := ingredient.point_value
-	var explosive_add := ingredient.explosive_value
+	var cauldron_count_before := context.cauldron_contents.size()
+	var effect := IngredientEffects.apply(ingredient, context)
+
+	var point_value := ingredient.point_value + effect.bonus_score
+	var explosive_add := ingredient.explosive_value + effect.bonus_explosiveness
+	if effect.score_penalty > 0:
+		point_value = maxi(0, point_value - effect.score_penalty)
+	if from_hand_play and hand_slot_index >= 0:
+		if ingredient.id == IngredientEffects.SEVERED_RIGHT_HAND_ID:
+			point_value += _count_hand_ingredients_to_left_from_start(hand_slot_index)
+		elif ingredient.id == IngredientEffects.SEVERED_LEFT_HAND_ID:
+			point_value += _count_hand_ingredients_to_right(hand_slot_index)
+
 	if _growth_potion_doubles_remaining > 0:
 		point_value *= 2
 		explosive_add *= 2
 		_growth_potion_doubles_remaining -= 1
 	if _AuraEffects.in_rhythm_doubles_ingredient(
-		context.cauldron_contents.size(),
+		cauldron_count_before,
 		context.current_aura
 	):
 		point_value *= 2
 		explosive_add *= 2
+
 	context.score += point_value
 	var unicorn_blocks_explosive := _unicorn_cures_next_explosive
 	if unicorn_blocks_explosive:
@@ -879,21 +885,6 @@ func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> voi
 	):
 		explosive_add = 0
 	context.explosiveness += explosive_add
-
-	var effect := IngredientEffects.apply(ingredient, context)
-	if effect.bonus_score > 0:
-		context.score += effect.bonus_score
-	if effect.bonus_explosiveness > 0:
-		var bonus_explosive := effect.bonus_explosiveness
-		if unicorn_blocks_explosive:
-			bonus_explosive = 0
-		if _ice_cube_shields_remaining > 0 and bonus_explosive > 0:
-			if context.explosiveness + bonus_explosive >= context.explosion_limit:
-				bonus_explosive = 0
-			_ice_cube_shields_remaining -= 1
-		context.explosiveness += bonus_explosive
-	if effect.score_penalty > 0:
-		context.score = maxi(0, context.score - effect.score_penalty)
 	if effect.bonus_gold > 0:
 		context.gold_gained_this_brew += effect.bonus_gold
 	if effect.boss_threshold_discount > 0:
@@ -1305,6 +1296,7 @@ func _reset_draw_flow_state() -> void:
 	last_bag_grant_ingredient = null
 	_hand_phase = HandPhase.BAG
 	_reset_hand_slots()
+	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
 	_hand_swap_allowance = 1
 	_hand_swaps_used = 0

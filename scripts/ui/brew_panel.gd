@@ -469,11 +469,7 @@ func _get_hand_display_stats_for_slot(slot_index: int, ingredient: IngredientDat
 	if GameManager.run == null or ingredient == null:
 		return null
 	var session := GameManager.run.brew_session
-	var slots: Array = []
-	if _player_hand != null:
-		slots = _player_hand.get_current_hand_slots()
-	else:
-		slots = session.get_hand_slots()
+	var slots := session.get_hand_slots()
 	while slots.size() < BrewSession.HAND_SLOT_COUNT:
 		slots.append(null)
 	if slot_index >= 0 and slot_index < slots.size():
@@ -505,23 +501,26 @@ func _sync_hand_ui() -> void:
 		_player_hand.visible = show_hand
 		if hand_phase == BrewSession.HandPhase.DRAWING:
 			var drawing_slots := _player_hand.get_current_hand_slots()
+			var drawing_stats := session.get_hand_display_stats(drawing_slots)
 			_player_hand.refresh_hand(
 				drawing_slots,
 				false,
 				false,
 				session.get_in_rhythm_double_hand_slots(drawing_slots),
-				session.get_hand_display_stats(drawing_slots)
+				drawing_stats
 			)
 			_set_play_undo_visible(false)
 			if show_mulligan:
 				call_deferred("_align_mulligan_control")
 			return
+		var hand_slots := session.get_hand_slots()
+		var hand_stats := session.get_hand_display_stats(hand_slots)
 		_player_hand.refresh_hand(
-			session.get_hand_slots(),
+			hand_slots,
 			can_interact,
 			can_interact,
-			session.get_in_rhythm_double_hand_slots(),
-			session.get_hand_display_stats()
+			session.get_in_rhythm_double_hand_slots(hand_slots),
+			hand_stats
 		)
 
 	_set_play_undo_visible(can_interact)

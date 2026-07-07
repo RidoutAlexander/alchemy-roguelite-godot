@@ -123,13 +123,9 @@ static func collect(session: BrewSession) -> Array[EffectEntry]:
 		true,
 		35
 	)
-	_add_cauldron_count_entry(
-		entries,
-		cauldron,
-		IngredientEffects.GARLIC_ID,
-		false,
-		36
-	)
+	if _has_ingredient_in_cauldron(cauldron, IngredientEffects.GARLIC_ID):
+		# Only the first garlic raises the explosion limit; extra copies do nothing.
+		_add_entry(entries, IngredientEffects.GARLIC_ID, "", 36)
 	_add_cauldron_count_entry(
 		entries,
 		cauldron,

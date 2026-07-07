@@ -34,6 +34,8 @@ const _SCORE_UP_COLOR := Color(0.12, 0.62, 0.18, 1)
 const _SCORE_DOWN_COLOR := Color(0.82, 0.18, 0.14, 1)
 const _EXPLOSIVE_UP_COLOR := Color(0.82, 0.18, 0.14, 1)
 const _EXPLOSIVE_DOWN_COLOR := Color(0.12, 0.62, 0.18, 1)
+const _MODIFIED_STAT_OUTLINE_COLOR := Color(0, 0, 0, 1)
+const _MODIFIED_STAT_OUTLINE_SIZE := 4
 
 @onready var _visual_root: Control = $VisualRoot
 @onready var _card_background: TextureRect = $VisualRoot/CardBackground
@@ -124,10 +126,16 @@ func bind_hand_card(
 	_base_point_value = ingredient.point_value if ingredient != null else 0
 	_base_explosive_value = ingredient.explosive_value if ingredient != null else 0
 	bind_preview(ingredient)
-	if display_point_value >= 0:
-		update_hand_stat_display(display_point_value, display_explosive_value)
+	var point_display := (
+		display_point_value if display_point_value >= 0 else _base_point_value
+	)
+	var explosive_display := (
+		display_explosive_value if display_point_value >= 0 else _base_explosive_value
+	)
+	if is_node_ready():
+		update_hand_stat_display(point_display, explosive_display)
 	else:
-		update_hand_stat_display(_base_point_value, _base_explosive_value)
+		call_deferred("update_hand_stat_display", point_display, explosive_display)
 	_apply_hand_layout()
 	_sync_hand_input()
 
@@ -144,6 +152,19 @@ func update_hand_stat_display(point_value: int, explosive_value: int) -> void:
 	else:
 		_explosive_value.text = ""
 		$VisualRoot/StatsRow/ExplosiveStat.visible = false
+
+
+func _reset_hand_stat_label_colors() -> void:
+	_clear_hand_stat_label_style(_points_value)
+	_clear_hand_stat_label_style(_explosive_value)
+
+
+func _clear_hand_stat_label_style(label: Label) -> void:
+	if label == null:
+		return
+	label.add_theme_color_override("font_color", _DEFAULT_STAT_COLOR)
+	label.remove_theme_color_override("font_outline_color")
+	label.add_theme_constant_override("outline_size", 0)
 
 
 func _apply_hand_stat_color(
@@ -167,11 +188,22 @@ func _apply_hand_stat_color(
 	else:
 		label.add_theme_color_override("font_color", _DEFAULT_STAT_COLOR)
 
+	if display_value != base_value:
+		label.add_theme_color_override(
+			"font_outline_color",
+			_MODIFIED_STAT_OUTLINE_COLOR
+		)
+		label.add_theme_constant_override("outline_size", _MODIFIED_STAT_OUTLINE_SIZE)
+	else:
+		label.remove_theme_color_override("font_outline_color")
+		label.add_theme_constant_override("outline_size", 0)
+
 
 func clear_hand_card() -> void:
 	set_hand_selected(false)
 	_base_point_value = 0
 	_base_explosive_value = 0
+	_reset_hand_stat_label_colors()
 	_reset_mode_flags()
 	_set_empty_state()
 
@@ -382,13 +414,16 @@ func bind_preview(ingredient: IngredientData) -> void:
 	_ensure_card_background_visible()
 	_name_label.text = ingredient.display_name
 	_description_label.text = ingredient.description
-	_points_value.text = "%d" % ingredient.point_value
-	if ingredient.explosive_value > 0:
-		_explosive_value.text = "%d" % ingredient.explosive_value
-		$VisualRoot/StatsRow/ExplosiveStat.visible = true
+	if _hand_mode:
+		_reset_hand_stat_label_colors()
 	else:
-		_explosive_value.text = ""
-		$VisualRoot/StatsRow/ExplosiveStat.visible = false
+		_points_value.text = "%d" % ingredient.point_value
+		if ingredient.explosive_value > 0:
+			_explosive_value.text = "%d" % ingredient.explosive_value
+			$VisualRoot/StatsRow/ExplosiveStat.visible = true
+		else:
+			_explosive_value.text = ""
+			$VisualRoot/StatsRow/ExplosiveStat.visible = false
 	_set_cost_row_visible(false)
 	_apply_rarity_tint(ingredient.rarity)
 	_apply_ingredient_art(ingredient)

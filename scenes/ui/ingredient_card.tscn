@@ -163,10 +163,10 @@ offset_bottom = 47.0
 
 [node name="Icon" type="TextureRect" parent="VisualRoot/StatsRow/PointsStat" unique_id=1271108892]
 layout_mode = 0
-offset_left = -58.0
-offset_top = -37.0
-offset_right = 18.0
-offset_bottom = 38.0
+offset_left = -69.0
+offset_top = -84.0
+offset_right = 7.0
+offset_bottom = -9.0
 mouse_filter = 2
 texture = ExtResource("4_points_icon")
 expand_mode = 1
@@ -174,10 +174,10 @@ stretch_mode = 5
 
 [node name="ValueLabel" type="Label" parent="VisualRoot/StatsRow/PointsStat" unique_id=724009172]
 layout_mode = 0
-offset_left = 8.0
-offset_top = -28.0
-offset_right = 55.0
-offset_bottom = 25.0
+offset_left = -13.0
+offset_top = -74.0
+offset_right = 34.0
+offset_bottom = -21.0
 theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 42
@@ -194,10 +194,10 @@ offset_bottom = 47.0
 
 [node name="IconBackground" type="TextureRect" parent="VisualRoot/StatsRow/ExplosiveStat" unique_id=864721831]
 layout_mode = 0
-offset_left = 58.0
-offset_top = -33.0
-offset_right = 129.0
-offset_bottom = 36.0
+offset_left = 74.0
+offset_top = -85.0
+offset_right = 145.0
+offset_bottom = -16.0
 mouse_filter = 2
 texture = ExtResource("5_explosive_icon")
 expand_mode = 1
@@ -213,10 +213,10 @@ color = Color(0.78, 0.34, 0.18, 0.75)
 
 [node name="ValueLabel" type="Label" parent="VisualRoot/StatsRow/ExplosiveStat" unique_id=1042933503]
 layout_mode = 0
-offset_left = 23.0
-offset_top = -27.0
-offset_right = 74.0
-offset_bottom = 26.0
+offset_left = 45.0
+offset_top = -73.0
+offset_right = 96.0
+offset_bottom = -20.0
 theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 42
@@ -254,14 +254,14 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -29.0
-offset_top = -17.0
+offset_top = -93.0
 offset_right = 16.0
 offset_bottom = 28.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(0.12, 0.08, 0.04, 1)
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 24
 text = "Effect description goes here."
 horizontal_alignment = 1
 vertical_alignment = 1
