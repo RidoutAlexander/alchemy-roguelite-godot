@@ -29,7 +29,9 @@ const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
 const HAND_CARD_SCALE := 0.34
 const HAND_CARD_BASE_SIZE := Vector2(300.0, 420.0)
-const HAND_EFFECT_ICON_GAP := 2.0
+const HAND_EFFECT_ICON_GAP := 4.0
+const HAND_EFFECT_ICON_CLEARANCE := 6.0
+const HAND_SCROLL_TOP_LOCAL_Y := -81.0
 const _DEFAULT_STAT_COLOR := Color(0.05, 0.05, 0.05, 1)
 const _SCORE_UP_COLOR := Color(0.12, 0.62, 0.18, 1)
 const _SCORE_DOWN_COLOR := Color(0.82, 0.18, 0.14, 1)
@@ -311,17 +313,32 @@ func _apply_hand_effect_layout() -> void:
 	_update_hand_effect_icon_position()
 
 
-func _hand_effect_icon_rest_y() -> float:
-	var strip_height := HandSlotEffectIcons.ICON_SIZE
-	return -(HAND_EFFECT_ICON_GAP + strip_height) / HAND_CARD_SCALE
+func _hand_effect_scroll_top_y() -> float:
+	if _visual_root == null:
+		return 0.0
+	var visual_scale := _visual_root.scale.y
+	var pivot_y := HAND_CARD_BASE_SIZE.y
+	return (
+		_hand_hover_offset
+		+ (HAND_SCROLL_TOP_LOCAL_Y - pivot_y) * visual_scale
+		+ pivot_y
+	)
+
+
+func _hand_effect_icon_y() -> float:
+	var scroll_top := _hand_effect_scroll_top_y()
+	var offset_below_scroll := (
+		HAND_EFFECT_ICON_GAP
+		+ HandSlotEffectIcons.ICON_SIZE
+		+ HAND_EFFECT_ICON_CLEARANCE
+	) / HAND_CARD_SCALE
+	return scroll_top - offset_below_scroll
 
 
 func _update_hand_effect_icon_position() -> void:
 	if _hand_effect_icons == null or not _hand_mode or not _hand_effect_icons.visible:
 		return
-	var visual_scale := _visual_root.scale.y if _visual_root != null else 1.0
-	var scale_lift := (visual_scale - 1.0) * HAND_CARD_BASE_SIZE.y
-	_hand_effect_icons.position.y = _hand_effect_icon_rest_y() + _hand_hover_offset + scale_lift
+	_hand_effect_icons.position.y = _hand_effect_icon_y()
 
 
 func _lookup_effect_ingredient(ingredient_id: String) -> IngredientData:
