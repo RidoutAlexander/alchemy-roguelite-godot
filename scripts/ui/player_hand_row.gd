@@ -20,7 +20,6 @@ const MIDDLE_SLOT_INDEX := 2
 const PLAY_BUTTON_GAP := 12.0
 const RHYTHM_SHAKE_OFFSET := Vector2(5.0, 2.0)
 const RHYTHM_SHAKE_STEP := 0.07
-const SLOT_TOP_MARGIN := 26.0
 
 @onready var _slot_row: Control = $SlotRow
 @onready var _drag_layer: Control = $DragLayer
@@ -361,7 +360,7 @@ func _layout_slots() -> void:
 		var anchor := _slot_anchors[slot_index]
 		if anchor == null:
 			continue
-		var rest := Vector2(start_x + SLOT_OVERLAP * slot_index, SLOT_TOP_MARGIN)
+		var rest := Vector2(start_x + SLOT_OVERLAP * slot_index, 0.0)
 		anchor.position = rest
 		_anchor_rest_positions.append(rest)
 		_apply_slot_z_index(slot_index)
