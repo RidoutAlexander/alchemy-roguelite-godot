@@ -546,12 +546,14 @@ func _sync_hand_ui() -> void:
 		if hand_phase == BrewSession.HandPhase.DRAWING:
 			var drawing_slots := _player_hand.get_current_hand_slots()
 			var drawing_stats := session.get_hand_display_stats(drawing_slots)
+			var drawing_effects := session.get_hand_slot_effect_entries(drawing_slots)
 			_player_hand.refresh_hand(
 				drawing_slots,
 				false,
 				false,
 				session.get_in_rhythm_double_hand_slots(drawing_slots),
-				drawing_stats
+				drawing_stats,
+				drawing_effects
 			)
 			_set_play_undo_visible(false)
 			if show_mulligan:
@@ -559,12 +561,14 @@ func _sync_hand_ui() -> void:
 			return
 		var hand_slots := session.get_hand_slots()
 		var hand_stats := session.get_hand_display_stats(hand_slots)
+		var hand_effects := session.get_hand_slot_effect_entries(hand_slots)
 		_player_hand.refresh_hand(
 			hand_slots,
 			can_interact,
 			can_interact,
 			session.get_in_rhythm_double_hand_slots(hand_slots),
-			hand_stats
+			hand_stats,
+			hand_effects
 		)
 
 	_set_play_undo_visible(can_interact)

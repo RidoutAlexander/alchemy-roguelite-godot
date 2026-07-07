@@ -2,6 +2,7 @@ class_name BrewSession
 extends RefCounted
 
 const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
+const _HandSlotEffects := preload("res://scripts/brewing/hand_slot_effects.gd")
 
 const HAND_SLOT_COUNT := 5
 const HAND_DRAW_COUNT := 5
@@ -271,6 +272,16 @@ func get_hand_display_stats(slots_override: Array = []) -> Array:
 	return _compute_hand_display_stats(slots_override)
 
 
+func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
+	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
+		return []
+	var slots := _resolve_display_hand_slots(slots_override)
+	var layout_slots: Array = []
+	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+		layout_slots = _hand_start_slots
+	return _HandSlotEffects.compute_entries(slots, HAND_SLOT_COUNT, layout_slots)
+
+
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
 	if not slots_override.is_empty():
 		return slots_override
@@ -492,10 +503,15 @@ func try_draw_to_hand() -> bool:
 	if not can_press_bag():
 		return false
 
-	var draw_count := mini(_next_hand_draw_count, _count_empty_hand_slots())
+	var target_hand_size := _next_hand_draw_count
+	_next_hand_draw_count = HAND_DRAW_COUNT
+	var filled_slots := HAND_SLOT_COUNT - _count_empty_hand_slots()
+	var draw_count := mini(
+		_count_empty_hand_slots(),
+		maxi(0, target_hand_size - filled_slots)
+	)
 	if draw_count <= 0:
 		return false
-	_next_hand_draw_count = HAND_DRAW_COUNT
 
 	var drawn: Array[IngredientData] = []
 	for _i in draw_count:
