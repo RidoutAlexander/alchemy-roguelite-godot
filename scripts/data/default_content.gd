@@ -3,6 +3,7 @@ extends RefCounted
 
 var ingredients: Dictionary = {}
 var auras: Dictionary = {}
+var trinkets: Dictionary = {}
 var starter_bag: Array[Dictionary] = []
 
 
@@ -15,6 +16,7 @@ static func create() -> DefaultContent:
 func _build() -> void:
 	ingredients = SpreadsheetContentLoader.load_ingredients()
 	auras = SpreadsheetContentLoader.load_auras()
+	trinkets = SpreadsheetContentLoader.load_trinkets()
 	starter_bag = SpreadsheetContentLoader.load_starter_bag(ingredients)
 
 
@@ -28,6 +30,14 @@ func all_ingredients() -> Array:
 
 func find_aura(aura_id: String) -> AuraData:
 	return auras.get(aura_id)
+
+
+func find_trinket(trinket_id: String) -> TrinketData:
+	return trinkets.get(trinket_id)
+
+
+func all_trinkets() -> Array:
+	return trinkets.values()
 
 
 func auras_for_pool(pool: AuraData.Pool, level: int = 1) -> Array:

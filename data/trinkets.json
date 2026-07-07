@@ -1,0 +1,17 @@
+[
+  {
+    "id": "pumpkin_trinket",
+    "display_name": "Pumpkin Necklace",
+    "description": "Pumpkins gain +1 score for each pumpkin played before it in a row"
+  },
+  {
+    "id": "red_mushroom_trinket",
+    "display_name": "Red Mushroom Trinket",
+    "description": "Red mushrooms can score a maximum of 6 instead of 4"
+  },
+  {
+    "id": "rat_trinket",
+    "display_name": "Rat Trinket",
+    "description": "Rats can score a maximum of 6 instead of 4"
+  }
+]

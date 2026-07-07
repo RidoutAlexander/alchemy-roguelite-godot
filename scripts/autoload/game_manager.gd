@@ -78,8 +78,11 @@ func continue_run() -> void:
 		start_new_run()
 		return
 	run.load_from_save(data)
-	last_brew_cleared = false
-	_set_phase(GamePhase.Phase.SHOP)
+	last_brew_cleared = run.pending_level_advance
+	if run.has_pending_trinket_reward():
+		_set_phase(GamePhase.Phase.TRINKET_REWARD)
+	else:
+		_set_phase(GamePhase.Phase.SHOP)
 	run_changed.emit()
 
 
@@ -97,6 +100,13 @@ func set_dev_mode_enabled(enabled: bool) -> void:
 
 func get_all_ingredients() -> Array:
 	return _content.all_ingredients()
+
+
+func grant_trinket(trinket_id: String) -> bool:
+	if not run.grant_trinket(trinket_id):
+		return false
+	run_changed.emit()
+	return true
 
 
 func can_press_bag() -> bool:
@@ -306,8 +316,9 @@ func finalize_brew_transition() -> void:
 
 
 func leave_shop() -> void:
-	if last_brew_cleared:
+	if last_brew_cleared or run.pending_level_advance:
 		run.leave_shop_after_clear()
+		last_brew_cleared = false
 	_save_at_shop()
 	_enter_brewing()
 
@@ -337,7 +348,11 @@ func try_purchase_offer(index: int) -> bool:
 
 
 func save_and_quit() -> void:
-	if current_phase not in [GamePhase.Phase.BREWING, GamePhase.Phase.SHOP]:
+	if current_phase not in [
+		GamePhase.Phase.BREWING,
+		GamePhase.Phase.TRINKET_REWARD,
+		GamePhase.Phase.SHOP,
+	]:
 		return
 	SaveService.save_run(run.to_save_data())
 	run_changed.emit()
@@ -383,7 +398,25 @@ func _complete_brew() -> void:
 		_end_run()
 		return
 	_save_at_shop()
+	if last_brew_cleared and run.has_pending_trinket_reward():
+		_set_phase(GamePhase.Phase.TRINKET_REWARD)
+	else:
+		_set_phase(GamePhase.Phase.SHOP)
+
+
+func get_pending_trinket_rewards() -> Array:
+	return run.get_pending_trinket_rewards()
+
+
+func complete_trinket_reward(trinket_id: String) -> bool:
+	if current_phase != GamePhase.Phase.TRINKET_REWARD:
+		return false
+	if not run.try_select_trinket_reward(trinket_id):
+		return false
+	run_changed.emit()
+	_save_at_shop()
 	_set_phase(GamePhase.Phase.SHOP)
+	return true
 
 
 func _end_run() -> void:

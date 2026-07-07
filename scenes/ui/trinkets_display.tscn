@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/trinkets_display.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/trinket_tooltip.tscn" id="2_tooltip"]
+
+[node name="TrinketsDisplay" type="Control"]
+layout_mode = 0
+offset_right = 260.0
+offset_bottom = 44.0
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="IconGrid" type="GridContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+columns = 6
+
+[node name="TooltipLayer" type="CanvasLayer" parent="."]
+layer = 55
+
+[node name="TrinketTooltip" parent="TooltipLayer" instance=ExtResource("2_tooltip")]

@@ -104,7 +104,8 @@ func start_brew(
 	boss_threshold_penalty: int = 0,
 	boss_threshold_discount: int = 0,
 	difficulty: int = GameDifficulty.Mode.HARD,
-	extra_mulligans: int = 0
+	extra_mulligans: int = 0,
+	owned_trinket_ids: Array[String] = []
 ) -> void:
 	context.level = level
 	var base_threshold := ThresholdCalculator.get_threshold_for_level(level, difficulty)
@@ -125,6 +126,7 @@ func start_brew(
 	context.gold_gained_this_brew = 0
 	context.boss_threshold_discount_gained = 0
 	context.free_shop_rerolls_gained = 0
+	context.owned_trinket_ids = owned_trinket_ids.duplicate()
 	_clear_presented_stat_snapshots()
 	_reset_presented_stats()
 	_practice_restart_used = false
@@ -278,6 +280,7 @@ func _build_hand_display_modifiers() -> Dictionary:
 		"ice_cube_shields": _ice_cube_shields_remaining,
 		"explosiveness": context.explosiveness,
 		"explosion_limit": context.explosion_limit,
+		"owned_trinket_ids": context.owned_trinket_ids.duplicate(),
 	}
 
 

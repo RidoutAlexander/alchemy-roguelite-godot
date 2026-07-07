@@ -110,7 +110,8 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		RED_MUSHROOM_ID:
 			result.bonus_score = _red_mushroom_bonus_score(
 				ingredient,
-				context.cauldron_contents
+				context.cauldron_contents,
+				context.owned_trinket_ids
 			)
 		LIGHTNING_ID:
 			result.chain_draws = LIGHTNING_CHAIN_DRAWS
@@ -127,7 +128,10 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		BAT_WING_ID:
 			result.bat_wing_pick_count = BAT_WING_PICK_COUNT
 		RAT_ID:
-			result.bonus_score = _rat_streak_bonus(context.cauldron_contents)
+			result.bonus_score = _rat_streak_bonus(
+				context.cauldron_contents,
+				context.owned_trinket_ids
+			)
 		VOODOO_DOLL_ID:
 			result.voodoo_doll_arms_copy = true
 		THORNS_ID:
@@ -154,6 +158,12 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 			result.vanish_next_ingredient = true
 		POISON_APPLE_ID:
 			result.poison_apple_delay_scheduled = true
+		PUMPKIN_ID:
+			if TrinketEffects.has_pumpkin_trinket(context.owned_trinket_ids):
+				result.bonus_score += TrinketEffects.pumpkin_trinket_bonus_score(
+					context.cauldron_contents,
+					true
+				)
 		GROWTH_POTION_ID:
 			result.growth_potion_doubles = GROWTH_POTION_DOUBLE_COUNT
 		SAGE_ID:
@@ -357,10 +367,12 @@ static func compute_hand_display_stats(
 					display_stats
 				)
 
+		var owned_trinket_ids: Array = modifiers.get("owned_trinket_ids", [])
 		var effect_bonuses := _preview_card_effect_bonuses(
 			ingredient,
 			sim_cauldron,
-			sim_explosiveness
+			sim_explosiveness,
+			owned_trinket_ids
 		)
 		point_value += int(effect_bonuses.get("bonus_score", 0))
 		explosive_value += int(effect_bonuses.get("bonus_explosiveness", 0))
@@ -418,10 +430,28 @@ static func compute_hand_display_stats(
 	return display_stats
 
 
+static func count_trailing_pumpkin_streak(
+	cauldron_contents: Array,
+	exclude_last_entry: bool = false
+) -> int:
+	var streak := 0
+	var last_index := cauldron_contents.size() - 1
+	if exclude_last_entry:
+		last_index -= 1
+	for i in range(last_index, -1, -1):
+		var entry = cauldron_contents[i]
+		if entry != null and entry.id == PUMPKIN_ID:
+			streak += 1
+		else:
+			break
+	return streak
+
+
 static func _preview_card_effect_bonuses(
 	ingredient: IngredientData,
 	cauldron_contents: Array,
-	explosiveness: int
+	explosiveness: int,
+	owned_trinket_ids: Array = []
 ) -> Dictionary:
 	var bonus_score := 0
 	var bonus_explosiveness := 0
@@ -440,17 +470,27 @@ static func _preview_card_effect_bonuses(
 		RED_MUSHROOM_ID:
 			var preview_contents := cauldron_contents.duplicate()
 			preview_contents.append(ingredient)
-			bonus_score = _red_mushroom_bonus_score(ingredient, preview_contents)
+			bonus_score = _red_mushroom_bonus_score(
+				ingredient,
+				preview_contents,
+				owned_trinket_ids
+			)
 		RAT_ID:
 			# Hand preview simulates before the current card is appended, unlike play.
 			bonus_score = mini(
-				RAT_STREAK_CAP,
+				TrinketEffects.rat_streak_cap(owned_trinket_ids),
 				count_trailing_rat_streak(cauldron_contents, false)
 			)
 		THORNS_ID:
 			bonus_score = maxi(0, explosiveness)
 		FISH_BONES_ID:
 			score_penalty = 1
+		PUMPKIN_ID:
+			if TrinketEffects.has_pumpkin_trinket(owned_trinket_ids):
+				bonus_score += TrinketEffects.pumpkin_trinket_bonus_score(
+					cauldron_contents,
+					false
+				)
 		_:
 			pass
 
@@ -477,8 +517,14 @@ static func _count_hand_ingredients_to_right(hand_slots: Array, slot_index: int)
 	return count
 
 
-static func _rat_streak_bonus(contents: Array) -> int:
-	return mini(RAT_STREAK_CAP, count_trailing_rat_streak(contents, true))
+static func _rat_streak_bonus(
+	contents: Array,
+	owned_trinket_ids: Array = []
+) -> int:
+	return mini(
+		TrinketEffects.rat_streak_cap(owned_trinket_ids),
+		count_trailing_rat_streak(contents, true)
+	)
 
 
 static func count_trailing_rat_streak(
@@ -517,12 +563,13 @@ static func _count_ingredient_id(contents: Array, ingredient_id: String) -> int:
 
 static func _red_mushroom_bonus_score(
 	ingredient: IngredientData,
-	contents: Array
+	contents: Array,
+	owned_trinket_ids: Array = []
 ) -> int:
 	if ingredient == null:
 		return 0
 	var total_before_doubles := mini(
-		RED_MUSHROOM_MAX_PRE_DOUBLE_SCORE,
+		TrinketEffects.red_mushroom_max_pre_double_score(owned_trinket_ids),
 		ingredient.point_value + _count_pumpkin_like(contents)
 	)
 	return total_before_doubles - ingredient.point_value

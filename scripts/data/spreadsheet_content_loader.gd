@@ -4,6 +4,7 @@ extends RefCounted
 const INGREDIENTS_PATH := "res://data/ingredients.json"
 const STARTER_BAG_PATH := "res://data/starter_bag.json"
 const AURAS_PATH := "res://data/auras.json"
+const TRINKETS_PATH := "res://data/trinkets.json"
 
 const RARITY_MAP := {
 	"common": IngredientData.Rarity.COMMON,
@@ -35,6 +36,15 @@ static func load_auras() -> Dictionary:
 		var aura := _parse_aura(row)
 		auras[aura.id] = aura
 	return auras
+
+
+static func load_trinkets() -> Dictionary:
+	var trinkets: Dictionary = {}
+	var rows := _read_json_array(TRINKETS_PATH, "trinkets")
+	for row in rows:
+		var trinket := _parse_trinket(row)
+		trinkets[trinket.id] = trinket
+	return trinkets
 
 
 static func load_starter_bag(ingredients: Dictionary) -> Array[Dictionary]:
@@ -85,6 +95,17 @@ static func _parse_aura(row: Dictionary) -> AuraData:
 		int(row.get("explosion_limit_modifier", 0)),
 		int(row.get("score_multiplier_percent", 100)),
 		int(row.get("gold_multiplier_percent", 100))
+	)
+
+
+static func _parse_trinket(row: Dictionary) -> TrinketData:
+	var trinket_id := str(row.get("id", "")).strip_edges()
+	var display_name := str(row.get("display_name", row.get("name", trinket_id))).strip_edges()
+	return TrinketData.new(
+		trinket_id,
+		display_name,
+		str(row.get("description", "")),
+		str(row.get("art", "")).strip_edges()
 	)
 
 

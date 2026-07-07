@@ -6,6 +6,7 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 @onready var _brew_panel: Control = $PhaseSwipeHost/BrewPanel
 @onready var _shop_panel: ShopPanel = $PhaseSwipeHost/ShopPanel
 @onready var _game_over_panel: Control = $GameOverPanel
+@onready var _trinket_reward_overlay: TrinketRewardOverlay = $TrinketRewardOverlay
 @onready var _brew_gold_counter: GoldDisplay = $PhaseSwipeHost/BrewPanel/GoldCounter
 @onready var _brew_explosiveness_counter: ExplosivenessDisplay = (
 	$PhaseSwipeHost/BrewPanel/ExplosivenessCounter
@@ -65,9 +66,7 @@ func _ready() -> void:
 	):
 		_practice_restart_button.pressed.connect(_on_practice_restart_pressed)
 	if _dev_mode_checkbox != null:
-		_dev_mode_checkbox.button_pressed = GameManager.is_dev_mode_enabled()
-		if not _dev_mode_checkbox.toggled.is_connected(_on_dev_mode_toggled):
-			_dev_mode_checkbox.toggled.connect(_on_dev_mode_toggled)
+		_configure_dev_mode_checkbox()
 	if _dev_hand_picker != null:
 		if not _dev_hand_picker.dev_hand_picker_completed.is_connected(
 			_on_dev_hand_picker_completed
@@ -81,10 +80,12 @@ func _ready() -> void:
 	GameManager.brew_stats_presented.connect(func(_ctx): _refresh_brew())
 	GameManager.brew_updated.connect(func(_ctx): _refresh_brew_input_state())
 	GameManager.brew_updated.connect(func(_ctx): _refresh_bag_remaining_count())
-	GameManager.ingredient_drawn.connect(func(_ctx, _ingredient): _refresh_bag_remaining_count())
+	GameManager.ingredient_drawn.connect(
+		func(_ctx, _ingredient, _parrot_doubled): _refresh_bag_remaining_count()
+	)
 	GameManager.hand_draw_batch_started.connect(func(_drawn): _refresh_bag_remaining_count())
 	GameManager.bag_display_changed.connect(_refresh_bag_remaining_count)
-	GameManager.brew_resolved.connect(_refresh_brew)
+	GameManager.brew_resolved.connect(func(_resolution): _refresh_brew())
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.game_over.connect(_refresh_game_over)
 
@@ -196,6 +197,8 @@ func _on_phase_changed(phase: int) -> void:
 	if phase == GamePhase.Phase.BREWING:
 		_refresh_brew_input_state()
 		_refresh_brew()
+	elif phase == GamePhase.Phase.SHOP and _shop_panel != null:
+		_shop_panel.refresh_stats_only()
 
 
 func _play_phase_swipe(phase: int) -> void:
@@ -225,6 +228,8 @@ func _play_phase_swipe(phase: int) -> void:
 				_refresh_brew()
 			elif phase == GamePhase.Phase.SHOP and _shop_panel != null:
 				_shop_panel.refresh_stats_only()
+			elif phase == GamePhase.Phase.TRINKET_REWARD and _trinket_reward_overlay != null:
+				_trinket_reward_overlay.show_offers(GameManager.get_pending_trinket_rewards())
 	)
 
 
@@ -235,6 +240,11 @@ func _apply_phase_visibility(phase: int) -> void:
 		_shop_panel.visible = phase == GamePhase.Phase.SHOP
 	if _game_over_panel:
 		_game_over_panel.visible = phase == GamePhase.Phase.GAME_OVER
+	if _trinket_reward_overlay != null:
+		if phase == GamePhase.Phase.TRINKET_REWARD:
+			_trinket_reward_overlay.show_offers(GameManager.get_pending_trinket_rewards())
+		else:
+			_trinket_reward_overlay.hide_overlay()
 	if _bag_remaining_count_label != null:
 		var show_count := phase == GamePhase.Phase.BREWING
 		_bag_remaining_count_label.visible = show_count
@@ -362,8 +372,31 @@ func _on_practice_restart_pressed() -> void:
 	GameManager.try_practice_restart()
 
 
+func _configure_dev_mode_checkbox() -> void:
+	_dev_mode_checkbox.focus_mode = Control.FOCUS_NONE
+	_dev_mode_checkbox.flat = true
+	var empty := StyleBoxEmpty.new()
+	for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
+		_dev_mode_checkbox.add_theme_stylebox_override(style_name, empty)
+	var blank_icon := ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	for icon_name in ["checked", "unchecked", "checked_disabled", "unchecked_disabled"]:
+		_dev_mode_checkbox.add_theme_icon_override(icon_name, blank_icon)
+	_dev_mode_checkbox.button_pressed = GameManager.is_dev_mode_enabled()
+	_refresh_dev_mode_checkbox_text()
+	if not _dev_mode_checkbox.toggled.is_connected(_on_dev_mode_toggled):
+		_dev_mode_checkbox.toggled.connect(_on_dev_mode_toggled)
+
+
+func _refresh_dev_mode_checkbox_text() -> void:
+	if _dev_mode_checkbox.button_pressed:
+		_dev_mode_checkbox.text = "✓ Developer Mode"
+	else:
+		_dev_mode_checkbox.text = "Developer Mode"
+
+
 func _on_dev_mode_toggled(enabled: bool) -> void:
 	GameManager.set_dev_mode_enabled(enabled)
+	_refresh_dev_mode_checkbox_text()
 
 
 func _on_dev_hand_picker_requested() -> void:

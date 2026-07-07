@@ -25,6 +25,8 @@
 [ext_resource type="PackedScene" uid="uid://playerhandrow01" path="res://scenes/ui/player_hand_row.tscn" id="22_player_hand"]
 [ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="23_hand_undo"]
 [ext_resource type="PackedScene" path="res://scenes/ui/brew_persistent_effects_display.tscn" id="25_persistent_effects"]
+[ext_resource type="PackedScene" path="res://scenes/ui/trinkets_display.tscn" id="26_trinkets_display"]
+[ext_resource type="PackedScene" path="res://scenes/ui/trinket_reward_overlay.tscn" id="27_trinket_reward"]
 
 [node name="Game" type="Control" unique_id=403037050]
 custom_minimum_size = Vector2(1024, 576)
@@ -47,6 +49,8 @@ mouse_filter = 2
 color = Color(0.058824, 0.070588, 0.090196, 1)
 
 [node name="EyeballPuzzleOverlay" parent="." unique_id=2060019417 instance=ExtResource("20_eyeball_puzzle")]
+
+[node name="TrinketRewardOverlay" parent="." instance=ExtResource("27_trinket_reward")]
 
 [node name="GameplayMusicPlayer" type="AudioStreamPlayer" parent="." unique_id=1668007247]
 
@@ -207,6 +211,13 @@ offset_right = -382.0
 offset_bottom = 162.0
 grow_horizontal = 0
 
+[node name="TrinketsDisplay" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("26_trinkets_display")]
+z_index = 7
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 266.0
+offset_bottom = 46.0
+
 [node name="ScoreFlask" parent="PhaseSwipeHost/BrewPanel" unique_id=882441203 instance=ExtResource("9_score_flask")]
 anchors_preset = 0
 offset_left = 3.0
@@ -300,6 +311,8 @@ offset_left = 819.0
 offset_top = 542.0
 offset_right = 1089.0
 offset_bottom = 572.0
+focus_mode = 0
+flat = true
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 18
 text = "Developer Mode"

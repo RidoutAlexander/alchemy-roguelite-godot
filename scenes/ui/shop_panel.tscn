@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/ui/shop_gold_spent_popups.gd" id="14_shop_gold_popups"]
 [ext_resource type="Script" uid="uid://c8k2mulligancost" path="res://scripts/ui/shop_button_cost_overlay.gd" id="15_cost_overlay"]
 [ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="16_gold_icon"]
+[ext_resource type="PackedScene" path="res://scenes/ui/trinkets_display.tscn" id="17_trinkets_display"]
 
 [node name="ShopPanel" type="Control" unique_id=1019768551]
 layout_mode = 3
@@ -144,15 +145,22 @@ offset_top = 15.0
 offset_right = 935.0
 offset_bottom = 67.0
 
+[node name="TrinketsDisplay" parent="." instance=ExtResource("17_trinkets_display")]
+z_index = 6
+offset_left = 58.0
+offset_top = 68.0
+offset_right = 318.0
+offset_bottom = 112.0
+
 [node name="OfferCards" type="Control" parent="." unique_id=920444359]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 57.999985
-offset_top = 123.999985
+offset_top = 174.0
 offset_right = -102.0
-offset_bottom = -176.0
+offset_bottom = -126.0
 grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.45206344, 0.45206344)

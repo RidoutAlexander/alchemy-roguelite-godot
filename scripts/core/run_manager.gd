@@ -16,8 +16,11 @@ var locked_level_aura_level: int = 0
 var current_aura: AuraData
 var current_shop_offers: Array = []
 var pending_boss_boom_berry_reward_ids: Array[String] = []
+var pending_trinket_reward_ids: Array[String] = []
+var pending_level_advance: bool = false
 var free_shop_rerolls: int = 0
 var pending_extra_mulligans: int = 0
+var owned_trinket_ids: Array[String] = []
 var bag := BagModel.new()
 var brew_session: BrewSession
 
@@ -28,6 +31,32 @@ var _shop_service: ShopService
 
 func find_ingredient(ingredient_id: String) -> IngredientData:
 	return _content.find_ingredient(ingredient_id)
+
+
+func find_trinket(trinket_id: String) -> TrinketData:
+	return _content.find_trinket(trinket_id)
+
+
+func get_owned_trinkets() -> Array[TrinketData]:
+	var result: Array[TrinketData] = []
+	for trinket_id in owned_trinket_ids:
+		var trinket := find_trinket(trinket_id)
+		if trinket != null:
+			result.append(trinket)
+	return result
+
+
+func has_trinket(trinket_id: String) -> bool:
+	return trinket_id in owned_trinket_ids
+
+
+func grant_trinket(trinket_id: String) -> bool:
+	if find_trinket(trinket_id) == null:
+		return false
+	if has_trinket(trinket_id):
+		return false
+	owned_trinket_ids.append(trinket_id)
+	return true
 
 
 func _init(content: DefaultContent) -> void:
@@ -55,6 +84,9 @@ func start_new_run(difficulty: int = GameDifficulty.Mode.HARD) -> void:
 	pending_boss_boom_berry_reward_ids.clear()
 	free_shop_rerolls = 0
 	pending_extra_mulligans = 0
+	owned_trinket_ids.clear()
+	pending_trinket_reward_ids.clear()
+	pending_level_advance = false
 	bag.set_master_bag(_content.flatten_starter_bag())
 
 
@@ -80,6 +112,18 @@ func load_from_save(data: Dictionary) -> void:
 		data.get("lockedLevelAuraLevel", data.get("lockedBossAuraLevel", 0))
 	)
 	current_aura = _content.find_aura(str(data.get("currentAuraId", "")))
+	owned_trinket_ids.clear()
+	pending_trinket_reward_ids.clear()
+	pending_level_advance = bool(data.get("pendingLevelAdvance", false))
+	for trinket_id in data.get("ownedTrinketIds", []):
+		var normalized := str(trinket_id).strip_edges()
+		if normalized != "" and find_trinket(normalized) != null:
+			owned_trinket_ids.append(normalized)
+	for trinket_id in data.get("pendingTrinketRewardIds", []):
+		var pending_id := str(trinket_id).strip_edges()
+		if pending_id != "" and find_trinket(pending_id) != null:
+			if not has_trinket(pending_id) and pending_id not in pending_trinket_reward_ids:
+				pending_trinket_reward_ids.append(pending_id)
 	var chips: Array[IngredientData] = []
 	for ingredient_id in data.get("bagIngredientIds", []):
 		var ingredient := _content.find_ingredient(str(ingredient_id))
@@ -132,6 +176,9 @@ func to_save_data() -> Dictionary:
 		"totalRunScore": total_run_score,
 		"bestSingleBrewThisRun": best_single_brew_this_run,
 		"deepestLevelReached": deepest_level_reached,
+		"ownedTrinketIds": owned_trinket_ids.duplicate(),
+		"pendingTrinketRewardIds": pending_trinket_reward_ids.duplicate(),
+		"pendingLevelAdvance": pending_level_advance,
 		"shopOffers": shop_offers,
 	}
 
@@ -150,7 +197,8 @@ func begin_brew() -> void:
 		boss_threshold_penalty,
 		boss_threshold_discount,
 		difficulty_mode,
-		extra_mulligans
+		extra_mulligans,
+		owned_trinket_ids.duplicate()
 	)
 
 
@@ -177,11 +225,13 @@ func resolve_brew() -> Dictionary:
 			boss_threshold_penalty = 0
 			boss_threshold_discount = 0
 			_grant_boss_boom_berry_reward()
+			_roll_trinket_reward_offers()
 	else:
 		var had_life := lives > 0
 		lives = maxi(0, lives - 1)
 		if had_life:
 			gold += GameConstants.LIFE_LOSS_GOLD_GRANT
+	pending_level_advance = cleared
 	prepare_shop_for_current_level()
 	return {
 		"outcome": context.outcome,
@@ -193,6 +243,7 @@ func resolve_brew() -> Dictionary:
 
 
 func leave_shop_after_clear() -> void:
+	pending_level_advance = false
 	current_level += 1
 	prepare_shop_for_current_level()
 
@@ -298,3 +349,40 @@ func _grant_boss_boom_berry_reward() -> void:
 func _clear_locked_level_aura() -> void:
 	locked_level_aura_id = ""
 	locked_level_aura_level = 0
+
+
+func has_pending_trinket_reward() -> bool:
+	return not pending_trinket_reward_ids.is_empty()
+
+
+func get_pending_trinket_rewards() -> Array[TrinketData]:
+	var result: Array[TrinketData] = []
+	for trinket_id in pending_trinket_reward_ids:
+		var trinket := find_trinket(trinket_id)
+		if trinket != null:
+			result.append(trinket)
+	return result
+
+
+func try_select_trinket_reward(trinket_id: String) -> bool:
+	var normalized := trinket_id.strip_edges()
+	if normalized == "" or normalized not in pending_trinket_reward_ids:
+		return false
+	if not grant_trinket(normalized):
+		return false
+	pending_trinket_reward_ids.clear()
+	return true
+
+
+func _roll_trinket_reward_offers() -> void:
+	pending_trinket_reward_ids.clear()
+	var pool: Array[String] = []
+	for trinket in _content.all_trinkets():
+		if trinket == null:
+			continue
+		if not has_trinket(trinket.id):
+			pool.append(trinket.id)
+	pool.shuffle()
+	var offer_count := mini(3, pool.size())
+	for index in offer_count:
+		pending_trinket_reward_ids.append(pool[index])

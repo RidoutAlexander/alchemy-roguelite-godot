@@ -17,6 +17,7 @@ XLSX_PATH = ROOT / "data" / "ingredients.xlsx"
 INGREDIENTS_JSON = ROOT / "data" / "ingredients.json"
 STARTER_BAG_JSON = ROOT / "data" / "starter_bag.json"
 AURAS_JSON = ROOT / "data" / "auras.json"
+TRINKETS_JSON = ROOT / "data" / "trinkets.json"
 
 INGREDIENT_HEADERS = [
     "id",
@@ -43,6 +44,12 @@ AURA_HEADERS = [
     "gold_multiplier_percent",
 ]
 
+TRINKET_HEADERS = [
+    "id",
+    "display_name",
+    "description",
+]
+
 DEFAULT_INGREDIENTS = [
     ["boom_berry_1", "boom_berry", "Small Boom Berry", "A tiny berry that pops.", 1, 1, 4, "common", False],
     ["boom_berry_2", "boom_berry", "Boom Berry", "A ripe berry with a bigger blast.", 2, 2, 6, "common", False],
@@ -52,6 +59,24 @@ DEFAULT_INGREDIENTS = [
 DEFAULT_STARTER_BAG = [
     ["boom_berry_1", 4],
     ["boom_berry_2", 2],
+]
+
+DEFAULT_TRINKETS = [
+    [
+        "pumpkin_trinket",
+        "Pumpkin Necklace",
+        "Pumpkins gain +1 score for each pumpkin played before it in a row",
+    ],
+    [
+        "red_mushroom_trinket",
+        "Red Mushroom Trinket",
+        "Red mushrooms can score a maximum of 6 instead of 4",
+    ],
+    [
+        "rat_trinket",
+        "Rat Trinket",
+        "Rats can score a maximum of 6 instead of 4",
+    ],
 ]
 
 DEFAULT_AURAS = [
@@ -328,7 +353,7 @@ def create_default_workbook() -> None:
     readme.title = "ReadMe"
     readme["A1"] = "Ingredient spreadsheet for Alchemy Roguelite"
     readme["A1"].font = Font(name="Arial", bold=True, size=14)
-    readme["A3"] = "1. Edit the Ingredients, Auras, and StarterBag sheets."
+    readme["A3"] = "1. Edit the Ingredients, Auras, Trinkets, and StarterBag sheets."
     readme["A4"] = "2. Save this file."
     readme["A5"] = "3. Run: py tools/export_ingredients.py"
     readme["A6"] = "4. Play the game in Godot (it loads data/*.json)."
@@ -339,7 +364,8 @@ def create_default_workbook() -> None:
     readme["A12"] = "shop_available FALSE = starter-only, never appears in the shop."
     readme["A13"] = "Description: effect text (normal) or flavor text (italicize in Excel)."
     readme["A14"] = "Example art file: assets/cards/ingredients/boom_berry_1.png"
-    for row in range(3, 15):
+    readme["A15"] = "Trinkets: id, display_name, description (passive run relics; art PNG optional in assets/cards/trinkets/)."
+    for row in range(3, 16):
         readme[f"A{row}"].font = NOTE_FONT
     readme.column_dimensions["A"].width = 78
 
@@ -388,8 +414,70 @@ def create_default_workbook() -> None:
         auras.append(row)
     _style_aura_sheet(auras)
 
+    trinkets = wb.create_sheet("Trinkets")
+    trinkets.append(TRINKET_HEADERS)
+    for row in DEFAULT_TRINKETS:
+        trinkets.append(row)
+    _style_trinket_sheet(trinkets)
+
     wb.save(XLSX_PATH)
     print(f"Created {XLSX_PATH}")
+
+
+def _style_trinket_sheet(sheet) -> None:
+    for cell in sheet[1]:
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center")
+    for row in sheet.iter_rows(min_row=2, max_col=len(TRINKET_HEADERS)):
+        for cell in row:
+            if cell.column == 3:
+                continue
+            cell.font = INPUT_FONT
+    widths = [18, 22, 52]
+    for idx, width in enumerate(widths, start=1):
+        sheet.column_dimensions[chr(64 + idx)].width = width
+
+
+def ensure_trinkets_sheet(wb) -> bool:
+    if "Trinkets" in wb.sheetnames:
+        sheet = wb["Trinkets"]
+        columns = _header_map(sheet)
+        if set(TRINKET_HEADERS).issubset(columns):
+            return False
+        rows: list[list] = []
+        for row_idx in range(2, sheet.max_row + 1):
+            trinket_id = sheet.cell(row_idx, columns.get("id", 1)).value
+            if trinket_id is None or str(trinket_id).strip() == "":
+                continue
+            display_name = (
+                sheet.cell(row_idx, columns.get("display_name", columns.get("name", 2))).value
+                if "display_name" in columns or "name" in columns
+                else trinket_id
+            )
+            rows.append(
+                [
+                    str(trinket_id).strip(),
+                    str(display_name or "").strip(),
+                    _description_from_cell(sheet.cell(row_idx, columns.get("description", 3))),
+                ]
+            )
+        if not rows:
+            rows = [list(row) for row in DEFAULT_TRINKETS]
+        del wb["Trinkets"]
+        trinkets = wb.create_sheet("Trinkets")
+        trinkets.append(TRINKET_HEADERS)
+        for row in rows:
+            trinkets.append(row)
+        _style_trinket_sheet(trinkets)
+        return True
+
+    trinkets = wb.create_sheet("Trinkets")
+    trinkets.append(TRINKET_HEADERS)
+    for row in DEFAULT_TRINKETS:
+        trinkets.append(row)
+    _style_trinket_sheet(trinkets)
+    return True
 
 
 def _style_aura_sheet(sheet) -> None:
@@ -518,13 +606,17 @@ def export_workbook() -> None:
     wb = load_workbook(XLSX_PATH)
     migrate_ingredients_sheet(wb)
     auras_added = ensure_auras_sheet(wb)
-    if auras_added:
+    trinkets_added = ensure_trinkets_sheet(wb)
+    if auras_added or trinkets_added:
         try:
             wb.save(XLSX_PATH)
-            print(f"Added Auras sheet to {XLSX_PATH}")
+            if auras_added:
+                print(f"Added Auras sheet to {XLSX_PATH}")
+            if trinkets_added:
+                print(f"Added Trinkets sheet to {XLSX_PATH}")
         except OSError as exc:
             print(
-                f"Could not save Auras sheet ({exc}). "
+                f"Could not save spreadsheet sheets ({exc}). "
                 "Close ingredients.xlsx in Excel and export again to update the file."
             )
 
@@ -534,6 +626,8 @@ def export_workbook() -> None:
         raise ValueError("Missing 'Auras' sheet in ingredients.xlsx")
     if "StarterBag" not in wb.sheetnames:
         raise ValueError("Missing 'StarterBag' sheet in ingredients.xlsx")
+    if "Trinkets" not in wb.sheetnames:
+        raise ValueError("Missing 'Trinkets' sheet in ingredients.xlsx")
 
     sheet = wb["Ingredients"]
     columns = _header_map(sheet)
@@ -680,11 +774,41 @@ def export_workbook() -> None:
     if not auras:
         raise ValueError("Auras sheet has no aura rows.")
 
+    trinket_sheet = wb["Trinkets"]
+    trinket_columns = _header_map(trinket_sheet)
+    missing_trinket_columns = set(TRINKET_HEADERS) - set(trinket_columns)
+    if missing_trinket_columns:
+        raise ValueError(f"Trinkets sheet missing columns: {sorted(missing_trinket_columns)}")
+
+    trinkets = []
+    seen_trinket_ids: set[str] = set()
+    for row_index in range(2, trinket_sheet.max_row + 1):
+        trinket_id = trinket_sheet.cell(row_index, trinket_columns["id"]).value
+        if trinket_id is None or str(trinket_id).strip() == "":
+            continue
+        trinket_id = str(trinket_id).strip()
+        if trinket_id in seen_trinket_ids:
+            raise ValueError(f"Duplicate trinket id '{trinket_id}' on row {row_index}.")
+        seen_trinket_ids.add(trinket_id)
+        trinkets.append(
+            {
+                "id": trinket_id,
+                "display_name": str(
+                    trinket_sheet.cell(row_index, trinket_columns["display_name"]).value
+                ).strip(),
+                "description": _description_from_cell(
+                    trinket_sheet.cell(row_index, trinket_columns["description"])
+                ),
+            }
+        )
+
     INGREDIENTS_JSON.write_text(json.dumps(ingredients, indent=2) + "\n", encoding="utf-8")
     STARTER_BAG_JSON.write_text(json.dumps(starter_bag, indent=2) + "\n", encoding="utf-8")
     AURAS_JSON.write_text(json.dumps(auras, indent=2) + "\n", encoding="utf-8")
+    TRINKETS_JSON.write_text(json.dumps(trinkets, indent=2) + "\n", encoding="utf-8")
     print(f"Exported {len(ingredients)} ingredients -> {INGREDIENTS_JSON}")
     print(f"Exported {len(auras)} auras -> {AURAS_JSON}")
+    print(f"Exported {len(trinkets)} trinkets -> {TRINKETS_JSON}")
     print(f"Exported {len(starter_bag)} starter stacks -> {STARTER_BAG_JSON}")
 
 
