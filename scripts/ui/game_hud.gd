@@ -265,8 +265,8 @@ func _refresh_brew() -> void:
 	if _brew_explosiveness_counter != null:
 		var session := GameManager.run.brew_session
 		_brew_explosiveness_counter.set_values(
-			session.presented_explosiveness,
-			ctx.explosion_limit
+			session.get_explosiveness_for_hud(GameManager.is_presentation_in_progress()),
+			session.get_explosion_limit_for_hud()
 		)
 	_refresh_practice_restart_button()
 	_refresh_rhythm_aura_shake(ctx)

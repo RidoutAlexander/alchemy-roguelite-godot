@@ -63,6 +63,7 @@ func _ready() -> void:
 	GameManager.frog_leg_escaped.connect(_on_frog_leg_escaped)
 	GameManager.brew_updated.connect(_on_brew_updated)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
+	GameManager.presentation_idle.connect(_on_presentation_idle)
 	GameManager.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
 	GameManager.bat_wing_picker_requested.connect(_on_bat_wing_picker_requested)
 
@@ -176,7 +177,11 @@ func _play_hand_draw_fly(ingredient: IngredientData, slot_index: int) -> void:
 
 func _on_hand_draw_landed(ingredient: IngredientData, slot_index: int) -> void:
 	if _player_hand != null:
-		_player_hand.reveal_slot(slot_index, ingredient)
+		_player_hand.reveal_slot(
+			slot_index,
+			ingredient,
+			_get_hand_display_stats_for_slot(slot_index, ingredient)
+		)
 	_pending_hand_draw_index += 1
 	_play_next_hand_draw_animation()
 
@@ -190,6 +195,7 @@ func _on_hand_card_played(
 	if ingredient == null:
 		return
 	_refresh_cauldron_contents_if_open()
+	_sync_hand_ui()
 	GameManager.set_presentation_in_progress(true)
 	if _player_hand != null:
 		_player_hand.hide_slot_for_fly(slot_index)
@@ -260,6 +266,7 @@ func _on_hand_undo_pressed() -> void:
 		_shake_hand_action_button(_hand_undo_button)
 		return
 	GameManager.try_undo_hand_swap()
+	_sync_hand_ui()
 
 
 func _on_hand_mulligan_pressed() -> void:
@@ -290,6 +297,7 @@ func _on_hand_swap_requested(from_slot: int, to_slot: int) -> void:
 		_shake_hand_action_button(_hand_undo_button)
 		return
 	GameManager.try_swap_hand_slots(from_slot, to_slot)
+	_sync_hand_ui()
 
 
 func _on_brew_completion_requested(outcome: int) -> void:
@@ -299,7 +307,12 @@ func _on_brew_completion_requested(outcome: int) -> void:
 		_try_play_pending_brew_exit_effects()
 	else:
 		_play_brew_exit_effects(outcome)
-	call_deferred("_try_finalize_brew_transition")
+	_try_finalize_brew_transition()
+
+
+func _on_presentation_idle() -> void:
+	_try_play_pending_brew_exit_effects()
+	_try_finalize_brew_transition()
 
 
 func _try_play_pending_brew_exit_effects_after_plop() -> void:
@@ -452,6 +465,25 @@ func _sync_brew_ambience() -> void:
 		_boiling_water_player.play()
 
 
+func _get_hand_display_stats_for_slot(slot_index: int, ingredient: IngredientData) -> Variant:
+	if GameManager.run == null or ingredient == null:
+		return null
+	var session := GameManager.run.brew_session
+	var slots: Array = []
+	if _player_hand != null:
+		slots = _player_hand.get_current_hand_slots()
+	else:
+		slots = session.get_hand_slots()
+	while slots.size() < BrewSession.HAND_SLOT_COUNT:
+		slots.append(null)
+	if slot_index >= 0 and slot_index < slots.size():
+		slots[slot_index] = ingredient
+	var display_stats := session.get_hand_display_stats(slots)
+	if slot_index >= 0 and slot_index < display_stats.size():
+		return display_stats[slot_index]
+	return null
+
+
 func _sync_hand_ui() -> void:
 	if GameManager.run == null:
 		return
@@ -464,21 +496,26 @@ func _sync_hand_ui() -> void:
 	if show_mulligan:
 		_refresh_mulligan_label(session)
 
-	if hand_phase == BrewSession.HandPhase.DRAWING:
-		if _player_hand != null:
-			_player_hand.visible = true
-			_player_hand.set_in_rhythm_shake_slots([])
-		_set_play_undo_visible(false)
-		if show_mulligan:
-			call_deferred("_align_mulligan_control")
-		return
-
 	if _player_hand != null:
 		var show_hand := (
 			hand_phase != BrewSession.HandPhase.BAG
 			or _hand_has_any_card(session.get_hand_slots())
+			or _hand_has_any_card(_player_hand.get_current_hand_slots())
 		)
 		_player_hand.visible = show_hand
+		if hand_phase == BrewSession.HandPhase.DRAWING:
+			var drawing_slots := _player_hand.get_current_hand_slots()
+			_player_hand.refresh_hand(
+				drawing_slots,
+				false,
+				false,
+				session.get_in_rhythm_double_hand_slots(drawing_slots),
+				session.get_hand_display_stats(drawing_slots)
+			)
+			_set_play_undo_visible(false)
+			if show_mulligan:
+				call_deferred("_align_mulligan_control")
+			return
 		_player_hand.refresh_hand(
 			session.get_hand_slots(),
 			can_interact,
@@ -755,7 +792,7 @@ func _play_cauldron_fly_with_data(
 			_on_brew_exit_animation_finished()
 			_try_play_pending_brew_exit_effects()
 		GameManager.present_card_stats()
-		_finish_card_presentation(ingredient, track_for_exit)
+		_complete_card_fly_sequence(ingredient, track_for_exit)
 		return
 
 	if track_for_exit:
@@ -790,12 +827,48 @@ func _play_cauldron_fly_repeat(
 					remaining_flies - 1
 				)
 			else:
-				_finish_card_presentation(ingredient, track_for_exit),
+				_complete_card_fly_sequence(ingredient, track_for_exit),
 		func() -> void:
 			_play_cauldron_plop()
 			GameManager.present_card_stats()
 			if track_for_exit and remaining_flies == 1:
 				_try_play_pending_brew_exit_effects_after_plop()
+	)
+
+
+func _complete_card_fly_sequence(ingredient: IngredientData, track_for_exit: bool) -> void:
+	var granted := _consume_pending_bag_grant()
+	if granted == null:
+		_finish_card_presentation(ingredient, track_for_exit)
+		return
+	_play_bag_grant_from_cauldron(granted, ingredient, track_for_exit)
+
+
+func _consume_pending_bag_grant() -> IngredientData:
+	if GameManager.run == null:
+		return null
+	return GameManager.run.brew_session.consume_last_bag_grant_ingredient()
+
+
+func _play_bag_grant_from_cauldron(
+	granted: IngredientData,
+	source_ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	var fly_data := _cauldron_to_bag_fly_data(granted)
+	if fly_data.is_empty():
+		GameManager.notify_bag_display_changed()
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		fly_data["texture"],
+		fly_data["start_center"],
+		fly_data["target_center"],
+		fly_data["size"],
+		func() -> void:
+			GameManager.notify_bag_display_changed()
+			_finish_card_presentation(source_ingredient, track_for_exit)
 	)
 
 
@@ -812,6 +885,7 @@ func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool)
 	if track_for_exit:
 		_on_brew_exit_animation_finished()
 	GameManager.notify_card_presentation_finished()
+	_try_play_pending_brew_exit_effects()
 
 
 func _play_frog_escape(ingredient: IngredientData, on_complete: Callable) -> void:
@@ -849,6 +923,8 @@ func _on_brew_exit_animation_finished() -> void:
 
 func _try_finalize_brew_transition() -> void:
 	if not GameManager.is_brew_transition_pending():
+		return
+	if GameManager.is_presentation_in_progress():
 		return
 	if _pending_brew_exit_outcome != -1:
 		return
@@ -921,6 +997,18 @@ func _bag_to_cauldron_fly_data(ingredient: IngredientData) -> Dictionary:
 	}
 
 
+func _cauldron_to_bag_fly_data(ingredient: IngredientData) -> Dictionary:
+	var texture := _load_ingredient_texture(ingredient)
+	if texture == null or _bag_anchor == null or _cauldron_target == null:
+		return {}
+	return {
+		"texture": texture,
+		"size": FLY_ART_SIZE,
+		"start_center": _cauldron_target.get_global_rect().get_center(),
+		"target_center": _bag_anchor.get_global_rect().get_center(),
+	}
+
+
 func _play_mulligan_animation(
 	old_ingredient: IngredientData,
 	new_ingredient: IngredientData,
@@ -960,7 +1048,11 @@ func _play_mulligan_draw_in(new_ingredient: IngredientData, slot_index: int) -> 
 	var draw_fly := _hand_draw_fly_data_for(new_ingredient, slot_index)
 	if draw_fly.is_empty():
 		if _player_hand != null:
-			_player_hand.reveal_slot(slot_index, new_ingredient)
+			_player_hand.reveal_slot(
+				slot_index,
+				new_ingredient,
+				_get_hand_display_stats_for_slot(slot_index, new_ingredient)
+			)
 		GameManager.notify_mulligan_presentation_finished()
 		_sync_hand_ui()
 		return
@@ -973,7 +1065,11 @@ func _play_mulligan_draw_in(new_ingredient: IngredientData, slot_index: int) -> 
 		draw_fly["size"],
 		func() -> void:
 			if _player_hand != null:
-				_player_hand.reveal_slot(slot_index, new_ingredient)
+				_player_hand.reveal_slot(
+					slot_index,
+					new_ingredient,
+					_get_hand_display_stats_for_slot(slot_index, new_ingredient)
+				)
 			GameManager.notify_mulligan_presentation_finished()
 			_sync_hand_ui()
 	)

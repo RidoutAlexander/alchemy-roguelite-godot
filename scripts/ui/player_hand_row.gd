@@ -85,6 +85,18 @@ func get_selected_slot() -> int:
 	return _selected_slot
 
 
+func get_current_hand_slots() -> Array:
+	var slots: Array = []
+	for _slot_index in HAND_SLOT_COUNT:
+		slots.append(null)
+	for slot_index in _slot_cards.size():
+		var card := _slot_cards[slot_index]
+		if card == null or not card.visible:
+			continue
+		slots[slot_index] = card.get_ingredient()
+	return slots
+
+
 func clear_selection() -> void:
 	_set_selected_slot(-1)
 

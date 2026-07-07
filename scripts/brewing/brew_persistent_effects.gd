@@ -81,6 +81,13 @@ static func collect(session: BrewSession) -> Array[EffectEntry]:
 	):
 		_add_entry(entries, IngredientEffects.VOODOO_DOLL_ID, "", 23)
 
+	_add_counter_entry(
+		entries,
+		IngredientEffects.RAT_ID,
+		IngredientEffects.count_trailing_rat_streak(cauldron),
+		29
+	)
+
 	_add_cauldron_count_entry(
 		entries,
 		cauldron,

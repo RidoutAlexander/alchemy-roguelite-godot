@@ -229,7 +229,9 @@ static func compute_hand_display_stats(
 	cauldron_contents: Array,
 	aura: AuraData,
 	hand_slot_count: int = 5,
-	growth_potion_doubles_remaining: int = 0
+	growth_potion_doubles_remaining: int = 0,
+	modifiers: Dictionary = {},
+	hand_start_slots: Array = []
 ) -> Array:
 	var cobbler_bonuses := compute_hand_cobbler_bonuses(
 		hand_slots,
@@ -240,40 +242,129 @@ static func compute_hand_display_stats(
 	for _slot_index in hand_slot_count:
 		display_stats.append(null)
 
+	var severed_reference := hand_start_slots if not hand_start_slots.is_empty() else hand_slots
 	var play_order: Array[int] = []
 	for slot_index in range(hand_slots.size()):
 		if hand_slots[slot_index] != null:
 			play_order.append(slot_index)
 
-	var cauldron_count := cauldron_contents.size()
+	var sim_cauldron: Array = cauldron_contents.duplicate()
+	var cauldron_count := sim_cauldron.size()
 	var doubles_remaining := growth_potion_doubles_remaining
-	for play_index in play_order.size():
-		var play_slot: int = play_order[play_index]
+	var parrot_doubles_next := bool(modifiers.get("parrot_doubles_next", false))
+	var unicorn_cures_next := bool(modifiers.get("unicorn_cures_next", false))
+	var ice_cube_shields := int(modifiers.get("ice_cube_shields", 0))
+	var sim_explosiveness := int(modifiers.get("explosiveness", 0))
+	var explosion_limit := int(modifiers.get("explosion_limit", GameConstants.DEFAULT_EXPLOSION_LIMIT))
+
+	for play_slot in play_order:
 		var ingredient: IngredientData = hand_slots[play_slot]
 		var point_value := ingredient.point_value
 		var explosive_value := ingredient.explosive_value
+
 		if doubles_remaining > 0:
 			point_value *= 2
 			explosive_value *= 2
 			doubles_remaining -= 1
+		if parrot_doubles_next:
+			point_value *= 2
+			explosive_value *= 2
+			parrot_doubles_next = false
 		if _AuraEffects.in_rhythm_doubles_ingredient(cauldron_count, aura):
 			point_value *= 2
 			explosive_value *= 2
 		if ingredient.id == SEVERED_RIGHT_HAND_ID:
-			point_value += _count_hand_ingredients_to_left(hand_slots, play_slot)
+			point_value += _count_hand_ingredients_to_left(severed_reference, play_slot)
 		if ingredient.id == SEVERED_LEFT_HAND_ID:
-			point_value += _count_hand_ingredients_to_right(hand_slots, play_slot)
+			point_value += _count_hand_ingredients_to_right(severed_reference, play_slot)
 		if play_slot < cobbler_bonuses.size():
-			var bonus: Dictionary = cobbler_bonuses[play_slot]
-			point_value += int(bonus.get("score", 0))
-			explosive_value += int(bonus.get("explosiveness", 0))
+			var cobbler_bonus: Dictionary = cobbler_bonuses[play_slot]
+			point_value += int(cobbler_bonus.get("score", 0))
+			explosive_value += int(cobbler_bonus.get("explosiveness", 0))
+
+		var effect_bonuses := _preview_card_effect_bonuses(
+			ingredient,
+			sim_cauldron,
+			sim_explosiveness
+		)
+		point_value += int(effect_bonuses.get("bonus_score", 0))
+		explosive_value += int(effect_bonuses.get("bonus_explosiveness", 0))
+		if int(effect_bonuses.get("score_penalty", 0)) > 0:
+			point_value = maxi(0, point_value - int(effect_bonuses.get("score_penalty", 0)))
+
+		var explosive_add := explosive_value
+		if unicorn_cures_next and explosive_add > 0:
+			explosive_add = 0
+			unicorn_cures_next = false
+		elif ice_cube_shields > 0 and explosive_add > 0:
+			if sim_explosiveness + explosive_add >= explosion_limit:
+				explosive_add = 0
+			ice_cube_shields -= 1
+		elif (
+			ingredient.id == CHICKEN_ID
+			and explosive_add > 0
+			and sim_explosiveness + explosive_add >= explosion_limit
+		):
+			explosive_add = 0
+
 		display_stats[play_slot] = {
 			"point_value": point_value,
-			"explosive_value": explosive_value,
+			"explosive_value": explosive_add,
 		}
+
+		sim_explosiveness += explosive_add
+		sim_cauldron.append(ingredient)
 		cauldron_count += 1
+		if ingredient.id == PARROT_ID:
+			parrot_doubles_next = true
+		if ingredient.id == UNICORN_HORN_ID:
+			unicorn_cures_next = true
+		if ingredient.id == ICE_CUBE_ID:
+			ice_cube_shields = ICE_CUBE_SHIELD_COUNT
 
 	return display_stats
+
+
+static func _preview_card_effect_bonuses(
+	ingredient: IngredientData,
+	cauldron_contents: Array,
+	explosiveness: int
+) -> Dictionary:
+	var bonus_score := 0
+	var bonus_explosiveness := 0
+	var score_penalty := 0
+	if ingredient == null:
+		return {
+			"bonus_score": bonus_score,
+			"bonus_explosiveness": bonus_explosiveness,
+			"score_penalty": score_penalty,
+		}
+
+	if ingredient.explosive_value > 0:
+		bonus_score += _count_ingredient_id(cauldron_contents, NEWT_TAIL_ID)
+
+	match ingredient.id:
+		RED_MUSHROOM_ID:
+			var preview_contents := cauldron_contents.duplicate()
+			preview_contents.append(ingredient)
+			bonus_score = mini(
+				RED_MUSHROOM_PUMPKIN_CAP,
+				_count_pumpkin_like(preview_contents)
+			)
+		RAT_ID:
+			bonus_score = _rat_streak_bonus(cauldron_contents)
+		THORNS_ID:
+			bonus_score = maxi(0, explosiveness)
+		FISH_BONES_ID:
+			score_penalty = 1
+		_:
+			pass
+
+	return {
+		"bonus_score": bonus_score,
+		"bonus_explosiveness": bonus_explosiveness,
+		"score_penalty": score_penalty,
+	}
 
 
 static func _count_hand_ingredients_to_left(hand_slots: Array, slot_index: int) -> int:
@@ -293,14 +384,24 @@ static func _count_hand_ingredients_to_right(hand_slots: Array, slot_index: int)
 
 
 static func _rat_streak_bonus(contents: Array) -> int:
+	return mini(RAT_STREAK_CAP, count_trailing_rat_streak(contents, true))
+
+
+static func count_trailing_rat_streak(
+	cauldron_contents: Array,
+	exclude_last_entry: bool = false
+) -> int:
 	var streak := 0
-	for i in range(contents.size() - 2, -1, -1):
-		var entry = contents[i]
+	var last_index := cauldron_contents.size() - 1
+	if exclude_last_entry:
+		last_index -= 1
+	for i in range(last_index, -1, -1):
+		var entry = cauldron_contents[i]
 		if entry != null and entry.id == RAT_ID:
 			streak += 1
 		else:
 			break
-	return mini(RAT_STREAK_CAP, streak)
+	return streak
 
 
 static func leech_boss_threshold_reduction(context: BrewContext) -> int:

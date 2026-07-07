@@ -13,3 +13,7 @@ static func from_save_value(value: Variant) -> int:
 
 static func to_save_value(mode: int) -> String:
 	return "easy" if mode == Mode.EASY else "hard"
+
+
+static func base_mulligans_per_brew(mode: int) -> int:
+	return 2 if mode == Mode.EASY else 1

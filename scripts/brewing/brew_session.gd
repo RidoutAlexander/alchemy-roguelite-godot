@@ -5,6 +5,7 @@ const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
 
 const HAND_SLOT_COUNT := 5
 const HAND_DRAW_COUNT := 5
+const HAND_END_EFFECTS_DELAY := 0.5
 const EYEBALL_PEEK_COUNT := 5
 const EYEBALL_PREVIEW_COUNT := 3
 
@@ -31,6 +32,7 @@ signal ingredient_drawn(
 signal frog_leg_escaped(ingredient: IngredientData)
 signal eyeball_puzzle_requested(reserved: Array)
 signal bat_wing_picker_requested(choices: Array)
+signal hand_end_effects_pending
 
 var context := BrewContext.new()
 
@@ -45,6 +47,8 @@ var _juggling_club_hands_remaining: int = 0
 var _lucky_coin_swap_hands_remaining: int = 0
 var _next_hand_draw_count: int = HAND_DRAW_COUNT
 var _lucky_coin_in_current_hand: bool = false
+var _brew_difficulty: int = GameDifficulty.Mode.HARD
+var _brew_extra_mulligans: int = 0
 var _mulligan_allowance: int = 1
 var _mulligans_used: int = 0
 var _play_slot_cursor: int = 0
@@ -70,6 +74,8 @@ var _fairy_vanish_next_ingredient: bool = false
 var _booberry_count_this_hand: int = 0
 var _poison_apple_pending: Array = []
 var _growth_potion_doubles_remaining: int = 0
+var _hand_end_effects_pending: bool = false
+var _brew_finalized: bool = false
 
 var presented_score: int = 0
 var presented_explosiveness: int = 0
@@ -83,6 +89,7 @@ var last_presented_stat_deltas: Dictionary = {
 }
 var last_play_fly_count: int = 1
 var last_play_fairy_poof: bool = false
+var last_bag_grant_ingredient: IngredientData = null
 
 
 func _init() -> void:
@@ -111,9 +118,7 @@ func start_brew(
 	context.bag = bag
 	context.score = 0
 	context.explosiveness = 0
-	context.explosion_limit = GameConstants.DEFAULT_EXPLOSION_LIMIT + explosion_limit_bonus
-	if aura != null:
-		context.explosion_limit += aura.explosion_limit_modifier
+	context.explosion_limit = _compute_base_explosion_limit(aura, explosion_limit_bonus)
 	context.outcome = BrewOutcome.Outcome.IN_PROGRESS
 	context.drawn_this_brew.clear()
 	context.cauldron_contents.clear()
@@ -123,14 +128,17 @@ func start_brew(
 	_clear_presented_stat_snapshots()
 	_reset_presented_stats()
 	_practice_restart_used = false
+	_brew_finalized = false
 	_stirring_spoon_hands_remaining = 0
 	_juggling_club_hands_remaining = 0
 	_lucky_coin_swap_hands_remaining = 0
 	_next_hand_draw_count = HAND_DRAW_COUNT
 	_lucky_coin_in_current_hand = false
-	_reset_draw_flow_state()
-	_mulligan_allowance = 1 + maxi(0, extra_mulligans)
+	_brew_difficulty = difficulty
+	_brew_extra_mulligans = maxi(0, extra_mulligans)
 	_mulligans_used = 0
+	_reset_draw_flow_state()
+	_refresh_mulligan_allowance()
 	bag.reset_for_brew(true)
 	brew_updated.emit(context)
 
@@ -153,6 +161,7 @@ func try_practice_restart() -> bool:
 	_practice_restart_used = true
 	context.score = 0
 	context.explosiveness = 0
+	context.explosion_limit = _compute_base_explosion_limit(context.current_aura)
 	context.drawn_this_brew.clear()
 	context.cauldron_contents.clear()
 	context.gold_gained_this_brew = 0
@@ -161,10 +170,18 @@ func try_practice_restart() -> bool:
 	_clear_presented_stat_snapshots()
 	_reset_presented_stats()
 	_reset_draw_flow_state()
+	_mulligans_used = 0
+	_refresh_mulligan_allowance()
 	context.bag.reset_for_brew()
 	context.bag.shuffle_working_deck()
 	brew_updated.emit(context)
 	return true
+
+
+func _refresh_mulligan_allowance() -> void:
+	_mulligan_allowance = (
+		GameDifficulty.base_mulligans_per_brew(_brew_difficulty) + _brew_extra_mulligans
+	)
 
 
 func get_hand_phase() -> int:
@@ -215,27 +232,55 @@ func get_mulligans_remaining() -> int:
 	return maxi(0, _mulligan_allowance - _mulligans_used)
 
 
-func get_in_rhythm_double_hand_slots() -> Array[int]:
-	if _hand_phase != HandPhase.HAND:
+func get_in_rhythm_double_hand_slots(slots_override: Array = []) -> Array[int]:
+	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
 		return []
 	return _AuraEffects.in_rhythm_double_hand_slots(
-		_hand_slots,
+		_resolve_display_hand_slots(slots_override),
 		context.cauldron_contents.size(),
 		context.current_aura,
 		HAND_SLOT_COUNT
 	)
 
 
-func get_hand_display_stats() -> Array:
-	if _hand_phase != HandPhase.HAND:
+func get_hand_display_stats(slots_override: Array = []) -> Array:
+	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
 		return []
+	return _compute_hand_display_stats(slots_override)
+
+
+func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
+	if not slots_override.is_empty():
+		return slots_override
+	return _hand_slots
+
+
+func _compute_hand_display_stats(slots_override: Array = []) -> Array:
+	var slots := _resolve_display_hand_slots(slots_override)
+	var severed_reference := (
+		_hand_start_slots
+		if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty()
+		else slots
+	)
 	return IngredientEffects.compute_hand_display_stats(
-		_hand_slots,
+		slots,
 		context.cauldron_contents,
 		context.current_aura,
 		HAND_SLOT_COUNT,
-		_growth_potion_doubles_remaining
+		_growth_potion_doubles_remaining,
+		_build_hand_display_modifiers(),
+		severed_reference
 	)
+
+
+func _build_hand_display_modifiers() -> Dictionary:
+	return {
+		"parrot_doubles_next": _parrot_doubles_next,
+		"unicorn_cures_next": _unicorn_cures_next_explosive,
+		"ice_cube_shields": _ice_cube_shields_remaining,
+		"explosiveness": context.explosiveness,
+		"explosion_limit": context.explosion_limit,
+	}
 
 
 func get_bag_display_count() -> int:
@@ -329,6 +374,12 @@ func get_growth_potion_doubles_remaining() -> int:
 
 func get_chain_draws_remaining() -> int:
 	return _chain_draws_remaining
+
+
+func consume_last_bag_grant_ingredient() -> IngredientData:
+	var granted := last_bag_grant_ingredient
+	last_bag_grant_ingredient = null
+	return granted
 
 
 func get_poison_apple_pending() -> Array:
@@ -456,7 +507,10 @@ func try_draw_custom_hand_to_hand(ingredients: Array) -> bool:
 
 
 func _begin_hand_draw(drawn: Array[IngredientData], bag_display_reserve: int) -> bool:
+	var explosiveness_before := context.explosiveness
 	_tick_poison_apple_on_new_hand()
+	if context.explosiveness != explosiveness_before:
+		enqueue_presented_stat_snapshot()
 	_hand_phase = HandPhase.DRAWING
 	_hand_undo_stack.clear()
 	_hand_swap_allowance = 1 + _compute_and_consume_hand_swap_bonus()
@@ -616,7 +670,7 @@ func _play_next_hand_card() -> void:
 		_play_slot_cursor += 1
 
 	if _play_slot_cursor >= HAND_SLOT_COUNT:
-		_finish_hand_play()
+		_request_finish_hand_play()
 		return
 
 	var ingredient: IngredientData = _hand_slots[_play_slot_cursor]
@@ -632,6 +686,34 @@ func _play_next_hand_card() -> void:
 
 	hand_card_played.emit(context, ingredient, slot_index, parrot_doubled)
 	brew_updated.emit(context)
+
+
+func has_pending_hand_end_effects() -> bool:
+	return _hand_end_effects_pending
+
+
+func cancel_pending_hand_end_effects() -> void:
+	_hand_end_effects_pending = false
+
+
+func apply_pending_hand_end_effects() -> void:
+	if not _hand_end_effects_pending:
+		return
+	if _hand_phase != HandPhase.PLAYING:
+		_hand_end_effects_pending = false
+		return
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		_hand_end_effects_pending = false
+		return
+	_hand_end_effects_pending = false
+	_finish_hand_play()
+
+
+func _request_finish_hand_play() -> void:
+	if _hand_end_effects_pending:
+		return
+	_hand_end_effects_pending = true
+	hand_end_effects_pending.emit()
 
 
 func _finish_hand_play() -> void:
@@ -839,6 +921,7 @@ func _apply_ingredient_play(ingredient: IngredientData, track_draw: bool) -> voi
 		var granted := GameManager.run.find_ingredient(effect.bag_grant_ingredient_id)
 		if granted != null:
 			context.bag.grant_ingredient_during_brew(granted)
+			last_bag_grant_ingredient = granted
 	if effect.bonus_swap_hands > 0:
 		if ingredient.id == IngredientEffects.STIRRING_SPOON_ID:
 			_stirring_spoon_hands_remaining += effect.bonus_swap_hands
@@ -1055,6 +1138,11 @@ func _gloom_weed_doubles_gold() -> bool:
 
 func _resolve_explosion() -> void:
 	context.outcome = BrewOutcome.Outcome.EXPLODED
+
+
+func ensure_brew_finalized() -> void:
+	if _brew_finalized:
+		return
 	_finalize_brew()
 
 
@@ -1074,11 +1162,34 @@ func _resolve_bag_empty() -> void:
 
 
 func _finalize_brew() -> void:
+	if _brew_finalized:
+		return
+	_brew_finalized = true
 	_clear_presented_stat_snapshots()
 	sync_presented_stats_from_context()
 	_reset_draw_flow_state()
 	context.bag.reset_for_brew()
 	brew_updated.emit(context)
+
+
+func get_explosiveness_for_hud(presentation_in_progress: bool) -> int:
+	if presentation_in_progress or _hand_phase == HandPhase.PLAYING:
+		return presented_explosiveness
+	return context.explosiveness
+
+
+func get_explosion_limit_for_hud() -> int:
+	return context.explosion_limit
+
+
+func _compute_base_explosion_limit(
+	aura: AuraData,
+	explosion_limit_bonus: int = 0
+) -> int:
+	var limit := GameConstants.DEFAULT_EXPLOSION_LIMIT + explosion_limit_bonus
+	if aura != null:
+		limit += aura.explosion_limit_modifier
+	return maxi(1, limit)
 
 
 func _reset_presented_stats() -> void:
@@ -1190,6 +1301,8 @@ func _resolve_lucky_coin_hand_effect() -> void:
 
 
 func _reset_draw_flow_state() -> void:
+	_hand_end_effects_pending = false
+	last_bag_grant_ingredient = null
 	_hand_phase = HandPhase.BAG
 	_reset_hand_slots()
 	_hand_undo_stack.clear()
@@ -1200,8 +1313,6 @@ func _reset_draw_flow_state() -> void:
 	_lucky_coin_swap_hands_remaining = 0
 	_next_hand_draw_count = HAND_DRAW_COUNT
 	_lucky_coin_in_current_hand = false
-	_mulligan_allowance = 1
-	_mulligans_used = 0
 	_play_slot_cursor = 0
 	_pending_hand_draw.clear()
 	_reset_hand_draw_display_reserve()

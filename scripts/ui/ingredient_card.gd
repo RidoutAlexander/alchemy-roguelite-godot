@@ -29,6 +29,11 @@ const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
 const HAND_CARD_SCALE := 0.34
 const HAND_CARD_BASE_SIZE := Vector2(300.0, 420.0)
+const _DEFAULT_STAT_COLOR := Color(0.05, 0.05, 0.05, 1)
+const _SCORE_UP_COLOR := Color(0.12, 0.62, 0.18, 1)
+const _SCORE_DOWN_COLOR := Color(0.82, 0.18, 0.14, 1)
+const _EXPLOSIVE_UP_COLOR := Color(0.82, 0.18, 0.14, 1)
+const _EXPLOSIVE_DOWN_COLOR := Color(0.12, 0.62, 0.18, 1)
 
 @onready var _visual_root: Control = $VisualRoot
 @onready var _card_background: TextureRect = $VisualRoot/CardBackground
@@ -71,6 +76,8 @@ var _picker_selected: bool = false
 var _puzzle_press_position: Vector2 = Vector2.INF
 var _hand_press_position: Vector2 = Vector2.INF
 var _is_animating: bool = false
+var _base_point_value: int = 0
+var _base_explosive_value: int = 0
 
 
 func _ready() -> void:
@@ -114,9 +121,13 @@ func bind_hand_card(
 	_hand_mode = true
 	_hand_slot_index = slot_index
 	_hand_drag_enabled = drag_enabled
+	_base_point_value = ingredient.point_value if ingredient != null else 0
+	_base_explosive_value = ingredient.explosive_value if ingredient != null else 0
 	bind_preview(ingredient)
 	if display_point_value >= 0:
 		update_hand_stat_display(display_point_value, display_explosive_value)
+	else:
+		update_hand_stat_display(_base_point_value, _base_explosive_value)
 	_apply_hand_layout()
 	_sync_hand_input()
 
@@ -125,16 +136,42 @@ func update_hand_stat_display(point_value: int, explosive_value: int) -> void:
 	if not is_node_ready() or not _hand_mode:
 		return
 	_points_value.text = "%d" % point_value
-	if explosive_value > 0:
+	_apply_hand_stat_color(_points_value, point_value, _base_point_value, true)
+	if explosive_value > 0 or _base_explosive_value > 0:
 		_explosive_value.text = "%d" % explosive_value
+		_apply_hand_stat_color(_explosive_value, explosive_value, _base_explosive_value, false)
 		$VisualRoot/StatsRow/ExplosiveStat.visible = true
 	else:
 		_explosive_value.text = ""
 		$VisualRoot/StatsRow/ExplosiveStat.visible = false
 
 
+func _apply_hand_stat_color(
+	label: Label,
+	display_value: int,
+	base_value: int,
+	higher_is_good: bool
+) -> void:
+	if label == null:
+		return
+	if display_value > base_value:
+		label.add_theme_color_override(
+			"font_color",
+			_SCORE_UP_COLOR if higher_is_good else _EXPLOSIVE_UP_COLOR
+		)
+	elif display_value < base_value:
+		label.add_theme_color_override(
+			"font_color",
+			_SCORE_DOWN_COLOR if higher_is_good else _EXPLOSIVE_DOWN_COLOR
+		)
+	else:
+		label.add_theme_color_override("font_color", _DEFAULT_STAT_COLOR)
+
+
 func clear_hand_card() -> void:
 	set_hand_selected(false)
+	_base_point_value = 0
+	_base_explosive_value = 0
 	_reset_mode_flags()
 	_set_empty_state()
 

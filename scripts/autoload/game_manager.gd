@@ -29,6 +29,7 @@ signal bag_display_changed
 signal dev_hand_picker_requested
 signal brew_resolved(resolution: Dictionary)
 signal game_over(comparison: Dictionary)
+signal presentation_idle
 
 var current_phase: int = GamePhase.Phase.MAIN_MENU
 var last_brew_cleared: bool = false
@@ -39,6 +40,8 @@ var run: RunManager = RunManager.new(_content)
 var _brew_transition_pending: bool = false
 var _presentation_in_progress: bool = false
 var _dev_mode_enabled: bool = false
+var _hand_end_effects_delay_id: int = 0
+var _brew_completion_queued: bool = false
 
 
 func _ready() -> void:
@@ -54,6 +57,7 @@ func _ready() -> void:
 	run.brew_session.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
 	run.brew_session.bat_wing_picker_requested.connect(_on_bat_wing_picker_requested)
 	run.brew_session.hand_mulligan_started.connect(_on_hand_mulligan_started)
+	run.brew_session.hand_end_effects_pending.connect(_on_hand_end_effects_pending)
 
 
 func has_save() -> bool:
@@ -130,6 +134,10 @@ func set_presentation_in_progress(active: bool) -> void:
 	_presentation_in_progress = active
 
 
+func is_presentation_in_progress() -> bool:
+	return _presentation_in_progress
+
+
 func notify_bag_display_changed() -> void:
 	bag_display_changed.emit()
 
@@ -142,7 +150,7 @@ func try_draw_ingredient() -> void:
 		return
 	run.brew_session.try_draw_to_hand()
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
-		_request_brew_completion()
+		_try_request_brew_completion()
 
 
 func try_draw_dev_hand(ingredients: Array) -> void:
@@ -151,7 +159,7 @@ func try_draw_dev_hand(ingredients: Array) -> void:
 	if not run.brew_session.try_draw_custom_hand_to_hand(ingredients):
 		return
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
-		_request_brew_completion()
+		_try_request_brew_completion()
 
 
 func try_play_hand() -> void:
@@ -159,7 +167,7 @@ func try_play_hand() -> void:
 		return
 	run.brew_session.try_play_hand()
 	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
-		_request_brew_completion()
+		_try_request_brew_completion()
 
 
 func try_swap_hand_slots(from_slot: int, to_slot: int) -> void:
@@ -208,12 +216,14 @@ func complete_mulligan(
 
 func notify_mulligan_presentation_finished() -> void:
 	_presentation_in_progress = false
+	call_deferred("_mark_presentation_idle")
 
 
 func notify_hand_draw_batch_finished() -> void:
 	_presentation_in_progress = false
 	run.brew_session.on_hand_draw_batch_finished()
 	_sync_hand_completion()
+	call_deferred("_mark_presentation_idle")
 
 
 func present_card_stats() -> void:
@@ -225,6 +235,7 @@ func present_card_stats() -> void:
 func notify_card_presentation_finished() -> void:
 	_presentation_in_progress = false
 	call_deferred("_continue_after_card_presentation")
+	call_deferred("_mark_presentation_idle")
 
 
 func _continue_after_card_presentation() -> void:
@@ -241,8 +252,9 @@ func _continue_after_card_presentation() -> void:
 
 
 func _sync_hand_completion() -> void:
-	if run.brew_session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
-		_request_brew_completion()
+	if run.brew_session.context.outcome == BrewOutcome.Outcome.IN_PROGRESS:
+		return
+	_try_request_brew_completion()
 
 
 func complete_eyeball_puzzle(ordered: Array = []) -> void:
@@ -258,14 +270,15 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 func complete_frog_leg_save() -> void:
 	_presentation_in_progress = false
 	run.brew_session.complete_frog_leg_save()
-	_request_brew_completion()
+	_try_request_brew_completion()
+	call_deferred("_mark_presentation_idle")
 
 
 func try_end_brew() -> void:
 	if not can_end_brew():
 		return
 	if run.brew_session.try_end_brew():
-		_request_brew_completion()
+		_try_request_brew_completion()
 
 
 func try_practice_restart() -> bool:
@@ -273,6 +286,7 @@ func try_practice_restart() -> bool:
 		return false
 	if current_phase != GamePhase.Phase.BREWING:
 		return false
+	_hand_end_effects_delay_id += 1
 	if not run.brew_session.try_practice_restart():
 		return false
 	_presentation_in_progress = false
@@ -287,6 +301,7 @@ func finalize_brew_transition() -> void:
 	if not _brew_transition_pending:
 		return
 	_brew_transition_pending = false
+	_brew_completion_queued = false
 	_complete_brew()
 
 
@@ -334,16 +349,30 @@ func return_to_main_menu() -> void:
 
 
 func _enter_brewing() -> void:
+	_cancel_hand_end_effects_delay()
+	_brew_completion_queued = false
+	_brew_transition_pending = false
 	run.begin_brew()
 	run_changed.emit()
 	_set_phase(GamePhase.Phase.BREWING)
 
 
-func _request_brew_completion() -> void:
+func _try_request_brew_completion() -> void:
+	if _presentation_in_progress:
+		_brew_completion_queued = true
+		return
+	_brew_completion_queued = false
 	if _brew_transition_pending:
 		return
+	run.brew_session.ensure_brew_finalized()
 	_brew_transition_pending = true
 	brew_completion_requested.emit(run.brew_session.context.outcome)
+
+
+func _mark_presentation_idle() -> void:
+	if _brew_completion_queued:
+		_try_request_brew_completion()
+	presentation_idle.emit()
 
 
 func _complete_brew() -> void:
@@ -387,7 +416,12 @@ func _try_present_pending_end_of_hand_stats() -> void:
 	if _presentation_in_progress:
 		return
 	var session := run.brew_session
-	if session.get_hand_phase() != BrewSession.HandPhase.BAG:
+	var hand_phase := session.get_hand_phase()
+	if hand_phase not in [
+		BrewSession.HandPhase.BAG,
+		BrewSession.HandPhase.DRAWING,
+		BrewSession.HandPhase.HAND,
+	]:
 		return
 	if not session.has_pending_stat_snapshots():
 		return
@@ -433,6 +467,35 @@ func _on_hand_mulligan_started(
 	slot_index: int
 ) -> void:
 	hand_mulligan_started.emit(old_ingredient, new_ingredient, slot_index)
+
+
+func _on_hand_end_effects_pending() -> void:
+	_hand_end_effects_delay_id += 1
+	var delay_id := _hand_end_effects_delay_id
+	_wait_and_apply_hand_end_effects(delay_id)
+
+
+func _wait_and_apply_hand_end_effects(delay_id: int) -> void:
+	set_presentation_in_progress(true)
+	await get_tree().create_timer(BrewSession.HAND_END_EFFECTS_DELAY).timeout
+	if delay_id != _hand_end_effects_delay_id:
+		return
+
+	var session := run.brew_session
+	set_presentation_in_progress(false)
+	if not session.has_pending_hand_end_effects():
+		brew_updated.emit(session.context)
+		call_deferred("_mark_presentation_idle")
+		return
+	session.apply_pending_hand_end_effects()
+	_sync_hand_completion()
+	call_deferred("_mark_presentation_idle")
+
+
+func _cancel_hand_end_effects_delay() -> void:
+	_hand_end_effects_delay_id += 1
+	if run != null and run.brew_session != null:
+		run.brew_session.cancel_pending_hand_end_effects()
 
 
 func _apply_exclusive_fullscreen() -> void:
