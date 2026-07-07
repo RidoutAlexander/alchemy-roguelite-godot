@@ -189,6 +189,71 @@ static func _cobbler_adjacency_bonus_between(
 	return {"score": 0, "explosiveness": 0}
 
 
+static func _hand_boom_berry_slot_immediately_left(hand_slots: Array, slot_index: int) -> int:
+	var left_slot := slot_index - 1
+	while left_slot >= 0:
+		if hand_slots[left_slot] != null:
+			if is_boom_berry_id(hand_slots[left_slot].id):
+				return left_slot
+			return -1
+		left_slot -= 1
+	return -1
+
+
+static func _cobbler_bonus_target_slot(
+	ingredient: IngredientData,
+	previous: IngredientData,
+	play_slot: int,
+	last_hand_slot: int,
+	hand_slots: Array
+) -> int:
+	if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
+		if last_hand_slot >= 0 and is_boom_berry_id(hand_slots[last_hand_slot].id):
+			return last_hand_slot
+		return _hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+	return play_slot
+
+
+static func _apply_retroactive_cobbler_bonus_to_slot(
+	target_slot: int,
+	cobbler_bonus: Dictionary,
+	pre_double_stats: Array,
+	display_stats: Array
+) -> void:
+	if target_slot < 0 or target_slot >= pre_double_stats.size():
+		return
+	var prior_stats: Variant = pre_double_stats[target_slot]
+	if not prior_stats is Dictionary:
+		return
+	var bonus_score := int(cobbler_bonus.get("score", 0))
+	var bonus_explosive := int(cobbler_bonus.get("explosiveness", 0))
+	if bonus_score == 0 and bonus_explosive == 0:
+		return
+	var old_prior_pv := int(prior_stats.get("point_value", 0))
+	var old_prior_ev := int(prior_stats.get("explosive_value", 0))
+	prior_stats["point_value"] = old_prior_pv + bonus_score
+	prior_stats["explosive_value"] = old_prior_ev + bonus_explosive
+	if target_slot >= display_stats.size():
+		return
+	var display_entry: Variant = display_stats[target_slot]
+	if not display_entry is Dictionary:
+		return
+	var display_pv := int(display_entry.get("point_value", 0))
+	var display_ev := int(display_entry.get("explosive_value", 0))
+	if old_prior_pv > 0:
+		display_entry["point_value"] = display_pv + int(
+			round(float(bonus_score * display_pv) / float(old_prior_pv))
+		)
+	else:
+		display_entry["point_value"] = display_pv + bonus_score
+	if old_prior_ev > 0:
+		display_entry["explosive_value"] = display_ev + int(
+			round(float(bonus_explosive * display_ev) / float(old_prior_ev))
+		)
+	else:
+		display_entry["explosive_value"] = display_ev + bonus_explosive
+
+
 static func compute_hand_cobbler_bonuses(
 	hand_slots: Array,
 	cauldron_contents: Array,
@@ -210,12 +275,13 @@ static func compute_hand_cobbler_bonuses(
 		var previous = sequence[-1] if not sequence.is_empty() else null
 		var bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
 		if int(bonus.get("score", 0)) > 0 or int(bonus.get("explosiveness", 0)) > 0:
-			var target_slot := play_slot
-			if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
-				if last_hand_slot >= 0 and is_boom_berry_id(hand_slots[last_hand_slot].id):
-					target_slot = last_hand_slot
-				else:
-					target_slot = -1
+			var target_slot := _cobbler_bonus_target_slot(
+				ingredient,
+				previous,
+				play_slot,
+				last_hand_slot,
+				hand_slots
+			)
 			if target_slot >= 0 and target_slot < bonuses.size():
 				bonuses[target_slot]["score"] += int(bonus.get("score", 0))
 				bonuses[target_slot]["explosiveness"] += int(bonus.get("explosiveness", 0))
@@ -273,26 +339,23 @@ static func compute_hand_display_stats(
 		var previous = sim_cauldron[-1] if not sim_cauldron.is_empty() else null
 		var cobbler_bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
 		if int(cobbler_bonus.get("score", 0)) > 0 or int(cobbler_bonus.get("explosiveness", 0)) > 0:
-			var target_slot := play_slot
-			if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
-				if last_hand_slot >= 0 and is_boom_berry_id(hand_slots[last_hand_slot].id):
-					target_slot = last_hand_slot
-				else:
-					target_slot = -1
+			var target_slot := _cobbler_bonus_target_slot(
+				ingredient,
+				previous,
+				play_slot,
+				last_hand_slot,
+				hand_slots
+			)
 			if target_slot == play_slot:
 				point_value += int(cobbler_bonus.get("score", 0))
 				explosive_value += int(cobbler_bonus.get("explosiveness", 0))
-			elif target_slot >= 0 and target_slot < pre_double_stats.size():
-				var prior_stats: Variant = pre_double_stats[target_slot]
-				if prior_stats is Dictionary:
-					prior_stats["point_value"] = (
-						int(prior_stats.get("point_value", 0))
-						+ int(cobbler_bonus.get("score", 0))
-					)
-					prior_stats["explosive_value"] = (
-						int(prior_stats.get("explosive_value", 0))
-						+ int(cobbler_bonus.get("explosiveness", 0))
-					)
+			else:
+				_apply_retroactive_cobbler_bonus_to_slot(
+					target_slot,
+					cobbler_bonus,
+					pre_double_stats,
+					display_stats
+				)
 
 		var effect_bonuses := _preview_card_effect_bonuses(
 			ingredient,
