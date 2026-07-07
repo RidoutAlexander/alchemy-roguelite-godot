@@ -27,6 +27,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/brew_persistent_effects_display.tscn" id="25_persistent_effects"]
 [ext_resource type="PackedScene" path="res://scenes/ui/trinkets_display.tscn" id="26_trinkets_display"]
 [ext_resource type="PackedScene" path="res://scenes/ui/trinket_reward_overlay.tscn" id="27_trinket_reward"]
+[ext_resource type="Script" uid="uid://c8k2mulligancost" path="res://scripts/ui/shop_button_cost_overlay.gd" id="28_cost_overlay"]
+[ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="29_gold_icon"]
 
 [node name="Game" type="Control" unique_id=403037050]
 custom_minimum_size = Vector2(1024, 576)
@@ -272,6 +274,70 @@ theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 22
 text = "Undo (0 swaps left)"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BuyBrewMulliganLabel" type="Label" parent="PhaseSwipeHost/BrewPanel"]
+z_index = 13
+visible = false
+offset_right = 280.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+text = "Buy a Mulligan 10 gold"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BuyBrewMulliganButton" parent="PhaseSwipeHost/BrewPanel" instance=ExtResource("23_hand_undo")]
+z_index = 13
+visible = false
+offset_left = 580.0
+offset_top = 220.0
+offset_right = 668.0
+offset_bottom = 308.0
+
+[node name="BuyBrewMulliganCost" type="Control" parent="PhaseSwipeHost/BrewPanel"]
+z_index = 13
+visible = false
+custom_minimum_size = Vector2(40, 36)
+layout_mode = 0
+offset_left = 532.0
+offset_top = 246.0
+offset_right = 572.0
+offset_bottom = 282.0
+mouse_filter = 2
+script = ExtResource("28_cost_overlay")
+
+[node name="CoinIcon" type="TextureRect" parent="PhaseSwipeHost/BrewPanel/BuyBrewMulliganCost"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("29_gold_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="AmountLabel" type="Label" parent="PhaseSwipeHost/BrewPanel/BuyBrewMulliganCost"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 26
+text = "10"
 horizontal_alignment = 1
 vertical_alignment = 1
 

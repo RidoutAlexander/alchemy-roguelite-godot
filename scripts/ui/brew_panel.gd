@@ -19,6 +19,7 @@ const HAND_ACTION_BUTTON_SIZE := Vector2(88.0, 88.0)
 const HAND_ACTION_LABEL_SIZE := Vector2(88.0, 24.0)
 const HAND_ACTION_LABEL_GAP := 4.0
 const HAND_ACTION_GROUP_GAP := 8.0
+const HAND_ACTION_STACK_GAP := 12.0
 
 @onready var _fly_layer: CanvasLayer = $DrawFlyLayer
 @onready var _explosion_layer: CanvasLayer = $ExplosionLayer
@@ -36,6 +37,10 @@ const HAND_ACTION_GROUP_GAP := 8.0
 @onready var _hand_undo_label: Label = $HandUndoLabel
 @onready var _hand_mulligan_button: ShopRerollButton = $HandMulliganButton
 @onready var _hand_mulligan_label: Label = $HandMulliganLabel
+@onready var _buy_brew_mulligan_button: ShopRerollButton = $BuyBrewMulliganButton
+@onready var _buy_brew_mulligan_label: Label = $BuyBrewMulliganLabel
+@onready var _buy_brew_mulligan_cost: ShopButtonCostOverlay = $BuyBrewMulliganCost
+@onready var _gold_counter: GoldDisplay = $GoldCounter
 @onready var _eyeball_puzzle: EyeballPuzzleOverlay = $"../../EyeballPuzzleOverlay"
 
 var _brew_exit_animations_pending: int = 0
@@ -81,6 +86,12 @@ func _ready() -> void:
 		_on_hand_mulligan_pressed
 	):
 		_hand_mulligan_button.pressed.connect(_on_hand_mulligan_pressed)
+	if _buy_brew_mulligan_button != null and not _buy_brew_mulligan_button.pressed.is_connected(
+		_on_buy_brew_mulligan_pressed
+	):
+		_buy_brew_mulligan_button.pressed.connect(_on_buy_brew_mulligan_pressed)
+	if _buy_brew_mulligan_cost != null:
+		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 	if _player_hand != null:
 		_player_hand.swap_requested.connect(_on_hand_swap_requested)
 		if not _player_hand.selection_changed.is_connected(_on_hand_selection_changed):
@@ -277,6 +288,15 @@ func _on_hand_mulligan_pressed() -> void:
 		_shake_hand_action_button(_hand_mulligan_button)
 		return
 	GameManager.try_mulligan(_player_hand.get_selected_slot())
+
+
+func _on_buy_brew_mulligan_pressed() -> void:
+	if GameManager.try_buy_brew_mulligan():
+		_sync_hand_ui()
+	else:
+		_shake_hand_action_button(_buy_brew_mulligan_button)
+		if _gold_counter != null:
+			_gold_counter.shake()
 
 
 func _on_hand_selection_changed(_slot_index: int) -> void:
@@ -560,12 +580,7 @@ func _align_mulligan_control() -> void:
 	if _hand_mulligan_button == null or not _hand_mulligan_button.visible:
 		return
 	var origin := _get_hand_action_column_origin()
-	_position_hand_action_control(
-		origin.x,
-		origin.y,
-		_hand_mulligan_button,
-		_hand_mulligan_label
-	)
+	_align_mulligan_column(origin.x, origin.y)
 
 
 func _get_hand_action_column_origin() -> Vector2:
@@ -603,8 +618,14 @@ func _align_hand_action_buttons() -> void:
 	var action_left := origin.x
 
 	if _hand_mulligan_button != null and _hand_mulligan_button.visible:
-		_position_hand_action_control(action_left, base_y, _hand_mulligan_button, _hand_mulligan_label)
-		action_left += _hand_action_control_width(_hand_mulligan_label) + HAND_ACTION_GROUP_GAP
+		_align_mulligan_column(action_left, base_y)
+		var mulligan_column_width := _hand_action_control_width(_hand_mulligan_label)
+		if _should_show_buy_brew_mulligan():
+			mulligan_column_width = maxf(
+				mulligan_column_width,
+				_hand_action_control_width(_buy_brew_mulligan_label)
+			)
+		action_left += mulligan_column_width + HAND_ACTION_GROUP_GAP
 
 	if _hand_undo_button != null and _hand_undo_button.visible:
 		_position_hand_action_control(action_left, base_y, _hand_undo_button, _hand_undo_label)
@@ -665,6 +686,12 @@ func _set_mulligan_visible(show_controls: bool) -> void:
 		_hand_mulligan_button.visible = show_controls
 	if _hand_mulligan_label != null:
 		_hand_mulligan_label.visible = show_controls
+	if _buy_brew_mulligan_button != null:
+		_buy_brew_mulligan_button.visible = show_controls
+	if _buy_brew_mulligan_label != null:
+		_buy_brew_mulligan_label.visible = show_controls
+	if _buy_brew_mulligan_cost != null:
+		_buy_brew_mulligan_cost.visible = show_controls
 
 
 func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
@@ -689,6 +716,10 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 		_hand_mulligan_label.text = _format_mulligan_label(session.get_mulligans_remaining())
 	if _hand_mulligan_button != null:
 		_hand_mulligan_button.disabled = false
+	if _buy_brew_mulligan_button != null:
+		_buy_brew_mulligan_button.disabled = false
+	if _buy_brew_mulligan_cost != null:
+		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 
 
 func _format_mulligan_label(mulligans_remaining: int) -> String:
@@ -713,6 +744,51 @@ func _can_use_mulligan_now() -> bool:
 	if session.get_hand_slot(selected_slot) == null:
 		return false
 	return GameManager.can_mulligan()
+
+
+func _align_mulligan_column(left: float, top: float) -> void:
+	var buy_stack_height := 0.0
+	if _should_show_buy_brew_mulligan():
+		buy_stack_height = (
+			_hand_action_group_height(_buy_brew_mulligan_label) + HAND_ACTION_STACK_GAP
+		)
+		_position_hand_action_control(
+			left,
+			top - buy_stack_height,
+			_buy_brew_mulligan_button,
+			_buy_brew_mulligan_label
+		)
+		_align_buy_brew_mulligan_cost()
+	_position_hand_action_control(left, top, _hand_mulligan_button, _hand_mulligan_label)
+
+
+func _should_show_buy_brew_mulligan() -> bool:
+	return (
+		_buy_brew_mulligan_button != null
+		and _buy_brew_mulligan_button.visible
+	)
+
+
+func _hand_action_group_height(label: Label) -> float:
+	var label_size := HAND_ACTION_LABEL_SIZE
+	if label != null:
+		label_size = label.get_minimum_size()
+		label_size.x = maxf(label_size.x, HAND_ACTION_LABEL_SIZE.x)
+		label_size.y = maxf(label_size.y, HAND_ACTION_LABEL_SIZE.y)
+	return label_size.y + HAND_ACTION_LABEL_GAP + HAND_ACTION_BUTTON_SIZE.y
+
+
+func _align_buy_brew_mulligan_cost() -> void:
+	if _buy_brew_mulligan_cost == null or _buy_brew_mulligan_button == null:
+		return
+	if not _buy_brew_mulligan_button.visible:
+		return
+	var button_rect := _buy_brew_mulligan_button.get_global_rect()
+	var cost_size := _buy_brew_mulligan_cost.size
+	_buy_brew_mulligan_cost.global_position = Vector2(
+		button_rect.position.x - cost_size.x + 6.0,
+		button_rect.position.y + (button_rect.size.y - cost_size.y) * 0.5
+	)
 
 
 func _shake_hand_action_button(button: ShopRerollButton) -> void:

@@ -339,6 +339,16 @@ func try_buy_shop_mulligan() -> bool:
 	return purchased
 
 
+func try_buy_brew_mulligan() -> bool:
+	if current_phase != GamePhase.Phase.BREWING:
+		return false
+	if not run.try_buy_brew_mulligan():
+		return false
+	run_changed.emit()
+	brew_updated.emit(run.brew_session.context)
+	return true
+
+
 func try_purchase_offer(index: int) -> bool:
 	var purchased := run.try_purchase_offer(index)
 	if purchased:

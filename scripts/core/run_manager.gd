@@ -269,6 +269,20 @@ func get_shop_mulligan_cost() -> int:
 	return GameConstants.SHOP_MULLIGAN_COST
 
 
+func get_brew_mulligan_cost() -> int:
+	return GameConstants.BREW_MULLIGAN_COST
+
+
+func try_buy_brew_mulligan() -> bool:
+	if gold < GameConstants.BREW_MULLIGAN_COST:
+		return false
+	if not brew_session.can_purchase_mulligan():
+		return false
+	gold -= GameConstants.BREW_MULLIGAN_COST
+	brew_session.grant_purchased_mulligan()
+	return true
+
+
 func try_buy_shop_mulligan() -> bool:
 	if gold < GameConstants.SHOP_MULLIGAN_COST:
 		return false

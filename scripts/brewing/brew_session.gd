@@ -49,6 +49,7 @@ var _next_hand_draw_count: int = HAND_DRAW_COUNT
 var _lucky_coin_in_current_hand: bool = false
 var _brew_difficulty: int = GameDifficulty.Mode.HARD
 var _brew_extra_mulligans: int = 0
+var _purchased_mulligans_this_brew: int = 0
 var _mulligan_allowance: int = 1
 var _mulligans_used: int = 0
 var _play_slot_cursor: int = 0
@@ -138,6 +139,7 @@ func start_brew(
 	_lucky_coin_in_current_hand = false
 	_brew_difficulty = difficulty
 	_brew_extra_mulligans = maxi(0, extra_mulligans)
+	_purchased_mulligans_this_brew = 0
 	_mulligans_used = 0
 	_reset_draw_flow_state()
 	_refresh_mulligan_allowance()
@@ -172,6 +174,7 @@ func try_practice_restart() -> bool:
 	_clear_presented_stat_snapshots()
 	_reset_presented_stats()
 	_reset_draw_flow_state()
+	_purchased_mulligans_this_brew = 0
 	_mulligans_used = 0
 	_refresh_mulligan_allowance()
 	context.bag.reset_for_brew()
@@ -182,7 +185,9 @@ func try_practice_restart() -> bool:
 
 func _refresh_mulligan_allowance() -> void:
 	_mulligan_allowance = (
-		GameDifficulty.base_mulligans_per_brew(_brew_difficulty) + _brew_extra_mulligans
+		GameDifficulty.base_mulligans_per_brew(_brew_difficulty)
+		+ _brew_extra_mulligans
+		+ _purchased_mulligans_this_brew
 	)
 
 
@@ -232,6 +237,19 @@ func get_hand_swaps_remaining() -> int:
 
 func get_mulligans_remaining() -> int:
 	return maxi(0, _mulligan_allowance - _mulligans_used)
+
+
+func can_purchase_mulligan() -> bool:
+	return (
+		context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+		and not _brew_finalized
+	)
+
+
+func grant_purchased_mulligan() -> void:
+	_purchased_mulligans_this_brew += 1
+	_refresh_mulligan_allowance()
+	brew_updated.emit(context)
 
 
 func get_in_rhythm_double_hand_slots(slots_override: Array = []) -> Array[int]:
@@ -1179,6 +1197,8 @@ func _finalize_brew(clear_hand: bool = true) -> void:
 	if _brew_finalized:
 		return
 	_brew_finalized = true
+	_purchased_mulligans_this_brew = 0
+	_refresh_mulligan_allowance()
 	_clear_presented_stat_snapshots()
 	sync_presented_stats_from_context()
 	if clear_hand:
