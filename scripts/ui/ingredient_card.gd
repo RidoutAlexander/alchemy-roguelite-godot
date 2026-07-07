@@ -230,6 +230,15 @@ func get_hand_hit_rect() -> Rect2:
 	return hit_rect
 
 
+func get_hand_effect_icon_y_offset() -> float:
+	if not _hand_mode or _visual_root == null:
+		return 0.0
+	var visual_scale := _visual_root.scale.y
+	var rise := -_hand_hover_offset
+	var scale_lift := (visual_scale - 1.0) * HAND_CARD_BASE_SIZE.y
+	return -(rise + scale_lift) * HAND_CARD_SCALE
+
+
 func update_hand_hover(hovered: bool, delta: float) -> void:
 	if not _hand_mode or _visual_root == null:
 		return
