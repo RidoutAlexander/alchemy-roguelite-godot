@@ -401,8 +401,11 @@ static func compute_hand_display_stats(
 		if unicorn_cures_next and explosive_add > 0:
 			explosive_add = 0
 			unicorn_cures_next = false
-		elif ice_cube_shields > 0 and explosive_add > 0:
-			if sim_explosiveness + explosive_add >= explosion_limit:
+		if ice_cube_shields > 0:
+			if (
+				explosive_add > 0
+				and sim_explosiveness + explosive_add >= explosion_limit
+			):
 				explosive_add = 0
 			ice_cube_shields -= 1
 		elif (

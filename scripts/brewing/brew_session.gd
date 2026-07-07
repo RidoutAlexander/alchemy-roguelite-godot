@@ -983,8 +983,11 @@ func _apply_ingredient_play(
 		if explosive_add > 0:
 			explosive_add = 0
 		_unicorn_cures_next_explosive = false
-	if _ice_cube_shields_remaining > 0 and explosive_add > 0:
-		if context.explosiveness + explosive_add >= context.explosion_limit:
+	if _ice_cube_shields_remaining > 0:
+		if (
+			explosive_add > 0
+			and context.explosiveness + explosive_add >= context.explosion_limit
+		):
 			explosive_add = 0
 		_ice_cube_shields_remaining -= 1
 	if (
