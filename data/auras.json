@@ -108,5 +108,15 @@
     "explosion_limit_modifier": 0,
     "score_multiplier_percent": 100,
     "gold_multiplier_percent": 100
+  },
+  {
+    "id": "bubbling_brew",
+    "display_name": "Bubbling Brew",
+    "description": "every 3rd ingredient added to the cauldron jumps back into your bag.",
+    "pool": "normal",
+    "pool_unlock_level": 1,
+    "explosion_limit_modifier": 0,
+    "score_multiplier_percent": 100,
+    "gold_multiplier_percent": 100
   }
 ]
