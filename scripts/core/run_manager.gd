@@ -39,23 +39,30 @@ func find_trinket(trinket_id: String) -> TrinketData:
 
 func get_owned_trinkets() -> Array[TrinketData]:
 	var result: Array[TrinketData] = []
+	var seen: Dictionary = {}
 	for trinket_id in owned_trinket_ids:
-		var trinket := find_trinket(trinket_id)
+		var normalized := _normalize_trinket_id(trinket_id)
+		if normalized == "" or seen.has(normalized):
+			continue
+		seen[normalized] = true
+		var trinket := find_trinket(normalized)
 		if trinket != null:
 			result.append(trinket)
 	return result
 
 
 func has_trinket(trinket_id: String) -> bool:
-	return trinket_id in owned_trinket_ids
+	var normalized := _normalize_trinket_id(trinket_id)
+	return normalized != "" and normalized in owned_trinket_ids
 
 
 func grant_trinket(trinket_id: String) -> bool:
-	if find_trinket(trinket_id) == null:
+	var normalized := _normalize_trinket_id(trinket_id)
+	if normalized == "" or find_trinket(normalized) == null:
 		return false
-	if has_trinket(trinket_id):
+	if has_trinket(normalized):
 		return false
-	owned_trinket_ids.append(trinket_id)
+	owned_trinket_ids.append(normalized)
 	return true
 
 
@@ -116,14 +123,10 @@ func load_from_save(data: Dictionary) -> void:
 	pending_trinket_reward_ids.clear()
 	pending_level_advance = bool(data.get("pendingLevelAdvance", false))
 	for trinket_id in data.get("ownedTrinketIds", []):
-		var normalized := str(trinket_id).strip_edges()
-		if normalized != "" and find_trinket(normalized) != null:
-			owned_trinket_ids.append(normalized)
+		grant_trinket(str(trinket_id))
 	for trinket_id in data.get("pendingTrinketRewardIds", []):
-		var pending_id := str(trinket_id).strip_edges()
-		if pending_id != "" and find_trinket(pending_id) != null:
-			if not has_trinket(pending_id) and pending_id not in pending_trinket_reward_ids:
-				pending_trinket_reward_ids.append(pending_id)
+		_append_unique_pending_trinket_offer(str(trinket_id))
+	_sanitize_pending_trinket_reward_ids()
 	var chips: Array[IngredientData] = []
 	for ingredient_id in data.get("bagIngredientIds", []):
 		var ingredient := _content.find_ingredient(str(ingredient_id))
@@ -356,17 +359,25 @@ func has_pending_trinket_reward() -> bool:
 
 
 func get_pending_trinket_rewards() -> Array[TrinketData]:
+	_sanitize_pending_trinket_reward_ids()
 	var result: Array[TrinketData] = []
+	var seen: Dictionary = {}
 	for trinket_id in pending_trinket_reward_ids:
-		var trinket := find_trinket(trinket_id)
+		var normalized := _normalize_trinket_id(trinket_id)
+		if normalized == "" or seen.has(normalized) or has_trinket(normalized):
+			continue
+		seen[normalized] = true
+		var trinket := find_trinket(normalized)
 		if trinket != null:
 			result.append(trinket)
 	return result
 
 
 func try_select_trinket_reward(trinket_id: String) -> bool:
-	var normalized := trinket_id.strip_edges()
-	if normalized == "" or normalized not in pending_trinket_reward_ids:
+	var normalized := _normalize_trinket_id(trinket_id)
+	if normalized == "" or has_trinket(normalized):
+		return false
+	if normalized not in pending_trinket_reward_ids:
 		return false
 	if not grant_trinket(normalized):
 		return false
@@ -376,13 +387,50 @@ func try_select_trinket_reward(trinket_id: String) -> bool:
 
 func _roll_trinket_reward_offers() -> void:
 	pending_trinket_reward_ids.clear()
-	var pool: Array[String] = []
-	for trinket in _content.all_trinkets():
-		if trinket == null:
-			continue
-		if not has_trinket(trinket.id):
-			pool.append(trinket.id)
+	var pool := _build_unowned_trinket_pool()
 	pool.shuffle()
 	var offer_count := mini(3, pool.size())
 	for index in offer_count:
-		pending_trinket_reward_ids.append(pool[index])
+		_append_unique_pending_trinket_offer(pool[index])
+
+
+func _normalize_trinket_id(trinket_id: String) -> String:
+	return str(trinket_id).strip_edges()
+
+
+func _build_unowned_trinket_pool() -> Array[String]:
+	var pool: Array[String] = []
+	var seen: Dictionary = {}
+	for trinket in _content.all_trinkets():
+		if trinket == null:
+			continue
+		var normalized := _normalize_trinket_id(trinket.id)
+		if normalized == "" or seen.has(normalized) or has_trinket(normalized):
+			continue
+		if find_trinket(normalized) == null:
+			continue
+		seen[normalized] = true
+		pool.append(normalized)
+	return pool
+
+
+func _append_unique_pending_trinket_offer(trinket_id: String) -> bool:
+	var normalized := _normalize_trinket_id(trinket_id)
+	if normalized == "" or find_trinket(normalized) == null:
+		return false
+	if has_trinket(normalized) or normalized in pending_trinket_reward_ids:
+		return false
+	pending_trinket_reward_ids.append(normalized)
+	return true
+
+
+func _sanitize_pending_trinket_reward_ids() -> void:
+	var sanitized: Array[String] = []
+	for trinket_id in pending_trinket_reward_ids:
+		var normalized := _normalize_trinket_id(trinket_id)
+		if normalized == "" or find_trinket(normalized) == null:
+			continue
+		if has_trinket(normalized) or normalized in sanitized:
+			continue
+		sanitized.append(normalized)
+	pending_trinket_reward_ids = sanitized
