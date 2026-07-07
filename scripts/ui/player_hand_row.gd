@@ -5,7 +5,6 @@ signal swap_requested(from_slot: int, to_slot: int)
 signal selection_changed(slot_index: int)
 
 const _CARD_SCENE := preload("res://scenes/ui/ingredient_card.tscn")
-const _EFFECT_ICONS_SCENE := preload("res://scenes/ui/hand_slot_effect_icons.tscn")
 
 const HAND_SLOT_COUNT := 5
 const CARD_SCALE := 0.34
@@ -22,14 +21,12 @@ const PLAY_BUTTON_GAP := 12.0
 const RHYTHM_SHAKE_OFFSET := Vector2(5.0, 2.0)
 const RHYTHM_SHAKE_STEP := 0.07
 const SLOT_TOP_MARGIN := 26.0
-const EFFECT_STRIP_GAP := 2.0
 
 @onready var _slot_row: Control = $SlotRow
 @onready var _drag_layer: Control = $DragLayer
 
 var _slot_cards: Array[IngredientCard] = []
 var _slot_anchors: Array[Control] = []
-var _slot_effect_icons: Array[HandSlotEffectIcons] = []
 var _dragging_card: IngredientCard = null
 var _drag_source_slot: int = -1
 var _drag_grab_offset: Vector2 = Vector2.ZERO
@@ -56,7 +53,6 @@ func _ready() -> void:
 func _build_slots() -> void:
 	_slot_cards.clear()
 	_slot_anchors.clear()
-	_slot_effect_icons.clear()
 	if _slot_row == null:
 		return
 
@@ -75,14 +71,6 @@ func _build_slots() -> void:
 		anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_slot_row.add_child(anchor)
 		_slot_anchors.append(anchor)
-
-		var effect_icons := _EFFECT_ICONS_SCENE.instantiate() as HandSlotEffectIcons
-		if effect_icons != null:
-			effect_icons.name = "SlotEffects%d" % (slot_index + 1)
-			effect_icons.visible = false
-			effect_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			anchor.add_child(effect_icons)
-			_slot_effect_icons.append(effect_icons)
 
 		var card := _CARD_SCENE.instantiate() as IngredientCard
 		if card == null:
@@ -133,7 +121,6 @@ func prepare_for_draw(persisted_slots: Array = []) -> void:
 			continue
 		card.visible = false
 		card.clear_hand_card()
-		_clear_slot_effect_icons(slot_index)
 	_update_hover_process()
 
 
@@ -176,13 +163,12 @@ func refresh_hand(
 			if slot_index < hand_display_stats.size()
 			else null
 		)
-		_bind_slot(slot_index, ingredient, display_stats)
 		var effect_entries = (
 			slot_effect_entries[slot_index]
 			if slot_index < slot_effect_entries.size()
 			else []
 		)
-		_bind_slot_effect_icons(slot_index, effect_entries)
+		_bind_slot(slot_index, ingredient, display_stats, effect_entries)
 	if (
 		_selected_slot >= 0
 		and (
@@ -229,7 +215,6 @@ func hide_slot_for_fly(slot_index: int) -> void:
 	var card := _slot_cards[slot_index]
 	if card != null:
 		card.visible = false
-	_clear_slot_effect_icons(slot_index)
 
 
 func suppress_slot(slot_index: int) -> void:
@@ -252,7 +237,12 @@ func reveal_slot(
 	_bind_slot(slot_index, ingredient, display_stats)
 
 
-func _bind_slot(slot_index: int, ingredient: IngredientData, display_stats: Variant = null) -> void:
+func _bind_slot(
+	slot_index: int,
+	ingredient: IngredientData,
+	display_stats: Variant = null,
+	effect_entries: Array = []
+) -> void:
 	if slot_index < 0 or slot_index >= _slot_cards.size():
 		return
 	var card := _slot_cards[slot_index]
@@ -261,7 +251,6 @@ func _bind_slot(slot_index: int, ingredient: IngredientData, display_stats: Vari
 	if ingredient == null:
 		card.visible = false
 		card.clear_hand_card()
-		_clear_slot_effect_icons(slot_index)
 		return
 	if display_stats is Dictionary:
 		card.bind_hand_card(
@@ -269,10 +258,11 @@ func _bind_slot(slot_index: int, ingredient: IngredientData, display_stats: Vari
 			slot_index,
 			false,
 			int(display_stats.get("point_value", ingredient.point_value)),
-			int(display_stats.get("explosive_value", ingredient.explosive_value))
+			int(display_stats.get("explosive_value", ingredient.explosive_value)),
+			effect_entries
 		)
 	else:
-		card.bind_hand_card(ingredient, slot_index, false)
+		card.bind_hand_card(ingredient, slot_index, false, -1, -1, effect_entries)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.visible = not _suppressed_slots.has(slot_index)
 	_apply_slot_z_index(slot_index)
@@ -374,7 +364,6 @@ func _layout_slots() -> void:
 		var rest := Vector2(start_x + SLOT_OVERLAP * slot_index, SLOT_TOP_MARGIN)
 		anchor.position = rest
 		_anchor_rest_positions.append(rest)
-		_update_slot_effect_icon_position(slot_index)
 		_apply_slot_z_index(slot_index)
 
 
@@ -383,21 +372,13 @@ func _apply_slot_z_index(slot_index: int) -> void:
 		return
 	var card := _slot_cards[slot_index]
 	if card == null or not card.visible:
-		if slot_index < _slot_effect_icons.size():
-			var hidden_strip := _slot_effect_icons[slot_index]
-			if hidden_strip != null:
-				hidden_strip.z_index = slot_index
 		return
-	var card_z := slot_index
 	if _selected_slot == slot_index:
-		card_z = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index + 10
+		card.z_index = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index + 10
 	elif _hover_slot == slot_index:
-		card_z = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index
-	card.z_index = card_z
-	if slot_index < _slot_effect_icons.size():
-		var strip := _slot_effect_icons[slot_index]
-		if strip != null and strip.visible:
-			strip.z_index = card_z + 1
+		card.z_index = HAND_SLOT_COUNT + HOVER_Z_BOOST + slot_index
+	else:
+		card.z_index = slot_index
 
 
 func _update_hover_process() -> void:
@@ -442,7 +423,6 @@ func _update_hand_hover_states(delta: float) -> void:
 		if card == null or not card.visible:
 			continue
 		card.update_hand_hover(slot_index == _hover_slot, delta)
-		_update_slot_effect_icon_position(slot_index)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -679,54 +659,7 @@ func _apply_selection_visuals() -> void:
 		if card.has_method("set_hand_selected"):
 			card.set_hand_selected(slot_index == _selected_slot)
 		_apply_slot_z_index(slot_index)
-		_update_slot_effect_icon_position(slot_index)
 
 
 func _mouse_global_position() -> Vector2:
 	return get_global_mouse_position()
-
-
-func _bind_slot_effect_icons(slot_index: int, entries: Variant) -> void:
-	if slot_index < 0 or slot_index >= _slot_effect_icons.size():
-		return
-	var strip := _slot_effect_icons[slot_index]
-	if strip == null:
-		return
-	if entries is Array and not entries.is_empty():
-		strip.bind_entries(entries, _lookup_ingredient_for_effect_icon)
-		_update_slot_effect_icon_position(slot_index)
-	else:
-		strip.clear_icons()
-
-
-func _clear_slot_effect_icons(slot_index: int) -> void:
-	if slot_index < 0 or slot_index >= _slot_effect_icons.size():
-		return
-	var strip := _slot_effect_icons[slot_index]
-	if strip != null:
-		strip.clear_icons()
-
-
-func _update_slot_effect_icon_position(slot_index: int) -> void:
-	if slot_index < 0 or slot_index >= _slot_effect_icons.size():
-		return
-	var strip := _slot_effect_icons[slot_index]
-	if strip == null or not strip.visible:
-		return
-	var card := _slot_cards[slot_index] if slot_index < _slot_cards.size() else null
-	var hover_offset := 0.0
-	if card != null and card.visible and card.has_method("get_hand_effect_icon_y_offset"):
-		hover_offset = card.get_hand_effect_icon_y_offset()
-	var strip_size := strip.size
-	if strip_size == Vector2.ZERO:
-		strip_size = strip.custom_minimum_size
-	strip.position = Vector2(
-		(CARD_DISPLAY_SIZE.x - strip_size.x) * 0.5,
-		-strip_size.y - EFFECT_STRIP_GAP + hover_offset
-	)
-
-
-func _lookup_ingredient_for_effect_icon(ingredient_id: String) -> IngredientData:
-	if GameManager.run == null:
-		return null
-	return GameManager.run.find_ingredient(ingredient_id)

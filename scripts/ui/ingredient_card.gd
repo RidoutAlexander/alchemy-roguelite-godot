@@ -29,6 +29,7 @@ const HAND_HOVER_RISE := 28.0
 const SCALE_SPEED := 12.0
 const HAND_CARD_SCALE := 0.34
 const HAND_CARD_BASE_SIZE := Vector2(300.0, 420.0)
+const HAND_EFFECT_ICON_GAP := 2.0
 const _DEFAULT_STAT_COLOR := Color(0.05, 0.05, 0.05, 1)
 const _SCORE_UP_COLOR := Color(0.12, 0.62, 0.18, 1)
 const _SCORE_DOWN_COLOR := Color(0.82, 0.18, 0.14, 1)
@@ -51,6 +52,7 @@ const _MODIFIED_STAT_OUTLINE_SIZE := 4
 @onready var _cost_plate_bg: TextureRect = $VisualRoot/CostRow/CostPlateBackground
 @onready var _cost_icon: TextureRect = $VisualRoot/CostRow/Icon
 @onready var _cost_label: Label = $VisualRoot/CostRow/CostLabel
+@onready var _hand_effect_icons: HandSlotEffectIcons = $HandSlotEffectIcons
 
 var _name_plate_bg: TextureRect
 var _description_plate_bg: TextureRect
@@ -117,7 +119,8 @@ func bind_hand_card(
 	slot_index: int,
 	drag_enabled: bool,
 	display_point_value: int = -1,
-	display_explosive_value: int = -1
+	display_explosive_value: int = -1,
+	effect_entries: Array = []
 ) -> void:
 	_reset_mode_flags()
 	_hand_mode = true
@@ -137,6 +140,7 @@ func bind_hand_card(
 	else:
 		call_deferred("update_hand_stat_display", point_display, explosive_display)
 	_apply_hand_layout()
+	_bind_hand_effect_entries(effect_entries)
 	_sync_hand_input()
 
 
@@ -204,6 +208,7 @@ func clear_hand_card() -> void:
 	_base_point_value = 0
 	_base_explosive_value = 0
 	_reset_hand_stat_label_colors()
+	_clear_hand_effect_entries()
 	_reset_mode_flags()
 	_set_empty_state()
 
@@ -230,15 +235,6 @@ func get_hand_hit_rect() -> Rect2:
 	return hit_rect
 
 
-func get_hand_effect_icon_y_offset() -> float:
-	if not _hand_mode or _visual_root == null:
-		return 0.0
-	var visual_scale := _visual_root.scale.y
-	var rise := -_hand_hover_offset
-	var scale_lift := (visual_scale - 1.0) * HAND_CARD_BASE_SIZE.y
-	return -(rise + scale_lift) * HAND_CARD_SCALE
-
-
 func update_hand_hover(hovered: bool, delta: float) -> void:
 	if not _hand_mode or _visual_root == null:
 		return
@@ -248,6 +244,7 @@ func update_hand_hover(hovered: bool, delta: float) -> void:
 	_visual_root.scale = Vector2.ONE * next_scale
 	_hand_hover_offset = lerpf(_hand_hover_offset, target_rise, SCALE_SPEED * delta)
 	_visual_root.position.y = _hand_hover_offset
+	_update_hand_effect_icon_position()
 
 
 func _hand_target_scale(hovered: bool) -> float:
@@ -270,6 +267,7 @@ func _apply_hand_layout() -> void:
 		_hand_hover_offset = 0.0
 	scale = Vector2.ONE * HAND_CARD_SCALE
 	pivot_offset = Vector2(HAND_CARD_BASE_SIZE.x * 0.5, HAND_CARD_BASE_SIZE.y) * HAND_CARD_SCALE
+	_apply_hand_effect_layout()
 
 
 func _snap_hand_highlight(active: bool) -> void:
@@ -282,6 +280,54 @@ func _snap_hand_highlight(active: bool) -> void:
 		_visual_root.scale = Vector2.ONE
 		_hand_hover_offset = 0.0
 	_visual_root.position.y = _hand_hover_offset
+	_update_hand_effect_icon_position()
+
+
+func _bind_hand_effect_entries(entries: Array) -> void:
+	if _hand_effect_icons == null:
+		return
+	if entries.is_empty():
+		_hand_effect_icons.clear_icons()
+		return
+	_hand_effect_icons.bind_entries(entries, _lookup_effect_ingredient)
+	_update_hand_effect_icon_position()
+
+
+func _clear_hand_effect_entries() -> void:
+	if _hand_effect_icons != null:
+		_hand_effect_icons.clear_icons()
+
+
+func _apply_hand_effect_layout() -> void:
+	if _hand_effect_icons == null:
+		return
+	_hand_effect_icons.z_index = 1
+	_hand_effect_icons.scale = Vector2.ONE / HAND_CARD_SCALE
+	var strip_size := _hand_effect_icons.custom_minimum_size
+	if _hand_effect_icons.size != Vector2.ZERO:
+		strip_size = _hand_effect_icons.size
+	var scaled_strip_width := strip_size.x * _hand_effect_icons.scale.x
+	_hand_effect_icons.position.x = (HAND_CARD_BASE_SIZE.x - scaled_strip_width) * 0.5
+	_update_hand_effect_icon_position()
+
+
+func _hand_effect_icon_rest_y() -> float:
+	var strip_height := HandSlotEffectIcons.ICON_SIZE
+	return -(HAND_EFFECT_ICON_GAP + strip_height) / HAND_CARD_SCALE
+
+
+func _update_hand_effect_icon_position() -> void:
+	if _hand_effect_icons == null or not _hand_mode or not _hand_effect_icons.visible:
+		return
+	var visual_scale := _visual_root.scale.y if _visual_root != null else 1.0
+	var scale_lift := (visual_scale - 1.0) * HAND_CARD_BASE_SIZE.y
+	_hand_effect_icons.position.y = _hand_effect_icon_rest_y() + _hand_hover_offset + scale_lift
+
+
+func _lookup_effect_ingredient(ingredient_id: String) -> IngredientData:
+	if GameManager.run == null:
+		return null
+	return GameManager.run.find_ingredient(ingredient_id)
 
 
 func _sync_hand_input() -> void:
