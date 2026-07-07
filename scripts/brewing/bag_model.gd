@@ -146,6 +146,46 @@ func take_random(count: int) -> Array[IngredientData]:
 	return picked
 
 
+func count_drawable_excluding_instances(excluded_instances: Array) -> int:
+	var excluded: Dictionary = {}
+	for item in excluded_instances:
+		if item is IngredientData:
+			excluded[item] = true
+	var total := 0
+	for chip in _working_chips:
+		if chip != null and not excluded.has(chip):
+			total += 1
+	return total
+
+
+func take_random_excluding_instances(
+	excluded_instances: Array,
+	count: int
+) -> Array[IngredientData]:
+	var excluded: Dictionary = {}
+	for item in excluded_instances:
+		if item is IngredientData:
+			excluded[item] = true
+
+	var pool: Array[IngredientData] = []
+	for chip in _working_chips:
+		if chip != null and not excluded.has(chip):
+			pool.append(chip)
+
+	if pool.is_empty():
+		return []
+
+	var picked: Array[IngredientData] = []
+	var slots := mini(count, pool.size())
+	for _i in slots:
+		var index := randi_range(0, pool.size() - 1)
+		var chosen: IngredientData = pool[index]
+		pool.remove_at(index)
+		_remove_working_chip(chosen)
+		picked.append(chosen)
+	return picked
+
+
 func take_random_excluding_id(excluded_id: String, count: int = 1) -> Array[IngredientData]:
 	var pool: Array[IngredientData] = []
 	for chip in _working_chips:

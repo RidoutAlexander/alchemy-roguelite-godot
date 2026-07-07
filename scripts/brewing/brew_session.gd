@@ -64,6 +64,7 @@ var _eyeball_reserved: Array[IngredientData] = []
 var _eyeball_puzzle_active: bool = false
 var _bat_wing_choices: Array[IngredientData] = []
 var _bat_wing_picker_active: bool = false
+var _bat_wing_reroll_used: bool = false
 var _unicorn_cures_next_explosive: bool = false
 var _ice_cube_shields_remaining: int = 0
 var _parrot_doubles_next: bool = false
@@ -388,6 +389,36 @@ func get_bat_wing_choices() -> Array[IngredientData]:
 	return _bat_wing_choices.duplicate()
 
 
+func can_reroll_bat_wing_choices() -> bool:
+	if (
+		not _bat_wing_picker_active
+		or _bat_wing_reroll_used
+		or _bat_wing_choices.is_empty()
+		or context.bag == null
+	):
+		return false
+	if not TrinketEffects.has_jar_of_flies(context.owned_trinket_ids):
+		return false
+	return context.bag.remaining_count() >= IngredientEffects.BAT_WING_PICK_COUNT
+
+
+func try_reroll_bat_wing_choices() -> bool:
+	if not can_reroll_bat_wing_choices():
+		return false
+
+	var previous_choices := _bat_wing_choices.duplicate()
+	var rerolled := context.bag.take_random(IngredientEffects.BAT_WING_PICK_COUNT)
+	if rerolled.size() < IngredientEffects.BAT_WING_PICK_COUNT:
+		context.bag.return_to_bag(rerolled)
+		return false
+
+	context.bag.return_to_bag(previous_choices)
+	_bat_wing_choices = rerolled
+	_bat_wing_reroll_used = true
+	brew_updated.emit(context)
+	return true
+
+
 func is_frog_leg_save_pending() -> bool:
 	return _frog_leg_save_pending
 
@@ -490,6 +521,7 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 
 	_bat_wing_choices.clear()
 	_bat_wing_picker_active = false
+	_bat_wing_reroll_used = false
 	var parrot_doubled := _apply_ingredient(selected, true)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
@@ -1003,6 +1035,7 @@ func _apply_ingredient_play(
 		_growth_potion_doubles_remaining += effect.growth_potion_doubles
 	if effect.bat_wing_pick_count > 0:
 		_bat_wing_choices = context.bag.take_random(effect.bat_wing_pick_count)
+		_bat_wing_reroll_used = false
 	if effect.voodoo_doll_arms_copy:
 		_voodoo_doll_arms_copy = true
 	else:
@@ -1432,6 +1465,7 @@ func _reset_draw_flow_state() -> void:
 	_eyeball_puzzle_active = false
 	_bat_wing_choices.clear()
 	_bat_wing_picker_active = false
+	_bat_wing_reroll_used = false
 	_unicorn_cures_next_explosive = false
 	_ice_cube_shields_remaining = 0
 	_parrot_doubles_next = false

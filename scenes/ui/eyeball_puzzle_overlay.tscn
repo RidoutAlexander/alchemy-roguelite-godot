@@ -4,6 +4,7 @@
 [ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="2_font"]
 [ext_resource type="PackedScene" uid="uid://eyeballpuzzleslot" path="res://scenes/ui/eyeball_puzzle_slot.tscn" id="3_slot"]
 [ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="4_button"]
+[ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="5_reroll_button"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.06, 0.07, 0.12, 0.96)
@@ -94,6 +95,27 @@ slot_number = 2
 layout_mode = 2
 size_flags_horizontal = 4
 slot_number = 3
+
+[node name="RerollRow" type="HBoxContainer" parent="Layout/PanelOffset/Panel/Content"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="RerollButton" parent="Layout/PanelOffset/Panel/Content/RerollRow" instance=ExtResource("5_reroll_button")]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+mouse_filter = 0
+
+[node name="RerollLabel" type="Label" parent="Layout/PanelOffset/Panel/Content/RerollRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.9, 0.75, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 20
+text = "Reroll choices"
+vertical_alignment = 1
 
 [node name="DoneButton" parent="Layout/PanelOffset/Panel/Content" instance=ExtResource("4_button")]
 custom_minimum_size = Vector2(280, 72)

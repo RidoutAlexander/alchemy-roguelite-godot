@@ -12,6 +12,8 @@ enum Mode { PUZZLE, PREVIEW, PICKER }
 @onready var _hint_label: Label = $Layout/PanelOffset/Panel/Content/HintLabel
 @onready var _order_slots_row: HBoxContainer = $Layout/PanelOffset/Panel/Content/OrderSlotsRow
 @onready var _done_button: WoodenButton = $Layout/PanelOffset/Panel/Content/DoneButton
+@onready var _reroll_row: HBoxContainer = $Layout/PanelOffset/Panel/Content/RerollRow
+@onready var _reroll_button: ShopRerollButton = $Layout/PanelOffset/Panel/Content/RerollRow/RerollButton
 @onready var _drag_layer: Control = $DragLayer
 
 var _mode: Mode = Mode.PUZZLE
@@ -30,6 +32,11 @@ func _ready() -> void:
 			_done_button.pressed.connect(_on_done_pressed)
 		_done_button.custom_minimum_size = Vector2(280.0, 72.0)
 		_done_button.size = _done_button.custom_minimum_size
+		_done_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	if _reroll_button != null:
+		if not _reroll_button.pressed.is_connected(_on_reroll_pressed):
+			_reroll_button.pressed.connect(_on_reroll_pressed)
+		_reroll_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	_gather_slots()
 	set_process(false)
 	set_process_input(false)
@@ -115,6 +122,7 @@ func show_picker(ingredients: Array) -> void:
 	if _done_button != null:
 		_done_button.visible = true
 		_done_button.disabled = true
+	_refresh_reroll_button()
 
 
 func hide_puzzle() -> void:
@@ -123,6 +131,8 @@ func hide_puzzle() -> void:
 	_mode = Mode.PUZZLE
 	if _done_button != null:
 		_done_button.visible = true
+	if _reroll_row != null:
+		_reroll_row.visible = false
 	visible = false
 	_clear_cards()
 	_reset_slot_visibility()
@@ -234,6 +244,27 @@ func _update_done_button_state() -> void:
 	if _done_button == null or _mode != Mode.PICKER:
 		return
 	_done_button.disabled = _selected_picker_card == null
+
+
+func _refresh_reroll_button() -> void:
+	if _reroll_row == null:
+		return
+	var show_reroll := _mode == Mode.PICKER and GameManager.can_reroll_bat_wing_choices()
+	_reroll_row.visible = show_reroll
+	if _reroll_button != null:
+		_reroll_button.visible = show_reroll
+		_reroll_button.disabled = not show_reroll
+
+
+func _on_reroll_pressed() -> void:
+	if _mode != Mode.PICKER:
+		return
+	if not GameManager.try_reroll_bat_wing_choices():
+		if _reroll_button != null:
+			_reroll_button.shake()
+		return
+	var refreshed_choices := GameManager.run.brew_session.get_bat_wing_choices()
+	show_picker(refreshed_choices)
 
 
 func _on_puzzle_drag_began(card: IngredientCard) -> void:

@@ -277,11 +277,20 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 	_sync_hand_completion()
 
 
+func can_reroll_bat_wing_choices() -> bool:
+	if run == null:
+		return false
+	return run.brew_session.can_reroll_bat_wing_choices()
+
+
+func try_reroll_bat_wing_choices() -> bool:
+	if run == null:
+		return false
+	return run.brew_session.try_reroll_bat_wing_choices()
+
+
 func complete_frog_leg_save() -> void:
-	_presentation_in_progress = false
 	run.brew_session.complete_frog_leg_save()
-	_try_request_brew_completion()
-	call_deferred("_mark_presentation_idle")
 
 
 func try_end_brew() -> void:

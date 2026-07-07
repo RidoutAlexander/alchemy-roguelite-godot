@@ -4,6 +4,7 @@ extends RefCounted
 const PUMPKIN_TRINKET_ID := "pumpkin_trinket"
 const RED_MUSHROOM_TRINKET_ID := "red_mushroom_trinket"
 const RAT_TRINKET_ID := "rat_trinket"
+const JAR_OF_FLIES_ID := "jar_of_flies"
 
 const RED_MUSHROOM_BASE_MAX_PRE_DOUBLE_SCORE := 4
 const RED_MUSHROOM_TRINKET_MAX_PRE_DOUBLE_SCORE := 6
@@ -25,6 +26,10 @@ static func has_red_mushroom_trinket(trinket_ids: Array) -> bool:
 
 static func has_rat_trinket(trinket_ids: Array) -> bool:
 	return has_trinket(trinket_ids, RAT_TRINKET_ID)
+
+
+static func has_jar_of_flies(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, JAR_OF_FLIES_ID)
 
 
 static func pumpkin_trinket_bonus_score(
