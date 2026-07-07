@@ -389,6 +389,11 @@ func get_bat_wing_choices() -> Array[IngredientData]:
 	return _bat_wing_choices.duplicate()
 
 
+func sync_owned_trinkets(owned_trinket_ids: Array[String]) -> void:
+	context.owned_trinket_ids = owned_trinket_ids.duplicate()
+	brew_updated.emit(context)
+
+
 func can_reroll_bat_wing_choices() -> bool:
 	if (
 		not _bat_wing_picker_active

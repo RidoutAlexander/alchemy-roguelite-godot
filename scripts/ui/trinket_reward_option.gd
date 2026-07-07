@@ -12,6 +12,8 @@ const _ART_PATH_TEMPLATE := "res://assets/cards/trinkets/%s.png"
 
 var _trinket: TrinketData
 var _selectable := true
+var _dev_selected := false
+var _dev_owned := false
 
 
 func _ready() -> void:
@@ -36,7 +38,9 @@ func get_trinket() -> TrinketData:
 func bind(trinket: TrinketData) -> void:
 	_trinket = trinket
 	_selectable = true
-	modulate = Color.WHITE
+	_dev_selected = false
+	_dev_owned = false
+	_apply_dev_visual_state()
 	if trinket == null:
 		_clear()
 		return
@@ -54,6 +58,21 @@ func bind(trinket: TrinketData) -> void:
 
 func set_selectable(enabled: bool) -> void:
 	_selectable = enabled
+
+
+func set_dev_picker_state(selected: bool, owned: bool) -> void:
+	_dev_selected = selected
+	_dev_owned = owned
+	_apply_dev_visual_state()
+
+
+func _apply_dev_visual_state() -> void:
+	if _dev_selected:
+		modulate = Color(0.9, 1.05, 0.82, 1.0)
+	elif _dev_owned:
+		modulate = Color(0.72, 0.72, 0.72, 1.0)
+	else:
+		modulate = Color.WHITE
 
 
 func _clear() -> void:
@@ -75,6 +94,7 @@ func _on_gui_input(event: InputEvent) -> void:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT:
 			selected.emit(_trinket)
+			accept_event()
 
 
 func _load_art(trinket: TrinketData) -> Texture2D:

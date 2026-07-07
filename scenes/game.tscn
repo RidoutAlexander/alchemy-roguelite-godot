@@ -389,6 +389,12 @@ follow_viewport_enabled = true
 
 [node name="DevHandPickerOverlay" parent="DevHandPickerLayer" instance=ExtResource("21_cauldron_contents")]
 
+[node name="DevTrinketPickerLayer" type="CanvasLayer" parent="."]
+layer = 15
+follow_viewport_enabled = true
+
+[node name="DevTrinketPickerOverlay" parent="DevTrinketPickerLayer" instance=ExtResource("21_cauldron_contents")]
+
 [node name="ShopPanel" parent="PhaseSwipeHost" unique_id=1760442899 instance=ExtResource("4_shop")]
 visible = false
 layout_mode = 1

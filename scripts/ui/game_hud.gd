@@ -29,6 +29,7 @@ const BAG_REMAINING_COUNT_INSET := Vector2(0.0, 6.0)
 @onready var _save_and_quit_button: BaseButton = $PhaseSwipeHost/BrewPanel/SaveAndQuitButton
 @onready var _dev_mode_checkbox: CheckBox = $PhaseSwipeHost/BrewPanel/DevModeCheckbox
 @onready var _dev_hand_picker: BagContentsOverlay = $DevHandPickerLayer/DevHandPickerOverlay
+@onready var _dev_trinket_picker: BagContentsOverlay = $DevTrinketPickerLayer/DevTrinketPickerOverlay
 @onready var _main_menu_button: BaseButton = $GameOverPanel/MainMenuButton
 @onready var _gameplay_music_player: AudioStreamPlayer = $GameplayMusicPlayer
 
@@ -72,9 +73,17 @@ func _ready() -> void:
 			_on_dev_hand_picker_completed
 		):
 			_dev_hand_picker.dev_hand_picker_completed.connect(_on_dev_hand_picker_completed)
+	if _dev_trinket_picker != null:
+		if not _dev_trinket_picker.dev_trinket_picker_completed.is_connected(
+			_on_dev_trinket_picker_completed
+		):
+			_dev_trinket_picker.dev_trinket_picker_completed.connect(
+				_on_dev_trinket_picker_completed
+			)
 
 	GameManager.phase_changed.connect(_on_phase_changed)
 	GameManager.dev_hand_picker_requested.connect(_on_dev_hand_picker_requested)
+	GameManager.dev_trinket_picker_requested.connect(_on_dev_trinket_picker_requested)
 	GameManager.run_changed.connect(_on_run_changed)
 	GameManager.brew_updated.connect(func(_ctx): _refresh_brew())
 	GameManager.brew_stats_presented.connect(func(_ctx): _refresh_brew())
@@ -407,6 +416,36 @@ func _on_dev_hand_picker_requested() -> void:
 
 func _on_dev_hand_picker_completed(selection: Array) -> void:
 	GameManager.try_draw_dev_hand(selection)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not GameManager.is_dev_mode_enabled():
+		return
+	if not event is InputEventKey:
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	if key_event.keycode != KEY_T:
+		return
+	GameManager.request_dev_trinket_picker()
+	get_viewport().set_input_as_handled()
+
+
+func _on_dev_trinket_picker_requested() -> void:
+	_open_dev_trinket_picker()
+
+
+func _open_dev_trinket_picker() -> void:
+	if _dev_trinket_picker == null or _dev_trinket_picker.is_open():
+		return
+	if GameManager.run == null:
+		return
+	_dev_trinket_picker.show_dev_trinket_picker(GameManager.get_all_trinkets())
+
+
+func _on_dev_trinket_picker_completed(trinket_ids: Array) -> void:
+	GameManager.grant_dev_trinkets(trinket_ids)
 
 
 func _refresh_practice_restart_button() -> void:

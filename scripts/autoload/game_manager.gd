@@ -27,6 +27,7 @@ signal eyeball_puzzle_requested(reserved: Array)
 signal bat_wing_picker_requested(choices: Array)
 signal bag_display_changed
 signal dev_hand_picker_requested
+signal dev_trinket_picker_requested
 signal brew_resolved(resolution: Dictionary)
 signal game_over(comparison: Dictionary)
 signal presentation_idle
@@ -102,11 +103,37 @@ func get_all_ingredients() -> Array:
 	return _content.all_ingredients()
 
 
+func get_all_trinkets() -> Array:
+	return _content.all_trinkets()
+
+
 func grant_trinket(trinket_id: String) -> bool:
 	if not run.grant_trinket(trinket_id):
 		return false
+	_sync_brew_owned_trinkets()
 	run_changed.emit()
 	return true
+
+
+func grant_dev_trinkets(trinket_ids: Array) -> void:
+	if run == null:
+		return
+	for trinket_id in trinket_ids:
+		run.grant_trinket(str(trinket_id))
+	_sync_brew_owned_trinkets()
+	run_changed.emit()
+
+
+func request_dev_trinket_picker() -> void:
+	if not _dev_mode_enabled or run == null:
+		return
+	dev_trinket_picker_requested.emit()
+
+
+func _sync_brew_owned_trinkets() -> void:
+	if run == null or current_phase != GamePhase.Phase.BREWING:
+		return
+	run.brew_session.sync_owned_trinkets(run.owned_trinket_ids)
 
 
 func can_press_bag() -> bool:
