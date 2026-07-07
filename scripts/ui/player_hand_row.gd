@@ -101,7 +101,7 @@ func clear_selection() -> void:
 	_set_selected_slot(-1)
 
 
-func prepare_for_draw() -> void:
+func prepare_for_draw(persisted_slots: Array = []) -> void:
 	_interaction_enabled = false
 	_suppressed_slots.clear()
 	_stop_all_rhythm_shakes()
@@ -112,6 +112,11 @@ func prepare_for_draw() -> void:
 	for slot_index in HAND_SLOT_COUNT:
 		var card := _slot_cards[slot_index]
 		if card == null:
+			continue
+		var persisted_ingredient = null
+		if slot_index < persisted_slots.size():
+			persisted_ingredient = persisted_slots[slot_index]
+		if persisted_ingredient != null:
 			continue
 		card.visible = false
 		card.clear_hand_card()

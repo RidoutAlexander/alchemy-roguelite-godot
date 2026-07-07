@@ -150,7 +150,10 @@ func _on_hand_draw_batch_started(drawn: Array) -> void:
 	GameManager.set_presentation_in_progress(true)
 	if _player_hand != null:
 		_player_hand.visible = true
-		_player_hand.prepare_for_draw()
+		var persisted_slots: Array = []
+		if GameManager.run != null:
+			persisted_slots = GameManager.run.brew_session.get_hand_slots()
+		_player_hand.prepare_for_draw(persisted_slots)
 	_set_play_undo_visible(false)
 	_play_next_hand_draw_animation()
 
@@ -164,6 +167,10 @@ func _play_next_hand_draw_animation() -> void:
 
 	var ingredient: IngredientData = _pending_hand_draw[_pending_hand_draw_index]
 	var slot_index := _pending_hand_draw.size() - 1 - _pending_hand_draw_index
+	if GameManager.run != null:
+		var target_slots := GameManager.run.brew_session.get_pending_hand_draw_target_slots()
+		if _pending_hand_draw_index < target_slots.size():
+			slot_index = int(target_slots[_pending_hand_draw_index])
 	_play_hand_draw_fly(ingredient, slot_index)
 
 
@@ -972,6 +979,10 @@ func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool)
 			escaping_frog,
 			func() -> void:
 				GameManager.complete_frog_leg_save()
+				if track_for_exit:
+					_on_brew_exit_animation_finished()
+				GameManager.notify_card_presentation_finished()
+				_try_play_pending_brew_exit_effects()
 		)
 		return
 	if track_for_exit:

@@ -50,6 +50,7 @@ const CINNAMON_ID := "cinnamon"
 const SAGE_ID := "sage"
 const EYE_OF_ENDER_ID := "eye_of_ender"
 const LUCKY_COIN_ID := "lucky_coin"
+const HONEY_ID := "honey"
 
 const LIGHTNING_CHAIN_DRAWS := 3
 const RED_MUSHROOM_MAX_PRE_DOUBLE_SCORE := 4

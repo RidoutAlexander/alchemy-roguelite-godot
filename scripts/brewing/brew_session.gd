@@ -54,7 +54,9 @@ var _mulligan_allowance: int = 1
 var _mulligans_used: int = 0
 var _play_slot_cursor: int = 0
 var _pending_hand_draw: Array = []
+var _pending_hand_draw_target_slots: Array = []
 var _hand_draw_display_reserve: int = 0
+var _honey_skipped_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
 var _eyeball_reserved: Array[IngredientData] = []
@@ -441,9 +443,7 @@ func complete_frog_leg_save() -> void:
 	if not _frog_leg_save_pending:
 		return
 	_frog_leg_save_pending = false
-	_apply_end_of_brew_bonuses()
-	context.outcome = BrewOutcome.Outcome.BANKED
-	_finalize_brew()
+	enqueue_presented_stat_snapshot()
 	brew_updated.emit(context)
 
 
@@ -492,7 +492,9 @@ func try_draw_to_hand() -> bool:
 	if not can_press_bag():
 		return false
 
-	var draw_count := _next_hand_draw_count
+	var draw_count := mini(_next_hand_draw_count, _count_empty_hand_slots())
+	if draw_count <= 0:
+		return false
 	_next_hand_draw_count = HAND_DRAW_COUNT
 
 	var drawn: Array[IngredientData] = []
@@ -522,6 +524,7 @@ func try_draw_custom_hand_to_hand(ingredients: Array) -> bool:
 	if drawn.size() != HAND_DRAW_COUNT:
 		return false
 
+	_reset_hand_slots()
 	return _begin_hand_draw(drawn, 0)
 
 
@@ -535,8 +538,8 @@ func _begin_hand_draw(drawn: Array[IngredientData], bag_display_reserve: int) ->
 	_hand_swap_allowance = 1 + _compute_and_consume_hand_swap_bonus()
 	_hand_swaps_used = 0
 	_lucky_coin_in_current_hand = false
-	_reset_hand_slots()
 	_pending_hand_draw = drawn.duplicate()
+	_pending_hand_draw_target_slots = _compute_hand_draw_target_slots(drawn.size())
 	_hand_draw_display_reserve = bag_display_reserve
 	hand_draw_batch_started.emit(drawn)
 	brew_updated.emit(context)
@@ -548,10 +551,13 @@ func on_hand_draw_batch_finished() -> void:
 		return
 	_reset_hand_draw_display_reserve()
 	for i in _pending_hand_draw.size():
-		var slot_index := _pending_hand_draw.size() - 1 - i
-		if slot_index >= 0 and slot_index < HAND_SLOT_COUNT:
+		if i >= _pending_hand_draw_target_slots.size():
+			break
+		var slot_index: int = _pending_hand_draw_target_slots[i]
+		if _is_valid_hand_slot(slot_index):
 			_hand_slots[slot_index] = _pending_hand_draw[i]
 	_pending_hand_draw.clear()
+	_pending_hand_draw_target_slots.clear()
 	_hand_phase = HandPhase.HAND
 	_hand_swaps_used = 0
 	_note_lucky_coin_in_hand()
@@ -563,6 +569,7 @@ func try_play_hand() -> bool:
 		return false
 	_hand_phase = HandPhase.PLAYING
 	_hand_start_slots = _hand_slots.duplicate()
+	_honey_skipped_slots = _compute_honey_skipped_slots()
 	_play_slot_cursor = 0
 	_play_next_hand_card()
 	return true
@@ -705,8 +712,14 @@ func _try_boss_early_clear() -> bool:
 
 
 func _play_next_hand_card() -> void:
-	while _play_slot_cursor < HAND_SLOT_COUNT and _hand_slots[_play_slot_cursor] == null:
-		_play_slot_cursor += 1
+	while _play_slot_cursor < HAND_SLOT_COUNT:
+		if _honey_skipped_slots.has(_play_slot_cursor):
+			_play_slot_cursor += 1
+			continue
+		if _hand_slots[_play_slot_cursor] == null:
+			_play_slot_cursor += 1
+			continue
+		break
 
 	if _play_slot_cursor >= HAND_SLOT_COUNT:
 		_request_finish_hand_play()
@@ -761,10 +774,12 @@ func _finish_hand_play() -> void:
 	if context.explosiveness != explosiveness_before:
 		enqueue_presented_stat_snapshot()
 	_resolve_lucky_coin_hand_effect()
-	_reset_hand_slots()
+	_honey_skipped_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
 	_hand_phase = HandPhase.BAG
+	if not _hand_has_any_card():
+		_reset_hand_slots()
 	brew_updated.emit(context)
 
 
@@ -1301,6 +1316,43 @@ func _clear_presented_stat_snapshots() -> void:
 	_presented_stat_snapshots.clear()
 
 
+func get_pending_hand_draw_target_slots() -> Array:
+	return _pending_hand_draw_target_slots.duplicate()
+
+
+func _count_empty_hand_slots() -> int:
+	var count := 0
+	for slot in _hand_slots:
+		if slot == null:
+			count += 1
+	return count
+
+
+func _compute_hand_draw_target_slots(draw_count: int) -> Array:
+	var targets: Array = []
+	for slot_index in range(HAND_SLOT_COUNT - 1, -1, -1):
+		if _hand_slots[slot_index] != null:
+			continue
+		targets.append(slot_index)
+		if targets.size() >= draw_count:
+			break
+	return targets
+
+
+func _compute_honey_skipped_slots() -> Dictionary:
+	var skipped := {}
+	for slot_index in range(1, HAND_SLOT_COUNT):
+		if slot_index >= _hand_start_slots.size():
+			continue
+		var ingredient: IngredientData = _hand_start_slots[slot_index]
+		if ingredient == null or ingredient.id != IngredientEffects.HONEY_ID:
+			continue
+		var left_ingredient: IngredientData = _hand_start_slots[slot_index - 1]
+		if left_ingredient != null:
+			skipped[slot_index - 1] = true
+	return skipped
+
+
 func _reset_hand_slots() -> void:
 	_hand_slots.clear()
 	for _i in HAND_SLOT_COUNT:
@@ -1356,6 +1408,8 @@ func _reset_draw_flow_state() -> void:
 	_lucky_coin_in_current_hand = false
 	_play_slot_cursor = 0
 	_pending_hand_draw.clear()
+	_pending_hand_draw_target_slots.clear()
+	_honey_skipped_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0
 	_eyeball_reserved.clear()
