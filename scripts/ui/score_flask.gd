@@ -99,9 +99,7 @@ func _apply_fill_visuals(session: BrewSession, ctx: BrewContext) -> void:
 	_update_meniscus_spawner()
 
 	var should_complete := false
-	if is_boss:
-		should_complete = display_score >= ctx.threshold and _display_fill >= 0.985
-	else:
+	if not is_boss:
 		should_complete = display_score > 0
 	if should_complete != _is_complete:
 		_is_complete = should_complete
@@ -183,11 +181,18 @@ func _is_hand_phase_blocking_stop() -> bool:
 
 
 func _refresh_complete_presentation(is_boss: bool) -> void:
+	if is_boss:
+		if _complete_label != null:
+			_complete_label.visible = false
+		mouse_default_cursor_shape = Control.CURSOR_ARROW
+		_stop_pulse()
+		return
+
 	var show_cta := _is_complete and not _is_hand_phase_blocking_stop()
 	if _complete_label != null:
 		_complete_label.visible = show_cta
 		if show_cta:
-			_complete_label.text = "Complete Potion" if is_boss else "Stop Brewing"
+			_complete_label.text = "Stop Brewing"
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if show_cta else Control.CURSOR_ARROW
 	if show_cta:
 		if _pulse_tween == null or not _pulse_tween.is_valid():
@@ -224,6 +229,8 @@ func _stop_pulse() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if GameManager.run != null and GameManager.run.brew_session.context.is_boss_level():
+		return
 	if not _is_complete:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

@@ -24,7 +24,7 @@ func can_end_brew() -> bool:
 	if outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return false
 	if is_boss_level():
-		return score >= threshold
+		return false
 	return score > 0
 
 

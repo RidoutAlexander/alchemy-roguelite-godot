@@ -3,6 +3,7 @@ extends Control
 
 const _IngredientFlyUtil := preload("res://scripts/ui/ingredient_fly_util.gd")
 const _CauldronExplosionEffect := preload("res://scripts/effects/cauldron_explosion_effect.gd")
+const _BossVictoryConfettiEffect := preload("res://scripts/effects/boss_victory_confetti_effect.gd")
 const FLY_ART_SIZE := Vector2(96.0, 96.0)
 const POST_PLOP_EXPLOSION_DELAY := 0.2
 const BOILING_BASE_PITCH := 0.9
@@ -334,18 +335,34 @@ func _try_play_pending_brew_exit_effects() -> void:
 
 
 func _play_brew_exit_effects(outcome: int) -> void:
-	if outcome != BrewOutcome.Outcome.EXPLODED:
+	if outcome == BrewOutcome.Outcome.EXPLODED:
+		_brew_exit_animations_pending += 1
+		_play_cauldron_explosion()
+		var origin := _rupture_cauldron_then_explode()
+		_CauldronExplosionEffect.play(
+			_explosion_layer,
+			origin,
+			func() -> void:
+				_on_brew_exit_animation_finished()
+		)
 		return
+	if outcome == BrewOutcome.Outcome.CLEARED and _is_current_boss_victory():
+		_brew_exit_animations_pending += 1
+		_brew_ambience_suppressed = true
+		if _boiling_water_player != null and _boiling_water_player.playing:
+			_boiling_water_player.stop()
+		_BossVictoryConfettiEffect.play(
+			_explosion_layer,
+			func() -> void:
+				_on_brew_exit_animation_finished()
+		)
 
-	_brew_exit_animations_pending += 1
-	_play_cauldron_explosion()
-	var origin := _rupture_cauldron_then_explode()
-	_CauldronExplosionEffect.play(
-		_explosion_layer,
-		origin,
-		func() -> void:
-			_on_brew_exit_animation_finished()
-	)
+
+func _is_current_boss_victory() -> bool:
+	if GameManager.run == null:
+		return false
+	var ctx := GameManager.run.brew_session.context
+	return ctx != null and ctx.is_boss_level()
 
 
 func _rupture_cauldron_then_explode() -> Vector2:

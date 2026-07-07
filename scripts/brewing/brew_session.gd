@@ -638,6 +638,8 @@ func _continue_hand_play_resolution() -> void:
 		return
 	if _try_begin_parrot_repeat_play():
 		return
+	if _try_boss_early_clear():
+		return
 	_play_next_hand_card()
 
 
@@ -655,11 +657,29 @@ func try_end_brew() -> bool:
 	if not can_player_end_brew():
 		return false
 	_apply_end_of_brew_bonuses()
-	if context.is_boss_level():
-		context.outcome = BrewOutcome.Outcome.CLEARED
-	else:
-		context.outcome = BrewOutcome.Outcome.BANKED
+	context.outcome = BrewOutcome.Outcome.BANKED
 	_finalize_brew()
+	return true
+
+
+func _should_boss_early_clear() -> bool:
+	return (
+		context.is_boss_level()
+		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+		and not context.is_exploded()
+		and context.score >= context.threshold
+	)
+
+
+func _try_boss_early_clear() -> bool:
+	if not _should_boss_early_clear():
+		return false
+	_hand_end_effects_pending = false
+	_chain_draws_remaining = 0
+	_apply_end_of_brew_bonuses()
+	context.outcome = BrewOutcome.Outcome.CLEARED
+	_finalize_brew(false)
+	brew_updated.emit(context)
 	return true
 
 
@@ -1152,13 +1172,19 @@ func _resolve_bag_empty() -> void:
 	_finalize_brew()
 
 
-func _finalize_brew() -> void:
+func _finalize_brew(clear_hand: bool = true) -> void:
 	if _brew_finalized:
 		return
 	_brew_finalized = true
 	_clear_presented_stat_snapshots()
 	sync_presented_stats_from_context()
-	_reset_draw_flow_state()
+	if clear_hand:
+		_reset_draw_flow_state()
+	else:
+		_hand_end_effects_pending = false
+		_chain_draws_remaining = 0
+		_parrot_repeat_pending = false
+		_clear_parrot_repeat()
 	context.bag.reset_for_brew()
 	brew_updated.emit(context)
 
