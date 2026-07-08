@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="6_gold_icon"]
 [ext_resource type="Texture2D" uid="uid://dm5klarbtc5eh" path="res://assets/cards/ingredient_card_background.png" id="14_card_bg"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_slot_effect_icons.tscn" id="15_effect_icons"]
+[ext_resource type="Texture2D" path="res://assets/cards/trinkets/gecko_hand_overlay.png" id="16_gecko_hand"]
 
 [node name="IngredientCard" type="Button" unique_id=1373869819]
 custom_minimum_size = Vector2(300, 420)
@@ -316,6 +317,14 @@ theme_override_font_sizes/font_size = 42
 text = "5"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="GeckoHandOverlay" type="TextureRect" parent="."]
+visible = false
+z_index = 2
+mouse_filter = 2
+texture = ExtResource("16_gecko_hand")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="HandSlotEffectIcons" parent="." instance=ExtResource("15_effect_icons")]
 visible = false
