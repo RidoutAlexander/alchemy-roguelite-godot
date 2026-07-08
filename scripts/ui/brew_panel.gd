@@ -20,6 +20,8 @@ const HAND_ACTION_LABEL_SIZE := Vector2(88.0, 24.0)
 const HAND_ACTION_LABEL_GAP := 4.0
 const HAND_ACTION_GROUP_GAP := 8.0
 const HAND_ACTION_STACK_GAP := 12.0
+const BUY_BREW_MULLIGAN_COST_SIZE := Vector2(28.0, 24.0)
+const BUY_BREW_MULLIGAN_COST_FONT := 18
 
 @onready var _fly_layer: CanvasLayer = $DrawFlyLayer
 @onready var _explosion_layer: CanvasLayer = $ExplosionLayer
@@ -93,6 +95,10 @@ func _ready() -> void:
 	):
 		_buy_brew_mulligan_button.pressed.connect(_on_buy_brew_mulligan_pressed)
 	if _buy_brew_mulligan_cost != null:
+		_buy_brew_mulligan_cost.configure(
+			BUY_BREW_MULLIGAN_COST_SIZE,
+			BUY_BREW_MULLIGAN_COST_FONT
+		)
 		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 	if _player_hand != null:
 		_player_hand.swap_requested.connect(_on_hand_swap_requested)
@@ -515,6 +521,14 @@ func _sync_brew_ambience() -> void:
 		_boiling_water_player.play()
 
 
+func _reveal_gecko_stay_slot_if_needed() -> void:
+	if GameManager.run == null:
+		return
+	var gecko_stay := GameManager.run.brew_session.consume_gecko_stay_presentation()
+	if bool(gecko_stay.get("stayed", false)):
+		_sync_hand_ui()
+
+
 func _get_hand_display_stats_for_slot(slot_index: int, ingredient: IngredientData) -> Variant:
 	if GameManager.run == null or ingredient == null:
 		return null
@@ -557,7 +571,7 @@ func _sync_hand_ui() -> void:
 				drawing_slots,
 				false,
 				false,
-				session.get_in_rhythm_double_hand_slots(drawing_slots),
+				session.get_aura_preview_shake_hand_slots(drawing_slots),
 				drawing_stats,
 				drawing_effects
 			)
@@ -572,7 +586,7 @@ func _sync_hand_ui() -> void:
 			hand_slots,
 			can_interact,
 			can_interact,
-			session.get_in_rhythm_double_hand_slots(hand_slots),
+			session.get_aura_preview_shake_hand_slots(hand_slots),
 			hand_stats,
 			hand_effects
 		)
@@ -703,12 +717,16 @@ func _set_mulligan_visible(show_controls: bool) -> void:
 		_hand_mulligan_button.visible = show_controls
 	if _hand_mulligan_label != null:
 		_hand_mulligan_label.visible = show_controls
+	_set_buy_brew_mulligan_visible(show_controls and _can_afford_buy_brew_mulligan())
+
+
+func _set_buy_brew_mulligan_visible(show_buy: bool) -> void:
 	if _buy_brew_mulligan_button != null:
-		_buy_brew_mulligan_button.visible = show_controls
+		_buy_brew_mulligan_button.visible = show_buy
 	if _buy_brew_mulligan_label != null:
-		_buy_brew_mulligan_label.visible = show_controls
+		_buy_brew_mulligan_label.visible = show_buy
 	if _buy_brew_mulligan_cost != null:
-		_buy_brew_mulligan_cost.visible = show_controls
+		_buy_brew_mulligan_cost.visible = show_buy
 
 
 func _set_hand_action_buttons_visible(visible_buttons: bool) -> void:
@@ -733,9 +751,11 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 		_hand_mulligan_label.text = _format_mulligan_label(session.get_mulligans_remaining())
 	if _hand_mulligan_button != null:
 		_hand_mulligan_button.disabled = false
-	if _buy_brew_mulligan_button != null:
+	var show_buy := _hand_mulligan_button != null and _hand_mulligan_button.visible
+	_set_buy_brew_mulligan_visible(show_buy and _can_afford_buy_brew_mulligan())
+	if _buy_brew_mulligan_button != null and _buy_brew_mulligan_button.visible:
 		_buy_brew_mulligan_button.disabled = false
-	if _buy_brew_mulligan_cost != null:
+	if _buy_brew_mulligan_cost != null and _buy_brew_mulligan_cost.visible:
 		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 
 
@@ -779,10 +799,19 @@ func _align_mulligan_column(left: float, top: float) -> void:
 	_position_hand_action_control(left, top, _hand_mulligan_button, _hand_mulligan_label)
 
 
+func _can_afford_buy_brew_mulligan() -> bool:
+	if GameManager.run == null:
+		return false
+	if not GameManager.run.brew_session.can_purchase_mulligan():
+		return false
+	return GameManager.run.gold >= GameManager.run.get_brew_mulligan_cost()
+
+
 func _should_show_buy_brew_mulligan() -> bool:
 	return (
 		_buy_brew_mulligan_button != null
 		and _buy_brew_mulligan_button.visible
+		and _can_afford_buy_brew_mulligan()
 	)
 
 
@@ -803,7 +832,7 @@ func _align_buy_brew_mulligan_cost() -> void:
 	var button_rect := _buy_brew_mulligan_button.get_global_rect()
 	var cost_size := _buy_brew_mulligan_cost.size
 	_buy_brew_mulligan_cost.global_position = Vector2(
-		button_rect.position.x - cost_size.x + 6.0,
+		button_rect.position.x - cost_size.x + 4.0,
 		button_rect.position.y + (button_rect.size.y - cost_size.y) * 0.5
 	)
 
@@ -947,16 +976,48 @@ func _play_cauldron_fly_repeat(
 
 func _complete_card_fly_sequence(ingredient: IngredientData, track_for_exit: bool) -> void:
 	var granted := _consume_pending_bag_grant()
-	if granted == null:
-		_finish_with_optional_jar_break_poof(ingredient, track_for_exit)
+	if granted != null:
+		_play_bag_grant_from_cauldron(granted, ingredient, track_for_exit)
 		return
-	_play_bag_grant_from_cauldron(granted, ingredient, track_for_exit)
+	var bubbling_return := _consume_pending_bubbling_return()
+	if bubbling_return != null:
+		_play_bubbling_return_from_cauldron(bubbling_return, ingredient, track_for_exit)
+		return
+	_finish_with_optional_jar_break_poof(ingredient, track_for_exit)
 
 
 func _consume_pending_bag_grant() -> IngredientData:
 	if GameManager.run == null:
 		return null
 	return GameManager.run.brew_session.consume_last_bag_grant_ingredient()
+
+
+func _consume_pending_bubbling_return() -> IngredientData:
+	if GameManager.run == null:
+		return null
+	return GameManager.run.brew_session.consume_bubbling_brew_return_presentation()
+
+
+func _play_bubbling_return_from_cauldron(
+	returned: IngredientData,
+	source_ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	var fly_data := _cauldron_to_bag_fly_data(returned)
+	if fly_data.is_empty():
+		GameManager.notify_bag_display_changed()
+		_finish_with_optional_jar_break_poof(source_ingredient, track_for_exit)
+		return
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		fly_data["texture"],
+		fly_data["start_center"],
+		fly_data["target_center"],
+		fly_data["size"],
+		func() -> void:
+			GameManager.notify_bag_display_changed()
+			_finish_with_optional_jar_break_poof(source_ingredient, track_for_exit)
+	)
 
 
 func _play_bag_grant_from_cauldron(
@@ -1013,6 +1074,7 @@ func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> v
 
 
 func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
+	_reveal_gecko_stay_slot_if_needed()
 	if _pending_frog_escape != null:
 		var escaping_frog := _pending_frog_escape
 		_pending_frog_escape = null

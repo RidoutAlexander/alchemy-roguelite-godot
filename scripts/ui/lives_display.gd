@@ -22,7 +22,7 @@ extends Control
 		icon_spacing = value
 		_queue_editor_refresh()
 
-@export var max_lives_shown: int = GameConstants.STARTING_LIVES:
+@export var max_lives_shown: int = GameConstants.MAX_LIVES:
 	set(value):
 		max_lives_shown = value
 		_queue_editor_refresh()
@@ -39,6 +39,8 @@ extends Control
 
 var _icons_row: HBoxContainer
 var _current_lives: int = -1
+var _display_lives_override: int = -1
+var _bonus_life_tween: Tween
 
 
 func _enter_tree() -> void:
@@ -105,6 +107,8 @@ func _draw() -> void:
 func _on_run_changed() -> void:
 	if Engine.is_editor_hint():
 		return
+	if _display_lives_override >= 0:
+		return
 	if GameManager.run == null:
 		set_lives(0)
 		return
@@ -113,10 +117,53 @@ func _on_run_changed() -> void:
 
 func set_lives(count: int) -> void:
 	var clamped := clampi(count, 0, max_lives_shown)
-	if clamped == _current_lives:
+	if clamped == _current_lives and _display_lives_override < 0:
 		return
 	_current_lives = clamped
 	_refresh_icons(clamped)
+
+
+func play_bonus_life_gain(from_lives: int, to_lives: int, on_complete: Callable = Callable()) -> void:
+	if _bonus_life_tween != null and _bonus_life_tween.is_valid():
+		_bonus_life_tween.kill()
+
+	_display_lives_override = clampi(from_lives, 0, max_lives_shown)
+	_current_lives = -1
+	set_lives(_display_lives_override)
+
+	var icons := _life_icon_nodes()
+	var bonus_index := GameConstants.STARTING_LIVES
+	if bonus_index >= icons.size():
+		_finish_bonus_life_gain(to_lives, on_complete)
+		return
+
+	var bonus_icon := icons[bonus_index]
+	bonus_icon.visible = true
+	bonus_icon.texture = icon_texture
+	bonus_icon.custom_minimum_size = icon_size
+	bonus_icon.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	bonus_icon.scale = Vector2(0.35, 0.35)
+	_update_layout_width(_slots_to_show(to_lives))
+
+	_bonus_life_tween = create_tween()
+	_bonus_life_tween.set_parallel(true)
+	_bonus_life_tween.tween_property(bonus_icon, "modulate:a", 1.0, 0.22)
+	_bonus_life_tween.tween_property(bonus_icon, "scale", Vector2.ONE, 0.28).set_trans(
+		Tween.TRANS_BACK
+	).set_ease(Tween.EASE_OUT)
+	_bonus_life_tween.set_parallel(false)
+	_bonus_life_tween.tween_interval(0.08)
+	_bonus_life_tween.tween_callback(func() -> void:
+		_finish_bonus_life_gain(to_lives, on_complete)
+	)
+
+
+func _finish_bonus_life_gain(to_lives: int, on_complete: Callable) -> void:
+	_display_lives_override = -1
+	_current_lives = -1
+	set_lives(to_lives)
+	if on_complete.is_valid():
+		on_complete.call()
 
 
 func _life_icon_nodes() -> Array[TextureRect]:
@@ -129,18 +176,39 @@ func _life_icon_nodes() -> Array[TextureRect]:
 	return icons
 
 
+func _slots_to_show(remaining_lives: int) -> int:
+	return maxi(GameConstants.STARTING_LIVES, mini(remaining_lives, max_lives_shown))
+
+
+func _update_layout_width(slots_shown: int) -> void:
+	var width := (
+		float(slots_shown) * icon_size.x
+		+ float(maxi(0, slots_shown - 1)) * float(icon_spacing)
+	)
+	custom_minimum_size.x = width
+	size.x = width
+
+
 func _refresh_icons(remaining_lives: int) -> void:
 	if icon_texture == null or empty_icon_texture == null:
 		return
 
+	var slots_shown := _slots_to_show(remaining_lives)
+	_update_layout_width(slots_shown)
+
 	var icons := _life_icon_nodes()
 	for i in icons.size():
 		var icon := icons[i]
-		icon.visible = i < max_lives_shown
-		if not icon.visible:
+		var slot_visible := i < slots_shown
+		icon.visible = slot_visible
+		if not slot_visible:
+			icon.scale = Vector2.ONE
+			icon.modulate = Color.WHITE
 			continue
 		icon.texture = icon_texture if i < remaining_lives else empty_icon_texture
 		icon.custom_minimum_size = icon_size
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.scale = Vector2.ONE
+		icon.modulate = Color.WHITE

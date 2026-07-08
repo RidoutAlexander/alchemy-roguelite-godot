@@ -105,6 +105,8 @@ var last_presented_stat_deltas: Dictionary = {
 }
 var last_play_fly_count: int = 1
 var last_play_fairy_poof: bool = false
+var _pending_gecko_stay_slot: int = -1
+var _pending_bubbling_brew_return: IngredientData = null
 var _jar_of_dirt_broke_poof_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
 var _pending_time_turner_target_slots: Array = []
@@ -281,6 +283,31 @@ func get_in_rhythm_double_hand_slots(slots_override: Array = []) -> Array[int]:
 		context.current_aura,
 		HAND_SLOT_COUNT
 	)
+
+
+func get_bubbling_brew_hand_slots(slots_override: Array = []) -> Array[int]:
+	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
+		return []
+	return _AuraEffects.bubbling_brew_hand_slots(
+		_resolve_display_hand_slots(slots_override),
+		context.cauldron_contents.size(),
+		context.current_aura,
+		HAND_SLOT_COUNT
+	)
+
+
+func get_aura_preview_shake_hand_slots(slots_override: Array = []) -> Array[int]:
+	var shake_slots: Array[int] = []
+	shake_slots.append_array(get_in_rhythm_double_hand_slots(slots_override))
+	shake_slots.append_array(get_bubbling_brew_hand_slots(slots_override))
+	var unique: Dictionary = {}
+	for slot_index in shake_slots:
+		unique[int(slot_index)] = true
+	var merged: Array[int] = []
+	for slot_index in unique.keys():
+		merged.append(int(slot_index))
+	merged.sort()
+	return merged
 
 
 func get_hand_display_stats(slots_override: Array = []) -> Array:
@@ -486,6 +513,34 @@ func get_pocket_watch_countdown() -> int:
 		context.cauldron_contents.size(),
 		context.owned_trinket_ids
 	)
+
+
+func get_gecko_assistant_countdown() -> int:
+	return TrinketEffects.gecko_assistant_countdown(
+		context.cauldron_contents.size(),
+		context.owned_trinket_ids
+	)
+
+
+func consume_bubbling_brew_return_presentation() -> IngredientData:
+	var ingredient := _pending_bubbling_brew_return
+	_pending_bubbling_brew_return = null
+	return ingredient
+
+
+func consume_gecko_stay_presentation() -> Dictionary:
+	var slot_index := _pending_gecko_stay_slot
+	_pending_gecko_stay_slot = -1
+	if slot_index < 0 or not _is_valid_hand_slot(slot_index):
+		return {"stayed": false, "slot_index": -1}
+	var ingredient: IngredientData = _hand_slots[slot_index]
+	if ingredient == null:
+		return {"stayed": false, "slot_index": -1}
+	return {
+		"stayed": true,
+		"slot_index": slot_index,
+		"ingredient": ingredient,
+	}
 
 
 func get_chain_draws_remaining() -> int:
@@ -927,10 +982,22 @@ func _play_next_hand_card() -> void:
 
 	var ingredient: IngredientData = _hand_slots[_play_slot_cursor]
 	var slot_index := _play_slot_cursor
+	var stays_in_hand := TrinketEffects.gecko_assistant_stays_in_hand(
+		context.cauldron_contents.size(),
+		context.owned_trinket_ids
+	)
 	_hand_slots[_play_slot_cursor] = null
 	_play_slot_cursor += 1
 
 	var parrot_doubled := _apply_ingredient(ingredient, true, true, slot_index)
+	if (
+		stays_in_hand
+		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+		and not last_play_fairy_poof
+		and _pending_bubbling_brew_return != ingredient
+	):
+		_hand_slots[slot_index] = ingredient
+		_pending_gecko_stay_slot = slot_index
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
@@ -1280,6 +1347,26 @@ func _apply_ingredient_play(
 
 	if from_hand_play and hand_slot_index >= 0:
 		_last_hand_play_slot = hand_slot_index
+
+	_try_bubbling_brew_return(ingredient, cauldron_count_before)
+
+
+func _try_bubbling_brew_return(
+	ingredient: IngredientData,
+	cauldron_count_before: int
+) -> void:
+	if ingredient == null:
+		return
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		return
+	if not _AuraEffects.bubbling_brew_returns_ingredient(
+		cauldron_count_before,
+		context.current_aura
+	):
+		return
+	_remove_from_cauldron(ingredient)
+	context.bag.return_to_bag([ingredient])
+	_pending_bubbling_brew_return = ingredient
 
 
 func _consume_pending_cobbler_bonus(
@@ -1780,6 +1867,8 @@ func _reset_draw_flow_state() -> void:
 	_frog_leg_save_pending = false
 	_fairy_vanish_next_ingredient = false
 	_jar_of_dirt_broke_poof_pending = false
+	_pending_bubbling_brew_return = null
+	_pending_gecko_stay_slot = -1
 	_pending_time_turner_new_hand.clear()
 	_pending_time_turner_target_slots.clear()
 	_frog_legs_played_this_brew.clear()

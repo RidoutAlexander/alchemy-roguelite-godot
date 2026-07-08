@@ -313,10 +313,17 @@ static func _cobbler_bonus_target_slot(
 	last_hand_slot: int,
 	hand_slots: Array
 ) -> int:
+	if ingredient == null or previous == null:
+		return play_slot
 	if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
-		if last_hand_slot >= 0 and is_boom_berry_id(hand_slots[last_hand_slot].id):
-			return last_hand_slot
-		return _hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+		if last_hand_slot >= 0 and last_hand_slot < hand_slots.size():
+			var last_ingredient: IngredientData = hand_slots[last_hand_slot]
+			if last_ingredient != null and is_boom_berry_id(last_ingredient.id):
+				return last_hand_slot
+		var left_slot := _hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+		if left_slot >= 0:
+			return left_slot
+		return play_slot
 	return play_slot
 
 

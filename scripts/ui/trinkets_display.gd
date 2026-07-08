@@ -157,7 +157,7 @@ func _on_icon_activated(
 
 
 func _countdown_text_for(trinket: TrinketData) -> String:
-	if trinket == null or trinket.id != TrinketEffects.POCKET_WATCH_ID:
+	if trinket == null:
 		return ""
 	if GameManager.run == null:
 		return ""
@@ -166,7 +166,13 @@ func _countdown_text_for(trinket: TrinketData) -> String:
 	var session := GameManager.run.brew_session
 	if session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return ""
-	var countdown := session.get_pocket_watch_countdown()
+	var countdown := 0
+	if trinket.id == TrinketEffects.POCKET_WATCH_ID:
+		countdown = session.get_pocket_watch_countdown()
+	elif trinket.id == TrinketEffects.GECKO_ASSISTANT_ID:
+		countdown = session.get_gecko_assistant_countdown()
+	else:
+		return ""
 	if countdown <= 0:
 		return ""
 	return str(countdown)

@@ -10,8 +10,12 @@ const TIME_TURNER_ID := "time_turner"
 const JAR_OF_FROGLEGS_ID := "jar_of_froglegs"
 const VOODOO_DOLL_TRINKET_ID := "voodoo_doll_trinket"
 const PRISTINE_FEATHER_ID := "pristine_feather"
+const BEATING_HEART_ID := "beating_heart"
+const BEATING_HEART_BOOM_BERRY_ID := "boom_berry_3"
+const GECKO_ASSISTANT_ID := "gecko_assistant"
 
 const POCKET_WATCH_INTERVAL := 21
+const GECKO_ASSISTANT_INTERVAL := 9
 const VOODOO_DOLL_TRINKET_SHOP_COST := 6
 
 const RED_MUSHROOM_BASE_MAX_PRE_DOUBLE_SCORE := 4
@@ -59,6 +63,24 @@ static func has_voodoo_doll_trinket(trinket_ids: Array) -> bool:
 
 static func has_pristine_feather(trinket_ids: Array) -> bool:
 	return has_trinket(trinket_ids, PRISTINE_FEATHER_ID)
+
+
+static func has_beating_heart(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, BEATING_HEART_ID)
+
+
+static func has_gecko_assistant(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, GECKO_ASSISTANT_ID)
+
+
+static func apply_acquire_effects(trinket_id: String, run: RunManager) -> void:
+	if run == null:
+		return
+	if trinket_id == BEATING_HEART_ID:
+		run.lives = mini(GameConstants.MAX_LIVES, run.lives + 1)
+		var boom_berry := run.find_ingredient(BEATING_HEART_BOOM_BERRY_ID)
+		if boom_berry != null:
+			run.bag.add_to_master_bag(boom_berry)
 
 
 static func feather_plays_twice(ingredient: IngredientData, trinket_ids: Array) -> bool:
@@ -110,6 +132,25 @@ static func pocket_watch_countdown(cauldron_count: int, trinket_ids: Array) -> i
 	if remainder == 0:
 		return POCKET_WATCH_INTERVAL
 	return POCKET_WATCH_INTERVAL - remainder
+
+
+static func gecko_assistant_stays_in_hand(
+	cauldron_count_before_add: int,
+	trinket_ids: Array
+) -> bool:
+	if not has_gecko_assistant(trinket_ids):
+		return false
+	var count_after := cauldron_count_before_add + 1
+	return count_after % GECKO_ASSISTANT_INTERVAL == 0
+
+
+static func gecko_assistant_countdown(cauldron_count: int, trinket_ids: Array) -> int:
+	if not has_gecko_assistant(trinket_ids):
+		return 0
+	var remainder := cauldron_count % GECKO_ASSISTANT_INTERVAL
+	if remainder == 0:
+		return GECKO_ASSISTANT_INTERVAL
+	return GECKO_ASSISTANT_INTERVAL - remainder
 
 
 static func pumpkin_trinket_bonus_score(

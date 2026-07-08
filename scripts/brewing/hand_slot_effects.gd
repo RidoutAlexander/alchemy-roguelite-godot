@@ -23,6 +23,13 @@ static func compute_entries(
 		cauldron_count_before_hand,
 		owned_trinket_ids
 	)
+	_append_gecko_assistant_entries(
+		per_slot,
+		hand_slots,
+		hand_slot_count,
+		cauldron_count_before_hand,
+		owned_trinket_ids
+	)
 	_append_pristine_feather_entries(per_slot, hand_slots, owned_trinket_ids)
 	return per_slot
 
@@ -73,6 +80,34 @@ static func _append_pocket_watch_entries(
 				per_slot[play_slot].append(
 					{
 						"trinket_id": TrinketEffects.POCKET_WATCH_ID,
+						"overlay_text": "",
+					}
+				)
+		cauldron_count += 1
+
+
+static func _append_gecko_assistant_entries(
+	per_slot: Array,
+	hand_slots: Array,
+	hand_slot_count: int,
+	cauldron_count_before_hand: int,
+	owned_trinket_ids: Array
+) -> void:
+	if not TrinketEffects.has_gecko_assistant(owned_trinket_ids):
+		return
+
+	var play_order: Array[int] = []
+	for slot_index in range(hand_slots.size()):
+		if hand_slots[slot_index] != null:
+			play_order.append(slot_index)
+
+	var cauldron_count := cauldron_count_before_hand
+	for play_slot in play_order:
+		if TrinketEffects.gecko_assistant_stays_in_hand(cauldron_count, owned_trinket_ids):
+			if play_slot >= 0 and play_slot < per_slot.size():
+				per_slot[play_slot].append(
+					{
+						"trinket_id": TrinketEffects.GECKO_ASSISTANT_ID,
 						"overlay_text": "",
 					}
 				)

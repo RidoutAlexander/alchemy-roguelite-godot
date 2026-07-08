@@ -50,8 +50,8 @@
     "description": "Gain a life and add a 3 Boomberry to your bag"
   },
   {
-    "id": "gecko_feet",
-    "display_name": "Gecko Feet",
-    "description": "Every 11 ingredients stays in your hand"
+    "id": "gecko_assistant",
+    "display_name": "Gecko Assistant",
+    "description": "Every 9th ingredient stays in your hand"
   }
 ]

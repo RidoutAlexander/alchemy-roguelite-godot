@@ -3,7 +3,7 @@ class_name GameConstants
 const BREW_VIEWPORT_SIZE := Vector2i(1024, 576)
 const BREW_WINDOW_SIZE := Vector2i(2048, 1152)
 const STARTING_LIVES := 3
-const MAX_LIVES := 3
+const MAX_LIVES := 4
 const LIFE_LOSS_GOLD_GRANT := 10
 const DEFAULT_EXPLOSION_LIMIT := 8
 const SHOP_SLOT_COUNT := 4
@@ -16,6 +16,7 @@ const MIN_BOSS_THRESHOLD := 1
 const BOSS_AURA_WARNING := "You must complete the potion this round."
 const PRACTICE_BREW_AURA_ID := "practice brew"
 const IN_RHYTHM_AURA_ID := "in_rhythm"
+const BUBBLING_BREW_AURA_ID := "bubbling_brew"
 const THRESHOLD_START := 5
 const THRESHOLD_STEP_BASE := 3
 const EASY_THRESHOLD_STEP := 2

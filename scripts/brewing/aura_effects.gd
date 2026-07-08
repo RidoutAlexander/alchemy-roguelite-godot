@@ -41,3 +41,42 @@ static func in_rhythm_double_hand_slots(
 			doubled_slots.append(slot_index)
 		cauldron_count += 1
 	return doubled_slots
+
+
+static func bubbling_brew_returns_ingredient(
+	cauldron_count_before_add: int,
+	aura: AuraData
+) -> bool:
+	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
+		return false
+	var count_after := cauldron_count_before_add + 1
+	return count_after % 3 == 0
+
+
+static func bubbling_brew_countdown(cauldron_count: int, aura: AuraData) -> int:
+	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
+		return 0
+	var remainder := cauldron_count % 3
+	if remainder == 0:
+		return 3
+	return 3 - remainder
+
+
+static func bubbling_brew_hand_slots(
+	hand_slots: Array,
+	cauldron_count_before_hand: int,
+	aura: AuraData,
+	hand_slot_count: int = 5
+) -> Array[int]:
+	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
+		return []
+
+	var bubbling_slots: Array[int] = []
+	var cauldron_count := cauldron_count_before_hand
+	for slot_index in hand_slot_count:
+		if slot_index >= hand_slots.size() or hand_slots[slot_index] == null:
+			continue
+		if bubbling_brew_returns_ingredient(cauldron_count, aura):
+			bubbling_slots.append(slot_index)
+		cauldron_count += 1
+	return bubbling_slots

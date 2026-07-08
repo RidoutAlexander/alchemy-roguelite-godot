@@ -31,3 +31,16 @@ func set_cost(amount: int) -> void:
 	cost = amount
 	if _label != null:
 		_label.text = str(maxi(0, amount))
+
+
+func configure(new_icon_size: Vector2, new_font_size: int = -1) -> void:
+	icon_size = new_icon_size
+	custom_minimum_size = new_icon_size
+	size = new_icon_size
+	if _icon != null:
+		_icon.custom_minimum_size = new_icon_size
+		_icon.size = new_icon_size
+	if new_font_size > 0:
+		font_size = new_font_size
+		if _label != null:
+			_label.add_theme_font_size_override("font_size", font_size)

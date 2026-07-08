@@ -21,6 +21,7 @@ var pending_level_advance: bool = false
 var free_shop_rerolls: int = 0
 var pending_extra_mulligans: int = 0
 var owned_trinket_ids: Array[String] = []
+
 var bag := BagModel.new()
 var brew_session: BrewSession
 
@@ -63,6 +64,14 @@ func grant_trinket(trinket_id: String) -> bool:
 	if has_trinket(normalized):
 		return false
 	owned_trinket_ids.append(normalized)
+	return true
+
+
+func acquire_trinket(trinket_id: String) -> bool:
+	var normalized := _normalize_trinket_id(trinket_id)
+	if not grant_trinket(normalized):
+		return false
+	TrinketEffects.apply_acquire_effects(normalized, self)
 	return true
 
 
@@ -422,7 +431,7 @@ func try_select_trinket_reward(trinket_id: String) -> bool:
 		return false
 	if normalized not in pending_trinket_reward_ids:
 		return false
-	if not grant_trinket(normalized):
+	if not acquire_trinket(normalized):
 		return false
 	pending_trinket_reward_ids.clear()
 	return true

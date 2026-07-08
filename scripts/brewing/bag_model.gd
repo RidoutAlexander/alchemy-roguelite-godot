@@ -238,8 +238,11 @@ func _remove_working_chip(chip: IngredientData) -> void:
 
 func return_to_bag(ingredients: Array) -> void:
 	for ingredient in ingredients:
-		if ingredient != null:
-			_working_chips.append(ingredient)
+		if ingredient == null:
+			continue
+		if _working_chips.has(ingredient):
+			continue
+		_working_chips.append(ingredient)
 
 
 func remove_instances(ingredients: Array) -> void:

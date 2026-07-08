@@ -244,7 +244,10 @@ func _play_phase_swipe(phase: int) -> void:
 
 func _apply_phase_visibility(phase: int) -> void:
 	if _brew_panel:
-		_brew_panel.visible = phase == GamePhase.Phase.BREWING
+		_brew_panel.visible = (
+			phase == GamePhase.Phase.BREWING
+			or phase == GamePhase.Phase.TRINKET_REWARD
+		)
 	if _shop_panel:
 		_shop_panel.visible = phase == GamePhase.Phase.SHOP
 	if _game_over_panel:
@@ -320,11 +323,16 @@ func _align_bag_remaining_count_label() -> void:
 
 
 func _should_shake_rhythm_aura(ctx: BrewContext) -> bool:
-	if ctx.current_aura == null or ctx.current_aura.id != GameConstants.IN_RHYTHM_AURA_ID:
+	if ctx.current_aura == null:
 		return false
 	if ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return false
-	return ctx.cauldron_contents.size() % 3 == 2
+	if ctx.cauldron_contents.size() % 3 != 2:
+		return false
+	return (
+		ctx.current_aura.id == GameConstants.IN_RHYTHM_AURA_ID
+		or ctx.current_aura.id == GameConstants.BUBBLING_BREW_AURA_ID
+	)
 
 
 func _refresh_rhythm_aura_shake(ctx: BrewContext) -> void:

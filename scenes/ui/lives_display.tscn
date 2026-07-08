@@ -5,9 +5,9 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/lives_icon_empty.png" id="3_lives_icon_empty"]
 
 [node name="LivesDisplay" type="Control"]
-custom_minimum_size = Vector2(168, 52)
+custom_minimum_size = Vector2(162, 52)
 layout_mode = 0
-offset_right = 168.0
+offset_right = 162.0
 offset_bottom = 52.0
 mouse_filter = 0
 script = ExtResource("1_script")
@@ -44,6 +44,14 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="LifeIcon2" type="TextureRect" parent="IconsRow"]
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("2_lives_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LifeIcon3" type="TextureRect" parent="IconsRow"]
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
 mouse_filter = 2

@@ -125,9 +125,10 @@ func _trinket_has_art(trinket: TrinketData) -> bool:
 
 
 func grant_trinket(trinket_id: String) -> bool:
-	if not run.grant_trinket(trinket_id):
+	if not run.acquire_trinket(trinket_id):
 		return false
 	_sync_brew_owned_trinkets()
+	notify_bag_display_changed()
 	run_changed.emit()
 	return true
 
@@ -136,8 +137,9 @@ func grant_dev_trinkets(trinket_ids: Array) -> void:
 	if run == null:
 		return
 	for trinket_id in trinket_ids:
-		run.grant_trinket(str(trinket_id))
+		run.acquire_trinket(str(trinket_id))
 	_sync_brew_owned_trinkets()
+	notify_bag_display_changed()
 	run_changed.emit()
 
 
@@ -521,10 +523,19 @@ func complete_trinket_reward(trinket_id: String) -> bool:
 		return false
 	if not run.try_select_trinket_reward(trinket_id):
 		return false
+	_sync_brew_owned_trinkets()
+	if trinket_id != TrinketEffects.BEATING_HEART_ID:
+		finalize_trinket_reward_to_shop()
+	return true
+
+
+func finalize_trinket_reward_to_shop() -> void:
+	if current_phase != GamePhase.Phase.TRINKET_REWARD:
+		return
+	notify_bag_display_changed()
 	run_changed.emit()
 	_save_at_shop()
 	_set_phase(GamePhase.Phase.SHOP)
-	return true
 
 
 func _end_run() -> void:

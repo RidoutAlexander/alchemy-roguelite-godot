@@ -35,6 +35,29 @@ func get_trinket() -> TrinketData:
 	return _trinket
 
 
+func get_icon_global_center() -> Vector2:
+	if _icon != null and _icon.visible:
+		return _icon.get_global_rect().get_center()
+	return get_global_rect().get_center()
+
+
+func get_icon_texture() -> Texture2D:
+	if _icon != null and _icon.texture != null:
+		return _icon.texture
+	return null
+
+
+func hide_for_poof() -> void:
+	if _icon != null:
+		_icon.visible = false
+	if _fallback != null:
+		_fallback.visible = false
+	if _name_label != null:
+		_name_label.visible = false
+	if _description_label != null:
+		_description_label.visible = false
+
+
 func bind(trinket: TrinketData) -> void:
 	_trinket = trinket
 	_selectable = true
