@@ -32,6 +32,10 @@ func create_bag_chip_from_save(chip_data: Dictionary) -> IngredientData:
 	var chip := template.duplicate_for_bag()
 	if chip_data.has("jarUses"):
 		chip.jar_of_dirt_uses_remaining = maxi(0, int(chip_data.get("jarUses", 0)))
+	if chip_data.has("fairyUses"):
+		chip.fairy_uses_remaining = maxi(0, int(chip_data.get("fairyUses", 0)))
+	if chip_data.has("emptyCageUses"):
+		chip.empty_cage_uses_remaining = maxi(0, int(chip_data.get("emptyCageUses", 0)))
 	return chip
 
 

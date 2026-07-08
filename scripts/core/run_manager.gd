@@ -185,6 +185,19 @@ func load_from_save(data: Dictionary) -> void:
 		offer.price = int(offer_data.get("price", ingredient.shop_cost))
 		_apply_shop_offer_modifiers(offer)
 		current_shop_offers.append(offer)
+	_sanitize_shop_offers()
+
+
+func _sanitize_shop_offers() -> void:
+	for slot_index in current_shop_offers.size():
+		var offer = current_shop_offers[slot_index]
+		if offer == null or offer.ingredient == null:
+			continue
+		if (
+			offer.ingredient.is_legendary()
+			and bag.has_master_ingredient(offer.ingredient.id)
+		):
+			current_shop_offers[slot_index] = null
 
 
 func _apply_shop_offer_modifiers(offer) -> void:
@@ -302,7 +315,8 @@ func prepare_shop_for_current_level() -> void:
 		current_level,
 		gold,
 		GameConstants.SHOP_SLOT_COUNT,
-		owned_trinket_ids
+		owned_trinket_ids,
+		bag
 	)
 
 
@@ -349,7 +363,8 @@ func try_reroll_shop() -> bool:
 		current_level,
 		gold,
 		GameConstants.SHOP_SLOT_COUNT,
-		owned_trinket_ids
+		owned_trinket_ids,
+		bag
 	)
 	return true
 
@@ -470,6 +485,8 @@ func _build_unowned_trinket_pool() -> Array[String]:
 		if normalized == "" or seen.has(normalized) or has_trinket(normalized):
 			continue
 		if find_trinket(normalized) == null:
+			continue
+		if not trinket.reward_offerable:
 			continue
 		seen[normalized] = true
 		pool.append(normalized)

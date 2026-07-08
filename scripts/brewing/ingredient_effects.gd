@@ -32,6 +32,9 @@ const STIRRING_SPOON_ID := "stirring_spoon"
 const JUGGLING_CLUB_ID := "juggling_club"
 const FISH_BONES_ID := "fish_bones"
 const FAIRY_IN_A_CAGE_ID := "fairy_in_a_cage"
+const FAIRY_IN_A_CAGE_MAX_USES := 5
+const EMPTY_CAGE_ID := "empty_cage"
+const EMPTY_CAGE_MAX_USES := 3
 const BOOBERRY_ID := "booberry"
 const CHICKEN_ID := "chicken"
 const POISON_APPLE_ID := "poison_apple"
@@ -183,7 +186,7 @@ static func apply(
 			result.score_penalty = 1
 			result.bonus_gold = 2
 		FAIRY_IN_A_CAGE_ID:
-			result.vanish_next_ingredient = true
+			pass
 		POISON_APPLE_ID:
 			result.poison_apple_delay_scheduled = true
 		GROWTH_POTION_ID:
@@ -235,10 +238,24 @@ static func is_pumpkin_ingredient(ingredient: IngredientData) -> bool:
 static func card_display_description(ingredient: IngredientData) -> String:
 	if ingredient == null:
 		return ""
-	if ingredient.id != JAR_OF_DIRT_ID:
+	var uses_left := uses_remaining_for_card(ingredient)
+	if uses_left < 0:
 		return ingredient.description
-	var uses_left := jar_of_dirt_uses_remaining(ingredient)
 	return "%s\n%d uses left" % [ingredient.description, uses_left]
+
+
+static func uses_remaining_for_card(ingredient: IngredientData) -> int:
+	if ingredient == null:
+		return -1
+	match ingredient.id:
+		JAR_OF_DIRT_ID:
+			return jar_of_dirt_uses_remaining(ingredient)
+		FAIRY_IN_A_CAGE_ID:
+			return fairy_uses_remaining(ingredient)
+		EMPTY_CAGE_ID:
+			return empty_cage_uses_remaining(ingredient)
+		_:
+			return -1
 
 
 static func jar_of_dirt_uses_remaining(ingredient: IngredientData) -> int:
@@ -247,6 +264,22 @@ static func jar_of_dirt_uses_remaining(ingredient: IngredientData) -> int:
 	if ingredient.jar_of_dirt_uses_remaining >= 0:
 		return ingredient.jar_of_dirt_uses_remaining
 	return JAR_OF_DIRT_MAX_USES
+
+
+static func fairy_uses_remaining(ingredient: IngredientData) -> int:
+	if ingredient == null or ingredient.id != FAIRY_IN_A_CAGE_ID:
+		return 0
+	if ingredient.fairy_uses_remaining >= 0:
+		return ingredient.fairy_uses_remaining
+	return FAIRY_IN_A_CAGE_MAX_USES
+
+
+static func empty_cage_uses_remaining(ingredient: IngredientData) -> int:
+	if ingredient == null or ingredient.id != EMPTY_CAGE_ID:
+		return 0
+	if ingredient.empty_cage_uses_remaining >= 0:
+		return ingredient.empty_cage_uses_remaining
+	return EMPTY_CAGE_MAX_USES
 
 
 static func explosion_limit_bonus_for_played_ingredient(

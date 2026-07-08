@@ -105,7 +105,8 @@ static func _parse_trinket(row: Dictionary) -> TrinketData:
 		trinket_id,
 		display_name,
 		str(row.get("description", "")),
-		str(row.get("art", "")).strip_edges()
+		str(row.get("art", "")).strip_edges(),
+		bool(row.get("reward_offerable", true))
 	)
 
 

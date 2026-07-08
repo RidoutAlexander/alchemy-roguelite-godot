@@ -23,7 +23,11 @@ func has_master_ingredient(ingredient_id: String) -> bool:
 
 
 func can_add_to_master_bag(ingredient: IngredientData) -> bool:
-	return ingredient != null
+	if ingredient == null:
+		return false
+	if ingredient.is_legendary() and has_master_ingredient(ingredient.id):
+		return false
+	return true
 
 
 func add_to_master_bag(ingredient: IngredientData) -> bool:
@@ -105,6 +109,10 @@ func get_master_chip_save_data() -> Array:
 		var entry := {"id": chip.id}
 		if chip.jar_of_dirt_uses_remaining >= 0:
 			entry["jarUses"] = chip.jar_of_dirt_uses_remaining
+		if chip.fairy_uses_remaining >= 0:
+			entry["fairyUses"] = chip.fairy_uses_remaining
+		if chip.empty_cage_uses_remaining >= 0:
+			entry["emptyCageUses"] = chip.empty_cage_uses_remaining
 		chips.append(entry)
 	return chips
 
@@ -356,5 +364,15 @@ func _inventory_stack_key(chip: IngredientData) -> String:
 		return "%s:%d" % [
 			chip.id,
 			IngredientEffects.jar_of_dirt_uses_remaining(chip),
+		]
+	if chip.id == IngredientEffects.FAIRY_IN_A_CAGE_ID:
+		return "%s:%d" % [
+			chip.id,
+			IngredientEffects.fairy_uses_remaining(chip),
+		]
+	if chip.id == IngredientEffects.EMPTY_CAGE_ID:
+		return "%s:%d" % [
+			chip.id,
+			IngredientEffects.empty_cage_uses_remaining(chip),
 		]
 	return chip.id

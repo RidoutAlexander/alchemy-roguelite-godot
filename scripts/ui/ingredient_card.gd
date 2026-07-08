@@ -100,10 +100,14 @@ var _hand_press_position: Vector2 = Vector2.INF
 var _is_animating: bool = false
 var _base_point_value: int = 0
 var _base_explosive_value: int = 0
+var _external_icon_strip: bool = false
 
 
 func _ready() -> void:
 	_cache_optional_nodes()
+	if _visual_root != null:
+		_visual_root.clip_contents = false
+	clip_contents = false
 	_scene_art_locked = _art_texture != null and _art_texture.texture != null
 
 	flat = true
@@ -112,12 +116,18 @@ func _ready() -> void:
 	_make_button_transparent()
 	_apply_optional_art_overrides()
 	_sync_ingredient_art_visibility()
-	_set_empty_state()
 	resized.connect(_on_resized)
 	gui_input.connect(_on_gui_input)
 	_ignore_visual_mouse_input(_visual_root)
 	_update_hover_pivot()
 	set_process(false)
+	call_deferred("_finish_ready")
+
+
+func _finish_ready() -> void:
+	if _has_offer:
+		return
+	_set_empty_state()
 
 
 func _cache_optional_nodes() -> void:
@@ -130,6 +140,50 @@ func _cache_optional_nodes() -> void:
 
 func get_ingredient() -> IngredientData:
 	return _ingredient
+
+
+func set_external_icon_strip(enabled: bool) -> void:
+	_external_icon_strip = enabled
+	if enabled and _hand_effect_icons != null:
+		_hand_effect_icons.clear_icons()
+		_hand_effect_icons.visible = false
+
+
+func get_hand_icon_strip_anchor_y() -> float:
+	if not _hand_mode:
+		return 0.0
+	return (
+		_hand_effect_scroll_top_y() * HAND_CARD_SCALE
+		- HAND_EFFECT_ICON_GAP
+		- HandSlotEffectIcons.ICON_SIZE
+		- HAND_EFFECT_ICON_CLEARANCE
+	)
+
+
+static func partition_effect_entries(entries: Array) -> Dictionary:
+	var icon_entries: Array = []
+	var has_gecko := false
+	var has_honey := false
+	var has_unicorn_sparkle := false
+	for entry in entries:
+		if not entry is Dictionary:
+			continue
+		if str(entry.get("trinket_id", "")) == _TrinketEffects.GECKO_ASSISTANT_ID:
+			has_gecko = true
+			continue
+		if str(entry.get("ingredient_id", "")) == _IngredientEffects.HONEY_ID:
+			has_honey = true
+			continue
+		if str(entry.get("ingredient_id", "")) == _IngredientEffects.UNICORN_HORN_ID:
+			has_unicorn_sparkle = true
+			continue
+		icon_entries.append(entry)
+	return {
+		"icon_entries": icon_entries,
+		"has_gecko": has_gecko,
+		"has_honey": has_honey,
+		"has_unicorn_sparkle": has_unicorn_sparkle,
+	}
 
 
 func bind_hand_card(
@@ -268,7 +322,8 @@ func update_hand_hover(hovered: bool, delta: float) -> void:
 	_hand_hover_offset = lerpf(_hand_hover_offset, target_rise, SCALE_SPEED * delta)
 	_visual_root.position.y = _hand_hover_offset
 	_sync_hand_visual_z_order(hovered or _hand_selected)
-	_update_hand_effect_icon_position()
+	if not _external_icon_strip:
+		_update_hand_effect_icon_position()
 
 
 func _hand_target_scale(hovered: bool) -> float:
@@ -309,45 +364,28 @@ func _snap_hand_highlight(active: bool) -> void:
 		_hand_hover_offset = 0.0
 	_visual_root.position.y = _hand_hover_offset
 	_sync_hand_visual_z_order(active)
-	_update_hand_effect_icon_position()
+	if not _external_icon_strip:
+		_update_hand_effect_icon_position()
 
 
 func _partition_effect_entries(entries: Array) -> Dictionary:
-	var icon_entries: Array = []
-	var has_gecko := false
-	var has_honey := false
-	var has_unicorn_sparkle := false
-	for entry in entries:
-		if not entry is Dictionary:
-			continue
-		if str(entry.get("trinket_id", "")) == _TrinketEffects.GECKO_ASSISTANT_ID:
-			has_gecko = true
-			continue
-		if str(entry.get("ingredient_id", "")) == _IngredientEffects.HONEY_ID:
-			has_honey = true
-			continue
-		if str(entry.get("ingredient_id", "")) == _IngredientEffects.UNICORN_HORN_ID:
-			has_unicorn_sparkle = true
-			continue
-		icon_entries.append(entry)
-	return {
-		"icon_entries": icon_entries,
-		"has_gecko": has_gecko,
-		"has_honey": has_honey,
-		"has_unicorn_sparkle": has_unicorn_sparkle,
-	}
+	return partition_effect_entries(entries)
 
 
 func _bind_hand_effect_entries(entries: Array) -> void:
 	if not _hand_mode or not is_node_ready():
 		return
-	var partitioned := _partition_effect_entries(entries)
+	var partitioned := partition_effect_entries(entries)
 	_set_gecko_hand_overlay_visible(partitioned.get("has_gecko", false))
 	_set_honey_splatter_overlay_visible(partitioned.get("has_honey", false))
 	_set_unicorn_sparkle_visible(partitioned.get("has_unicorn_sparkle", false))
-	_bind_effect_icon_entries(partitioned.get("icon_entries", []))
-	_apply_hand_effect_layout()
-	_update_hand_effect_icon_position()
+	if _external_icon_strip:
+		if _hand_effect_icons != null:
+			_hand_effect_icons.clear_icons()
+			_hand_effect_icons.visible = false
+	else:
+		_bind_effect_icon_entries(partitioned.get("icon_entries", []))
+		_apply_hand_effect_layout()
 
 
 func _bind_effect_icon_entries(icon_entries: Array) -> void:
@@ -366,10 +404,11 @@ func _clear_hand_effect_entries() -> void:
 	_set_unicorn_sparkle_visible(false)
 	if _hand_effect_icons != null:
 		_hand_effect_icons.clear_icons()
+		_hand_effect_icons.visible = false
 
 
 func _apply_hand_effect_layout() -> void:
-	if _hand_effect_icons == null:
+	if _hand_effect_icons == null or _external_icon_strip:
 		return
 	_hand_effect_icons.z_index = 1
 	_hand_effect_icons.scale = Vector2.ONE / HAND_CARD_SCALE
@@ -521,6 +560,7 @@ func _sync_hand_input() -> void:
 
 
 func _reset_mode_flags() -> void:
+	_external_icon_strip = false
 	_puzzle_drag_enabled = false
 	_hand_mode = false
 	_hand_drag_enabled = false

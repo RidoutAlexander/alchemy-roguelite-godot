@@ -16,14 +16,15 @@ func generate_offers(
 	_level: int,
 	gold: int,
 	slot_count: int = GameConstants.SHOP_SLOT_COUNT,
-	owned_trinket_ids: Array = []
+	owned_trinket_ids: Array = [],
+	bag: BagModel = null
 ) -> Array:
 	var offers: Array = []
 	offers.resize(slot_count)
 	for slot_index in slot_count:
 		offers[slot_index] = null
 
-	var affordable := _affordable_ingredients(gold, owned_trinket_ids)
+	var affordable := _affordable_ingredients(gold, owned_trinket_ids, bag)
 	if affordable.is_empty():
 		return offers
 
@@ -51,10 +52,20 @@ func _excluding_offered(candidates: Array, offered_ids: Dictionary) -> Array:
 	return available
 
 
-func _affordable_ingredients(gold: int, owned_trinket_ids: Array) -> Array:
+func _affordable_ingredients(
+	gold: int,
+	owned_trinket_ids: Array,
+	bag: BagModel = null
+) -> Array:
 	var affordable: Array = []
 	for ingredient in _content.all_ingredients():
 		if ingredient == null or not ingredient.shop_available:
+			continue
+		if (
+			bag != null
+			and ingredient.is_legendary()
+			and bag.has_master_ingredient(ingredient.id)
+		):
 			continue
 		if TrinketEffects.shop_price_for_ingredient(ingredient, owned_trinket_ids) > gold:
 			continue

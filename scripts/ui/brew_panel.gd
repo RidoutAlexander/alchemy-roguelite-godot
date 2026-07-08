@@ -45,6 +45,7 @@ const BUY_BREW_MULLIGAN_COST_FONT := 18
 @onready var _buy_brew_mulligan_cost: ShopButtonCostOverlay = $BuyBrewMulliganCost
 @onready var _gold_counter: GoldDisplay = $GoldCounter
 @onready var _eyeball_puzzle: EyeballPuzzleOverlay = $"../../EyeballPuzzleOverlay"
+@onready var _trinkets_display: TrinketsDisplay = $TrinketsDisplay
 
 var _brew_exit_animations_pending: int = 0
 var _pending_frog_escape: IngredientData = null
@@ -172,6 +173,7 @@ func _on_hand_draw_batch_started(drawn: Array) -> void:
 		if GameManager.run != null:
 			persisted_slots = GameManager.run.brew_session.get_hand_slots()
 		_player_hand.prepare_for_draw(persisted_slots)
+		_prime_hand_draw_effect_entries()
 	_set_play_undo_visible(false)
 	_play_next_hand_draw_animation()
 
@@ -215,14 +217,41 @@ func _play_hand_draw_fly(ingredient: IngredientData, slot_index: int) -> void:
 
 
 func _on_hand_draw_landed(ingredient: IngredientData, slot_index: int) -> void:
-	if _player_hand != null:
-		_player_hand.reveal_slot(
-			slot_index,
-			ingredient,
-			_get_hand_display_stats_for_slot(slot_index, ingredient)
-		)
+	_refresh_visible_hand_slots_after_change(slot_index, ingredient)
 	_pending_hand_draw_index += 1
 	_play_next_hand_draw_animation()
+
+
+func _refresh_visible_hand_slots_after_change(
+	changed_slot_index: int,
+	changed_ingredient: IngredientData
+) -> void:
+	if _player_hand == null or GameManager.run == null or changed_ingredient == null:
+		return
+	var slots := _hand_slots_for_effect_preview(changed_slot_index, changed_ingredient)
+	var session := GameManager.run.brew_session
+	var display_stats := session.get_hand_display_stats(slots)
+	var slot_effects := session.get_hand_slot_effect_entries(slots)
+	_player_hand.cache_slot_effect_entries(slot_effects)
+	for slot_index in BrewSession.HAND_SLOT_COUNT:
+		if slot_index >= slots.size() or slots[slot_index] == null:
+			continue
+		var stats = (
+			display_stats[slot_index]
+			if slot_index < display_stats.size()
+			else null
+		)
+		var effects = (
+			slot_effects[slot_index]
+			if slot_index < slot_effects.size()
+			else []
+		)
+		_player_hand.reveal_slot(
+			slot_index,
+			slots[slot_index],
+			stats,
+			effects
+		)
 
 
 func _on_hand_card_played(
@@ -240,10 +269,6 @@ func _on_hand_card_played(
 		_player_hand.hide_slot_for_fly(slot_index)
 	var brew_ended := _ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
 	var session := GameManager.run.brew_session
-	if session.last_play_fairy_poof:
-		session.last_play_fairy_poof = false
-		_play_fairy_poof_hand(ingredient, slot_index, brew_ended)
-		return
 	var fly_count := session.last_play_fly_count
 	_play_hand_card_fly(ingredient, slot_index, brew_ended, fly_count)
 
@@ -259,10 +284,6 @@ func _on_ingredient_drawn(
 	GameManager.set_presentation_in_progress(true)
 	var brew_ended := ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS
 	var session := GameManager.run.brew_session
-	if session.last_play_fairy_poof:
-		session.last_play_fairy_poof = false
-		_play_fairy_poof_draw(ingredient, brew_ended)
-		return
 	var fly_count := session.last_play_fly_count
 	_play_cauldron_fly(ingredient, brew_ended, fly_count)
 
@@ -541,15 +562,51 @@ func _get_hand_display_stats_for_slot(slot_index: int, ingredient: IngredientDat
 	if GameManager.run == null or ingredient == null:
 		return null
 	var session := GameManager.run.brew_session
-	var slots := session.get_hand_slots()
-	while slots.size() < BrewSession.HAND_SLOT_COUNT:
-		slots.append(null)
-	if slot_index >= 0 and slot_index < slots.size():
-		slots[slot_index] = ingredient
+	var slots := _hand_slots_for_effect_preview(slot_index, ingredient)
 	var display_stats := session.get_hand_display_stats(slots)
 	if slot_index >= 0 and slot_index < display_stats.size():
 		return display_stats[slot_index]
 	return null
+
+
+func _hand_slots_for_effect_preview(
+	slot_index: int,
+	ingredient: IngredientData = null
+) -> Array:
+	var slots: Array = []
+	if GameManager.run != null:
+		slots = GameManager.run.brew_session.get_hand_slots().duplicate()
+	while slots.size() < BrewSession.HAND_SLOT_COUNT:
+		slots.append(null)
+	if _player_hand != null:
+		var visible_slots := _player_hand.get_current_hand_slots()
+		for i in visible_slots.size():
+			if i < slots.size() and visible_slots[i] != null:
+				slots[i] = visible_slots[i]
+	if ingredient != null and slot_index >= 0 and slot_index < slots.size():
+		slots[slot_index] = ingredient
+	return slots
+
+
+func _get_hand_effect_entries_for_slot(
+	slot_index: int,
+	ingredient: IngredientData = null
+) -> Array:
+	if GameManager.run == null:
+		return []
+	var slots := _hand_slots_for_effect_preview(slot_index, ingredient)
+	var all_effects := GameManager.run.brew_session.get_hand_slot_effect_entries(slots)
+	if slot_index >= 0 and slot_index < all_effects.size():
+		return all_effects[slot_index]
+	return []
+
+
+func _prime_hand_draw_effect_entries() -> void:
+	if _player_hand == null or GameManager.run == null:
+		return
+	var slots := _hand_slots_for_effect_preview(-1)
+	var effects := GameManager.run.brew_session.get_hand_slot_effect_entries(slots)
+	_player_hand.cache_slot_effect_entries(effects)
 
 
 func _sync_hand_ui() -> void:
@@ -898,54 +955,6 @@ func _play_cauldron_plop() -> void:
 	_cauldron_plop_player.play()
 
 
-func _play_fairy_poof_hand(
-	ingredient: IngredientData,
-	slot_index: int,
-	track_for_exit: bool
-) -> void:
-	var fly_data := _hand_play_fly_data_for(ingredient, slot_index)
-	_play_fairy_poof_with_data(fly_data, ingredient, track_for_exit)
-
-
-func _play_fairy_poof_draw(ingredient: IngredientData, track_for_exit: bool) -> void:
-	var fly_data := _bag_to_cauldron_fly_data(ingredient)
-	if not fly_data.is_empty():
-		fly_data["target_center"] = fly_data["start_center"]
-	_play_fairy_poof_with_data(fly_data, ingredient, track_for_exit)
-
-
-func _play_fairy_poof_with_data(
-	fly_data: Dictionary,
-	ingredient: IngredientData,
-	track_for_exit: bool
-) -> void:
-	if track_for_exit:
-		_brew_exit_animations_pending += 1
-
-	if fly_data.is_empty():
-		_present_card_stats_after_play(
-			ingredient,
-			track_for_exit,
-			func() -> void:
-				_finish_card_presentation(ingredient, track_for_exit)
-		)
-		return
-
-	_IngredientFlyUtil.play_poof(
-		_fly_layer,
-		fly_data.get("texture"),
-		fly_data["start_center"],
-		fly_data.get("size", FLY_ART_SIZE),
-		func() -> void:
-			_present_card_stats_after_play(
-				ingredient,
-				track_for_exit,
-				func() -> void:
-					_finish_card_presentation(ingredient, track_for_exit)
-			)
-	)
-
-
 func _play_hand_card_fly(
 	ingredient: IngredientData,
 	slot_index: int,
@@ -1098,18 +1107,61 @@ func _finish_with_optional_jar_break_poof(
 	track_for_exit: bool
 ) -> void:
 	if GameManager.run == null:
-		_finish_card_presentation(source_ingredient, track_for_exit)
+		_finish_with_optional_fairy_escape_poof(source_ingredient, track_for_exit)
 		return
 	if not GameManager.run.brew_session.consume_jar_of_dirt_broke_poof():
+		_finish_with_optional_fairy_escape_poof(source_ingredient, track_for_exit)
+		return
+	_play_cauldron_contact_poof(
+		_load_ingredient_texture(source_ingredient),
+		source_ingredient,
+		track_for_exit,
+		func() -> void:
+			_finish_with_optional_fairy_escape_poof(source_ingredient, track_for_exit)
+	)
+
+
+func _finish_with_optional_fairy_escape_poof(
+	source_ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	if GameManager.run == null:
+		_finish_with_optional_empty_cage_recapture(source_ingredient, track_for_exit)
+		return
+	if not GameManager.run.brew_session.consume_fairy_escaped_poof():
+		_finish_with_optional_empty_cage_recapture(source_ingredient, track_for_exit)
+		return
+	_play_cauldron_contact_poof(
+		_load_ingredient_texture(source_ingredient),
+		source_ingredient,
+		track_for_exit,
+		func() -> void:
+			_play_fairy_escape_to_trinket(source_ingredient, track_for_exit)
+	)
+
+
+func _finish_with_optional_empty_cage_recapture(
+	source_ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	if GameManager.run == null:
 		_finish_card_presentation(source_ingredient, track_for_exit)
 		return
-	_play_jar_break_poof(source_ingredient, track_for_exit)
+	if not GameManager.run.brew_session.consume_empty_cage_recapture_pending():
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	_play_empty_cage_recapture(source_ingredient, track_for_exit)
 
 
-func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> void:
-	var texture := _load_ingredient_texture(ingredient)
+func _play_cauldron_contact_poof(
+	texture: Texture2D,
+	ingredient: IngredientData,
+	track_for_exit: bool,
+	on_complete: Callable
+) -> void:
 	if texture == null or _cauldron_target == null:
-		_finish_card_presentation(ingredient, track_for_exit)
+		if on_complete.is_valid():
+			on_complete.call()
 		return
 	if track_for_exit:
 		_brew_exit_animations_pending += 1
@@ -1123,9 +1175,88 @@ func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> v
 				ingredient,
 				track_for_exit,
 				func() -> void:
-					_finish_card_presentation(ingredient, track_for_exit)
+					if on_complete.is_valid():
+						on_complete.call()
 			)
 	)
+
+
+func _play_fairy_escape_to_trinket(source_ingredient: IngredientData, track_for_exit: bool) -> void:
+	var texture := _load_trinket_texture(TrinketEffects.VENGEFUL_FAIRY_ID)
+	var start_center := _get_cauldron_effect_origin()
+	var target_center := start_center
+	if _trinkets_display != null:
+		target_center = _trinkets_display.get_next_slot_global_center()
+	if texture == null:
+		_apply_fairy_escape_rewards(source_ingredient, track_for_exit)
+		return
+	if track_for_exit:
+		_brew_exit_animations_pending += 1
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		texture,
+		start_center,
+		target_center,
+		FLY_ART_SIZE,
+		func() -> void:
+			_apply_fairy_escape_rewards(source_ingredient, track_for_exit),
+		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
+	)
+
+
+func _apply_fairy_escape_rewards(source_ingredient: IngredientData, track_for_exit: bool) -> void:
+	if GameManager.run == null:
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	GameManager.run.brew_session.complete_fairy_escape_sequence(GameManager.run)
+	GameManager.run_changed.emit()
+	var granted := _consume_pending_bag_grant()
+	if granted != null:
+		_play_bag_grant_from_cauldron(granted, source_ingredient, track_for_exit)
+		return
+	_finish_card_presentation(source_ingredient, track_for_exit)
+
+
+func _play_empty_cage_recapture(source_ingredient: IngredientData, track_for_exit: bool) -> void:
+	var start_center := Vector2.ZERO
+	if _trinkets_display != null:
+		start_center = _trinkets_display.get_trinket_global_center(
+			TrinketEffects.VENGEFUL_FAIRY_ID
+		)
+	if start_center == Vector2.ZERO and _trinkets_display != null:
+		start_center = _trinkets_display.get_next_slot_global_center()
+	var texture := _load_trinket_texture(TrinketEffects.VENGEFUL_FAIRY_ID)
+	if texture == null:
+		texture = _load_ingredient_texture(source_ingredient)
+	var bag_target := _bag_anchor.get_global_rect().get_center() if _bag_anchor != null else Vector2.ZERO
+	if texture == null or bag_target == Vector2.ZERO:
+		_apply_empty_cage_recapture_reward(source_ingredient, track_for_exit)
+		return
+	if track_for_exit:
+		_brew_exit_animations_pending += 1
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		texture,
+		start_center,
+		bag_target,
+		FLY_ART_SIZE,
+		func() -> void:
+			_apply_empty_cage_recapture_reward(source_ingredient, track_for_exit),
+		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
+	)
+
+
+func _apply_empty_cage_recapture_reward(source_ingredient: IngredientData, track_for_exit: bool) -> void:
+	if GameManager.run == null:
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	var granted := GameManager.run.brew_session.complete_empty_cage_recapture(GameManager.run)
+	GameManager.run_changed.emit()
+	GameManager.notify_bag_display_changed()
+	if granted != null:
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	_finish_card_presentation(source_ingredient, track_for_exit)
 
 
 func _present_card_stats_after_play(
@@ -1532,12 +1663,7 @@ func _play_time_turner_draw_in(new_hand: Array, draw_index: int) -> void:
 
 	var draw_fly := _hand_draw_fly_data_for(ingredient, slot_index)
 	if draw_fly.is_empty():
-		if _player_hand != null:
-			_player_hand.reveal_slot(
-				slot_index,
-				ingredient,
-				_get_hand_display_stats_for_slot(slot_index, ingredient)
-			)
+		_refresh_visible_hand_slots_after_change(slot_index, ingredient)
 		_play_time_turner_draw_in(new_hand, draw_index + 1)
 		return
 
@@ -1549,12 +1675,7 @@ func _play_time_turner_draw_in(new_hand: Array, draw_index: int) -> void:
 		draw_fly["target_center"],
 		draw_fly["size"],
 		func() -> void:
-			if _player_hand != null:
-				_player_hand.reveal_slot(
-					slot_index,
-					ingredient,
-					_get_hand_display_stats_for_slot(slot_index, ingredient)
-				)
+			_refresh_visible_hand_slots_after_change(slot_index, ingredient)
 			_play_time_turner_draw_in(new_hand, draw_index + 1)
 	)
 
@@ -1597,12 +1718,7 @@ func _play_mulligan_draw_in(new_ingredient: IngredientData, slot_index: int) -> 
 
 	var draw_fly := _hand_draw_fly_data_for(new_ingredient, slot_index)
 	if draw_fly.is_empty():
-		if _player_hand != null:
-			_player_hand.reveal_slot(
-				slot_index,
-				new_ingredient,
-				_get_hand_display_stats_for_slot(slot_index, new_ingredient)
-			)
+		_refresh_visible_hand_slots_after_change(slot_index, new_ingredient)
 		GameManager.notify_mulligan_presentation_finished()
 		_sync_hand_ui()
 		return
@@ -1614,12 +1730,7 @@ func _play_mulligan_draw_in(new_ingredient: IngredientData, slot_index: int) -> 
 		draw_fly["target_center"],
 		draw_fly["size"],
 		func() -> void:
-			if _player_hand != null:
-				_player_hand.reveal_slot(
-					slot_index,
-					new_ingredient,
-					_get_hand_display_stats_for_slot(slot_index, new_ingredient)
-				)
+			_refresh_visible_hand_slots_after_change(slot_index, new_ingredient)
 			GameManager.notify_mulligan_presentation_finished()
 			_sync_hand_ui()
 	)
@@ -1668,6 +1779,18 @@ func _hand_has_any_card(slots: Array) -> bool:
 
 func _load_ingredient_texture(ingredient: IngredientData) -> Texture2D:
 	var art_path := "res://assets/cards/ingredients/%s.png" % ingredient.get_art_filename()
+	if ResourceLoader.exists(art_path):
+		return load(art_path)
+	return null
+
+
+func _load_trinket_texture(trinket_id: String) -> Texture2D:
+	if GameManager.run == null:
+		return null
+	var trinket := GameManager.run.find_trinket(trinket_id)
+	if trinket == null:
+		return null
+	var art_path := "res://assets/cards/trinkets/%s.png" % trinket.get_art_filename()
 	if ResourceLoader.exists(art_path):
 		return load(art_path)
 	return null

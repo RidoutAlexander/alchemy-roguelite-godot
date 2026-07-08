@@ -97,7 +97,7 @@ var _pristine_feather_repeat_hand_slot: int = -1
 var _voodoo_doll_arms_copy: bool = false
 var _practice_restart_used: bool = false
 var _frog_leg_save_pending: bool = false
-var _fairy_vanish_next_ingredient: bool = false
+
 var _booberry_count_this_hand: int = 0
 var _poison_apple_pending: Array = []
 var _growth_potion_doubles_remaining: int = 0
@@ -115,12 +115,14 @@ var last_presented_stat_deltas: Dictionary = {
 	"gold_reward": 0,
 }
 var last_play_fly_count: int = 1
-var last_play_fairy_poof: bool = false
+
 var _pending_bubbling_brew_return: IngredientData = null
 var _pending_phoenix_save_presentation: bool = false
 var _phoenix_save_from_explosiveness: int = 0
 var _phoenix_save_visual_active: bool = false
 var _jar_of_dirt_broke_poof_pending: bool = false
+var _fairy_escaped_poof_pending: bool = false
+var _empty_cage_recapture_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
 var _pending_time_turner_target_slots: Array = []
 var _frog_legs_played_this_brew: Array[IngredientData] = []
@@ -357,7 +359,7 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 	var layout_slots: Array = []
 	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
 		layout_slots = _hand_start_slots
-	var unicorn_cured_slots := _resolve_unicorn_cured_slots_for_display()
+	var unicorn_cured_slots := _resolve_unicorn_cured_slots_for_display(slots)
 	var effect_entries := _HandSlotEffects.compute_entries(
 		slots,
 		HAND_SLOT_COUNT,
@@ -366,11 +368,11 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		context.owned_trinket_ids,
 		unicorn_cured_slots,
 		_parrot_doubles_next,
-		_resolve_gecko_stayed_slots_for_display(),
-		_resolve_honey_skipped_slots_for_display(),
+		_resolve_gecko_stayed_slots_for_display(slots),
+		_resolve_honey_skipped_slots_for_display(slots),
 		_hand_locked_slots if _hand_phase == HandPhase.PLAYING else {}
 	)
-	_sanitize_hand_overlay_effect_entries(effect_entries)
+	_sanitize_hand_overlay_effect_entries(effect_entries, slots)
 	return effect_entries
 
 
@@ -382,27 +384,46 @@ func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
 	return _hand_slots.duplicate()
 
 
-func _resolve_gecko_stayed_slots_for_display() -> Dictionary:
+func _resolve_gecko_stayed_slots_for_display(slots_override: Array = []) -> Dictionary:
 	if _hand_phase == HandPhase.PLAYING:
 		return _gecko_stayed_slots
 	if _hand_phase == HandPhase.HAND:
 		return _hand_preview_gecko_slots
+	if _hand_phase == HandPhase.DRAWING and not slots_override.is_empty():
+		var honey_skipped := _HandSlotEffects.compute_honey_skipped_slots(
+			slots_override,
+			HAND_SLOT_COUNT
+		)
+		return _HandSlotEffects.compute_gecko_stay_slots(
+			slots_override,
+			HAND_SLOT_COUNT,
+			honey_skipped,
+			IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
+			context.owned_trinket_ids
+		)
 	return {}
 
 
-func _resolve_honey_skipped_slots_for_display() -> Dictionary:
+func _resolve_honey_skipped_slots_for_display(slots_override: Array = []) -> Dictionary:
 	if _hand_phase == HandPhase.PLAYING:
 		return _honey_skipped_slots
 	if _hand_phase == HandPhase.HAND:
 		return _hand_preview_honey_slots
+	if _hand_phase == HandPhase.DRAWING and not slots_override.is_empty():
+		return _HandSlotEffects.compute_honey_skipped_slots(
+			slots_override,
+			HAND_SLOT_COUNT
+		)
 	return {}
 
 
-func _resolve_unicorn_cured_slots_for_display() -> Array:
+func _resolve_unicorn_cured_slots_for_display(slots_override: Array = []) -> Array:
 	if _hand_phase == HandPhase.PLAYING:
 		return _unicorn_cured_slots.duplicate()
 	if _hand_phase == HandPhase.HAND:
 		return _hand_preview_unicorn_slots.duplicate()
+	if _hand_phase == HandPhase.DRAWING and not slots_override.is_empty():
+		return _compute_unicorn_cured_slots_for_hand(slots_override)
 	return []
 
 
@@ -435,11 +456,14 @@ func _refresh_hand_preview_locks() -> void:
 	_hand_preview_unicorn_slots = _compute_unicorn_cured_slots_for_hand(_hand_slots)
 
 
-func _sanitize_hand_overlay_effect_entries(per_slot: Array) -> void:
-	var allowed_gecko_slots := _resolve_gecko_stayed_slots_for_display()
-	var allowed_honey_slots := _resolve_honey_skipped_slots_for_display()
+func _sanitize_hand_overlay_effect_entries(
+	per_slot: Array,
+	slots_override: Array = []
+) -> void:
+	var allowed_gecko_slots := _resolve_gecko_stayed_slots_for_display(slots_override)
+	var allowed_honey_slots := _resolve_honey_skipped_slots_for_display(slots_override)
 	var allowed_unicorn_slots := {}
-	for slot_index in _resolve_unicorn_cured_slots_for_display():
+	for slot_index in _resolve_unicorn_cured_slots_for_display(slots_override):
 		allowed_unicorn_slots[int(slot_index)] = true
 	for slot_index in range(per_slot.size()):
 		var entries: Array = per_slot[slot_index]
@@ -821,6 +845,42 @@ func consume_jar_of_dirt_broke_poof() -> bool:
 	return pending
 
 
+func consume_fairy_escaped_poof() -> bool:
+	var pending := _fairy_escaped_poof_pending
+	_fairy_escaped_poof_pending = false
+	return pending
+
+
+func consume_empty_cage_recapture_pending() -> bool:
+	var pending := _empty_cage_recapture_pending
+	_empty_cage_recapture_pending = false
+	return pending
+
+
+func complete_fairy_escape_sequence(run: RunManager) -> void:
+	if run == null:
+		return
+	run.acquire_trinket(TrinketEffects.VENGEFUL_FAIRY_ID)
+	sync_owned_trinkets(run.owned_trinket_ids)
+	var empty_cage := _find_ingredient_template(IngredientEffects.EMPTY_CAGE_ID)
+	if empty_cage == null:
+		return
+	context.bag.grant_ingredient_during_brew(empty_cage)
+	last_bag_grant_ingredient = empty_cage
+
+
+func complete_empty_cage_recapture(run: RunManager) -> IngredientData:
+	if run != null:
+		run.consume_trinket(TrinketEffects.VENGEFUL_FAIRY_ID)
+		sync_owned_trinkets(run.owned_trinket_ids)
+	var fairy := _find_ingredient_template(IngredientEffects.FAIRY_IN_A_CAGE_ID)
+	if fairy == null:
+		return null
+	var chip := fairy.duplicate_for_bag()
+	context.bag.grant_ingredient_during_brew(chip)
+	return chip
+
+
 func get_poison_apple_pending() -> Array:
 	return _poison_apple_pending
 
@@ -847,10 +907,6 @@ func has_unicorn_cures_next_explosive() -> bool:
 
 func has_parrot_doubles_next() -> bool:
 	return _parrot_doubles_next
-
-
-func has_fairy_vanish_next_ingredient() -> bool:
-	return _fairy_vanish_next_ingredient
 
 
 func has_voodoo_doll_arms_copy() -> bool:
@@ -1381,11 +1437,7 @@ func _apply_ingredient(
 	from_hand_play: bool = false,
 	hand_slot_index: int = -1
 ) -> bool:
-	if _try_vanish_ingredient_from_fairy(ingredient, track_draw):
-		return false
-
 	_note_booberry_played_this_hand(ingredient)
-	last_play_fairy_poof = false
 	var parrot_doubled_this_ingredient := _parrot_doubles_next
 	if parrot_doubled_this_ingredient:
 		_parrot_doubles_next = false
@@ -1644,13 +1696,15 @@ func _apply_ingredient_play(
 			last_bag_grant_ingredient = granted
 	if ingredient.id == IngredientEffects.JAR_OF_DIRT_ID:
 		_consume_jar_of_dirt_use(ingredient)
+	if ingredient.id == IngredientEffects.FAIRY_IN_A_CAGE_ID:
+		_consume_fairy_use(ingredient)
+	if ingredient.id == IngredientEffects.EMPTY_CAGE_ID:
+		_consume_empty_cage_use(ingredient)
 	if effect.bonus_swap_hands > 0:
 		if ingredient.id == IngredientEffects.STIRRING_SPOON_ID:
 			_stirring_spoon_hands_remaining += effect.bonus_swap_hands
 		elif ingredient.id == IngredientEffects.JUGGLING_CLUB_ID:
 			_juggling_club_hands_remaining += effect.bonus_swap_hands
-	if effect.vanish_next_ingredient:
-		_fairy_vanish_next_ingredient = true
 	if effect.poison_apple_delay_scheduled:
 		_poison_apple_pending.append(
 			{
@@ -1856,21 +1910,29 @@ func _consume_jar_of_dirt_use(jar_chip: IngredientData) -> void:
 	_jar_of_dirt_broke_poof_pending = true
 
 
-func _try_vanish_ingredient_from_fairy(
-	ingredient: IngredientData,
-	track_draw: bool
-) -> bool:
-	if not _fairy_vanish_next_ingredient:
-		return false
+func _consume_fairy_use(fairy_chip: IngredientData) -> void:
+	if fairy_chip == null:
+		return
+	if fairy_chip.fairy_uses_remaining < 0:
+		fairy_chip.fairy_uses_remaining = IngredientEffects.FAIRY_IN_A_CAGE_MAX_USES
+	fairy_chip.fairy_uses_remaining -= 1
+	if fairy_chip.fairy_uses_remaining > 0:
+		return
+	_remove_all_chip_instances_from_cauldron(fairy_chip)
+	context.bag.remove_one_chip_from_master(fairy_chip)
+	_fairy_escaped_poof_pending = true
 
-	_fairy_vanish_next_ingredient = false
-	if track_draw:
-		context.drawn_this_brew.append(ingredient)
-	context.bag.remove_one_chip_from_master(ingredient)
-	last_play_fly_count = 1
-	last_play_fairy_poof = true
-	enqueue_presented_stat_snapshot()
-	return true
+
+func _consume_empty_cage_use(empty_cage_chip: IngredientData) -> void:
+	if empty_cage_chip == null:
+		return
+	if empty_cage_chip.empty_cage_uses_remaining < 0:
+		empty_cage_chip.empty_cage_uses_remaining = IngredientEffects.EMPTY_CAGE_MAX_USES
+	empty_cage_chip.empty_cage_uses_remaining -= 1
+	if empty_cage_chip.empty_cage_uses_remaining > 0:
+		return
+	context.bag.remove_one_chip_from_master(empty_cage_chip)
+	_empty_cage_recapture_pending = true
 
 
 func _try_frog_leg_save() -> bool:
@@ -1953,6 +2015,15 @@ func _remove_from_cauldron(ingredient: IngredientData) -> void:
 	var index := context.cauldron_contents.rfind(ingredient)
 	if index >= 0:
 		context.cauldron_contents.remove_at(index)
+
+
+func _remove_all_chip_instances_from_cauldron(chip: IngredientData) -> void:
+	if chip == null:
+		return
+	var index := context.cauldron_contents.rfind(chip)
+	while index >= 0:
+		context.cauldron_contents.remove_at(index)
+		index = context.cauldron_contents.rfind(chip)
 
 
 func _apply_end_of_brew_bonuses() -> void:
@@ -2332,8 +2403,9 @@ func _reset_draw_flow_state() -> void:
 	_clear_pristine_feather_repeat()
 	_voodoo_doll_arms_copy = false
 	_frog_leg_save_pending = false
-	_fairy_vanish_next_ingredient = false
 	_jar_of_dirt_broke_poof_pending = false
+	_fairy_escaped_poof_pending = false
+	_empty_cage_recapture_pending = false
 	_pending_bubbling_brew_return = null
 	_pending_phoenix_save_presentation = false
 	_phoenix_save_from_explosiveness = 0

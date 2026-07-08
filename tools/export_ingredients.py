@@ -48,6 +48,7 @@ TRINKET_HEADERS = [
     "id",
     "display_name",
     "description",
+    "reward_offerable",
 ]
 
 DEFAULT_INGREDIENTS = [
@@ -66,16 +67,19 @@ DEFAULT_TRINKETS = [
         "pumpkin_trinket",
         "Pumpkin Necklace",
         "Pumpkins gain +1 score for each pumpkin played before it in a row (maximum of +3)",
+        True,
     ],
     [
         "red_mushroom_trinket",
         "Red Mushroom Trinket",
         "Red mushrooms can score a maximum of 6 instead of 4",
+        True,
     ],
     [
         "rat_trinket",
         "Rat Trinket",
         "Rats can score a maximum of 6 instead of 4",
+        True,
     ],
 ]
 
@@ -447,6 +451,7 @@ def sync_workbook_from_json() -> None:
             item["id"],
             item["display_name"],
             item["description"],
+            bool(item.get("reward_offerable", True)),
         ]
         for item in trinkets
     ]
@@ -501,8 +506,9 @@ def create_default_workbook() -> None:
     readme["A12"] = "shop_available FALSE = starter-only, never appears in the shop."
     readme["A13"] = "Description: effect text (normal) or flavor text (italicize in Excel)."
     readme["A14"] = "Example art file: assets/cards/ingredients/boom_berry_1.png"
-    readme["A15"] = "Trinkets: id, display_name, description (passive run relics; art PNG optional in assets/cards/trinkets/)."
-    for row in range(3, 16):
+    readme["A15"] = "Trinkets: id, display_name, description, reward_offerable (passive run relics; art PNG optional in assets/cards/trinkets/)."
+    readme["A16"] = "reward_offerable FALSE = never rolled as a boss trinket reward (can still be granted by effects/dev tools)."
+    for row in range(3, 17):
         readme[f"A{row}"].font = NOTE_FONT
     readme.column_dimensions["A"].width = 78
 
@@ -571,7 +577,10 @@ def _style_trinket_sheet(sheet) -> None:
             if cell.column == 3:
                 continue
             cell.font = INPUT_FONT
-    widths = [18, 22, 52]
+    reward_validation = DataValidation(type="list", formula1='"TRUE,FALSE"', allow_blank=False)
+    reward_validation.add(f"D2:D{max(sheet.max_row, 200)}")
+    sheet.add_data_validation(reward_validation)
+    widths = [18, 22, 52, 16]
     for idx, width in enumerate(widths, start=1):
         sheet.column_dimensions[chr(64 + idx)].width = width
 
@@ -592,11 +601,18 @@ def ensure_trinkets_sheet(wb) -> bool:
                 if "display_name" in columns or "name" in columns
                 else trinket_id
             )
+            reward_offerable = True
+            if "reward_offerable" in columns:
+                reward_offerable = _parse_bool(
+                    sheet.cell(row_idx, columns["reward_offerable"]).value,
+                    default=True,
+                )
             rows.append(
                 [
                     str(trinket_id).strip(),
                     str(display_name or "").strip(),
                     _description_from_cell(sheet.cell(row_idx, columns.get("description", 3))),
+                    reward_offerable,
                 ]
             )
         if not rows:
@@ -935,6 +951,12 @@ def export_workbook() -> None:
                 ).strip(),
                 "description": _description_from_cell(
                     trinket_sheet.cell(row_index, trinket_columns["description"])
+                ),
+                "reward_offerable": _parse_bool(
+                    trinket_sheet.cell(
+                        row_index, trinket_columns["reward_offerable"]
+                    ).value,
+                    default=True,
                 ),
             }
         )

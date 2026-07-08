@@ -73,8 +73,6 @@ static func collect(session: BrewSession) -> Array[EffectEntry]:
 		_add_entry(entries, IngredientEffects.UNICORN_HORN_ID, "", 20)
 	if session.has_parrot_doubles_next():
 		_add_entry(entries, IngredientEffects.PARROT_ID, "", 21)
-	if session.has_fairy_vanish_next_ingredient():
-		_add_entry(entries, IngredientEffects.FAIRY_IN_A_CAGE_ID, "", 22)
 	if session.has_voodoo_doll_arms_copy() and _has_ingredient_in_cauldron(
 		cauldron,
 		IngredientEffects.VOODOO_DOLL_ID

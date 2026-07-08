@@ -16,15 +16,17 @@ func bind(
 ) -> void:
 	custom_minimum_size = icon_size
 	size = icon_size
-	if _icon != null:
-		_icon.custom_minimum_size = icon_size
-		_icon.size = icon_size
-		_icon.texture = _load_trinket_art(trinket_id) if trinket_id != "" else _load_ingredient_art(ingredient)
-	if _overlay != null:
-		_overlay.text = overlay_text
-		_overlay.visible = overlay_text != ""
+	var icon := _icon if _icon != null else get_node_or_null("Icon") as TextureRect
+	if icon != null:
+		icon.custom_minimum_size = icon_size
+		icon.size = icon_size
+		icon.texture = _load_trinket_art(trinket_id) if trinket_id != "" else _load_ingredient_art(ingredient)
+	var overlay := _overlay if _overlay != null else get_node_or_null("Overlay") as Label
+	if overlay != null:
+		overlay.text = overlay_text
+		overlay.visible = overlay_text != ""
 		var font_size := clampi(int(icon_size.y * 0.52), 14, 28)
-		_overlay.add_theme_font_size_override("font_size", font_size)
+		overlay.add_theme_font_size_override("font_size", font_size)
 
 
 func _load_ingredient_art(ingredient: IngredientData) -> Texture2D:

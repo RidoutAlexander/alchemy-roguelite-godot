@@ -2,6 +2,7 @@ class_name HandUnicornSparkles
 extends Control
 
 var _layers: Array[CPUParticles2D] = []
+var _pending_active: bool = false
 
 
 func _ready() -> void:
@@ -44,12 +45,18 @@ func _ready() -> void:
 
 	for layer in _layers:
 		add_child(layer)
+	_apply_pending_active()
 
 
 func set_active(active: bool) -> void:
+	_pending_active = active
+	_apply_pending_active()
+
+
+func _apply_pending_active() -> void:
 	for layer in _layers:
 		if layer != null:
-			layer.emitting = active and visible
+			layer.emitting = _pending_active and visible
 
 
 func configure_for_card(card_size: Vector2, _card_scale: float) -> void:

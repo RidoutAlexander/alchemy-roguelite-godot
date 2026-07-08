@@ -14,6 +14,7 @@ const BEATING_HEART_ID := "beating_heart"
 const BEATING_HEART_BOOM_BERRY_ID := "boom_berry_3"
 const GECKO_ASSISTANT_ID := "gecko_assistant"
 const HEADLESS_CHICKEN_ID := "headless_chicken"
+const VENGEFUL_FAIRY_ID := "vengeful_fairy"
 
 const POCKET_WATCH_INTERVAL := 21
 const HEADLESS_CHICKEN_BLOCKED_HANDS := 2
@@ -77,6 +78,10 @@ static func has_gecko_assistant(trinket_ids: Array) -> bool:
 
 static func has_headless_chicken(trinket_ids: Array) -> bool:
 	return has_trinket(trinket_ids, HEADLESS_CHICKEN_ID)
+
+
+static func has_vengeful_fairy(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, VENGEFUL_FAIRY_ID)
 
 
 static func headless_chicken_blocks_chicken_draws(

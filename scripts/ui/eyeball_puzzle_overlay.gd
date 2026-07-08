@@ -139,7 +139,7 @@ func show_picker(ingredients: Array) -> void:
 	_populate_slots(ingredients, false)
 	_reset_picker_card_states()
 	_ensure_picker_cards_interactive()
-	_refresh_picker_choice_previews()
+	call_deferred("_refresh_picker_choice_previews")
 	if _done_button != null:
 		_done_button.visible = true
 		_done_button.disabled = true
@@ -296,13 +296,16 @@ func _populate_slots(ingredients: Array, enable_drag: bool) -> void:
 		var card := _CARD_SCENE.instantiate() as IngredientCard
 		if card == null:
 			continue
+		if enable_drag:
+			_wire_puzzle_card(card)
+		else:
+			_wire_picker_card(card, ingredient)
 		_order_slots[i].place_card(card)
 		if enable_drag:
 			card.bind_puzzle_card(ingredient)
-			_wire_puzzle_card(card)
 		else:
 			card.bind_picker_card(ingredient)
-			_wire_picker_card(card, ingredient)
+			_apply_picker_choice_preview(card, ingredient)
 
 
 func _wire_puzzle_card(card: IngredientCard) -> void:
@@ -336,20 +339,27 @@ func _on_picker_card_unhovered() -> void:
 	GameManager.clear_bat_wing_pick_preview()
 
 
+func _apply_picker_choice_preview(card: IngredientCard, ingredient: IngredientData) -> void:
+	if card == null or ingredient == null or GameManager.run == null:
+		return
+	var preview: Dictionary = GameManager.run.brew_session.get_bat_wing_choice_preview(
+		ingredient
+	)
+	card.apply_picker_preview(preview)
+	if card.has_method("reapply_picker_effect_layout"):
+		card.reapply_picker_effect_layout()
+
+
 func _refresh_picker_choice_previews() -> void:
 	if _mode != Mode.PICKER or GameManager.run == null:
 		return
-	var session := GameManager.run.brew_session
 	for slot in _order_slots:
 		if not slot.visible:
 			continue
 		var card := slot.get_card()
 		if card == null:
 			continue
-		var ingredient := card.get_ingredient()
-		if ingredient == null:
-			continue
-		card.apply_picker_preview(session.get_bat_wing_choice_preview(ingredient))
+		_apply_picker_choice_preview(card, card.get_ingredient())
 
 
 func _on_brew_updated(_ctx: BrewContext) -> void:
@@ -439,7 +449,7 @@ func _refresh_picker_choices(ingredients: Array) -> void:
 	_populate_slots(ingredients, false)
 	_reset_picker_card_states()
 	_ensure_picker_cards_interactive()
-	_refresh_picker_choice_previews()
+	call_deferred("_refresh_picker_choice_previews")
 	if _done_button != null:
 		_done_button.disabled = true
 	_refresh_reroll_button()

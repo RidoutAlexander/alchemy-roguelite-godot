@@ -98,6 +98,41 @@ func _clear_hover() -> void:
 		_tooltip.hide_tooltip()
 
 
+func get_trinket_global_center(trinket_id: String) -> Vector2:
+	if GameManager.run == null:
+		return Vector2.ZERO
+	for trinket in GameManager.run.get_owned_trinkets():
+		if trinket == null or trinket.id != trinket_id:
+			continue
+		var icon := _find_icon_for_trinket(trinket)
+		if icon != null:
+			return icon.get_global_rect().get_center()
+	return Vector2.ZERO
+
+
+func get_next_slot_global_center() -> Vector2:
+	if GameManager.run == null:
+		return Vector2.ZERO
+	return get_slot_global_center(GameManager.run.get_owned_trinkets().size())
+
+
+func get_slot_global_center(slot_index: int) -> Vector2:
+	if _grid == null or slot_index < 0:
+		return Vector2.ZERO
+	var owned_count := 0
+	if GameManager.run != null:
+		owned_count = GameManager.run.get_owned_trinkets().size()
+	var projected_count := maxi(owned_count, slot_index + 1)
+	var icon_size := _resolve_icon_size(projected_count)
+	var col := slot_index % MAX_COLUMNS
+	var row := int(slot_index / MAX_COLUMNS)
+	var grid_origin := _grid.get_global_rect().position
+	return grid_origin + Vector2(
+		icon_size.x * (float(col) + 0.5) + GRID_GAP * float(col),
+		icon_size.y * (float(row) + 0.5) + GRID_GAP * float(row)
+	)
+
+
 func _find_icon_for_trinket(trinket: TrinketData) -> TrinketIcon:
 	if trinket == null:
 		return null

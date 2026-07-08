@@ -2,61 +2,79 @@
   {
     "id": "pumpkin_trinket",
     "display_name": "Pumpkin Necklace",
-    "description": "Pumpkins gain +1 score for each pumpkin played before it in a row"
+    "description": "Pumpkins gain +1 score for each pumpkin played before it in a row",
+    "reward_offerable": true
   },
   {
     "id": "red_mushroom_trinket",
     "display_name": "Red Mushroom Trinket",
-    "description": "Red mushrooms can score a maximum of 6 instead of 4"
+    "description": "Red mushrooms can score a maximum of 6 instead of 4",
+    "reward_offerable": true
   },
   {
     "id": "rat_trinket",
     "display_name": "Rat Trinket",
-    "description": "Rats can score a maximum of 6 instead of 4"
+    "description": "Rats can score a maximum of 6 instead of 4",
+    "reward_offerable": true
   },
   {
     "id": "jar_of_flies",
     "display_name": "Jar of Flies",
-    "description": "Batwing has an option to reroll choices once"
+    "description": "Batwing has an option to reroll choices once",
+    "reward_offerable": true
   },
   {
     "id": "pocket_watch",
     "display_name": "Pocket Watch",
-    "description": "Every 21st ingredient added has double stats"
+    "description": "Every 21st ingredient added has double stats",
+    "reward_offerable": true
   },
   {
     "id": "time_turner",
     "display_name": "Time Turner",
-    "description": "Click to redraw your hand and lose this trinket"
+    "description": "Click to redraw your hand and lose this trinket",
+    "reward_offerable": true
   },
   {
     "id": "jar_of_froglegs",
     "display_name": "Jar of Froglegs",
-    "description": "Your froglegs jump back into your bag at the end of the level."
+    "description": "Your froglegs jump back into your bag at the end of the level.",
+    "reward_offerable": true
   },
   {
     "id": "voodoo_doll_trinket",
     "display_name": "Voodoo Doll",
-    "description": "Voodoo Dolls become common in the shop and cost 6"
+    "description": "Voodoo Dolls become common in the shop and cost 6",
+    "reward_offerable": true
   },
   {
     "id": "pristine_feather",
     "display_name": "Pristine Feather",
-    "description": "Your feathers are played twice"
+    "description": "Your feathers are played twice",
+    "reward_offerable": true
   },
   {
     "id": "beating_heart",
     "display_name": "Beating Heart",
-    "description": "Gain a life and add a 3 Boomberry to your bag"
+    "description": "Gain a life and add a 3 Boomberry to your bag",
+    "reward_offerable": true
   },
   {
     "id": "gecko_assistant",
     "display_name": "Gecko Assistant",
-    "description": "Every 9th ingredient stays in your hand"
+    "description": "Every 9th ingredient stays in your hand",
+    "reward_offerable": true
   },
   {
     "id": "headless_chicken",
     "display_name": "Headless Chicken",
-    "description": "You cannot draw chickens for the first 2 turns"
+    "description": "You cannot draw chickens for the first 2 turns",
+    "reward_offerable": true
+  },
+  {
+    "id": "vengeful_fairy",
+    "display_name": "Vengeful Fairy",
+    "description": "A furious fairy escaped from its cage. Play Empty Cage three times to recapture her.",
+    "reward_offerable": false
   }
 ]

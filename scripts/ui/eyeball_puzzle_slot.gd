@@ -92,6 +92,9 @@ func place_card(card: IngredientCard, swap_to_slot: EyeballPuzzleSlot = null) ->
 			return
 
 	_attach_card(card)
+	if card.has_method("is_picker_mode") and card.is_picker_mode():
+		if card.has_method("reapply_picker_effect_layout"):
+			card.reapply_picker_effect_layout()
 	card_dropped.emit(card)
 
 

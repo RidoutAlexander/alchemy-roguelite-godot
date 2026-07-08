@@ -13,6 +13,8 @@ var shop_cost: int
 var rarity: Rarity
 var shop_available: bool = true
 var jar_of_dirt_uses_remaining: int = -1
+var fairy_uses_remaining: int = -1
+var empty_cage_uses_remaining: int = -1
 var is_bag_chip: bool = false
 
 
@@ -42,6 +44,10 @@ func get_art_filename() -> String:
 	return art if art != "" else id
 
 
+func is_legendary() -> bool:
+	return rarity == Rarity.LEGENDARY
+
+
 func duplicate_for_bag() -> IngredientData:
 	var copy := IngredientData.new(
 		id,
@@ -57,6 +63,10 @@ func duplicate_for_bag() -> IngredientData:
 	copy.is_bag_chip = true
 	if id == "jar_of_dirt":
 		copy.jar_of_dirt_uses_remaining = IngredientEffects.JAR_OF_DIRT_MAX_USES
+	elif id == IngredientEffects.FAIRY_IN_A_CAGE_ID:
+		copy.fairy_uses_remaining = IngredientEffects.FAIRY_IN_A_CAGE_MAX_USES
+	elif id == IngredientEffects.EMPTY_CAGE_ID:
+		copy.empty_cage_uses_remaining = IngredientEffects.EMPTY_CAGE_MAX_USES
 	return copy
 
 
