@@ -177,7 +177,16 @@ func _life_icon_nodes() -> Array[TextureRect]:
 
 
 func _slots_to_show(remaining_lives: int) -> int:
-	return maxi(GameConstants.STARTING_LIVES, mini(remaining_lives, max_lives_shown))
+	var slots := maxi(GameConstants.STARTING_LIVES, mini(remaining_lives, max_lives_shown))
+	if _bonus_life_slot_unlocked():
+		slots = maxi(slots, GameConstants.STARTING_LIVES + 1)
+	return slots
+
+
+func _bonus_life_slot_unlocked() -> bool:
+	if Engine.is_editor_hint() or GameManager.run == null:
+		return false
+	return GameManager.run.bonus_life_slot_unlocked
 
 
 func _update_layout_width(slots_shown: int) -> void:

@@ -44,16 +44,19 @@ def cobbler_bonus_target_slot(
     play_slot: int,
     last_hand_slot: int,
     hand_slots: list[str | None],
+    last_hand_ingredient_id: str | None = None,
 ) -> int:
     if ingredient_id == COBBLER_ID and previous_id is not None and is_boom_berry_id(previous_id):
+        left_slot = hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+        if left_slot >= 0:
+            return left_slot
         if (
             last_hand_slot >= 0
-            and last_hand_slot < len(hand_slots)
-            and hand_slots[last_hand_slot] is not None
-            and is_boom_berry_id(hand_slots[last_hand_slot])
+            and last_hand_ingredient_id is not None
+            and is_boom_berry_id(last_hand_ingredient_id)
         ):
             return last_hand_slot
-        return hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+        return -1
     return play_slot
 
 
@@ -63,14 +66,26 @@ def resolve_hand_play_cobbler(
     play_slot: int,
     last_hand_slot: int,
     hand_slots: list[str | None],
+    last_hand_ingredient_id: str | None = None,
 ) -> dict:
     previous_id = cauldron_ids[-1] if cauldron_ids else None
     bonus = cobbler_adjacency_bonus(previous_id, ingredient_id)
     if bonus["score"] == 0 and bonus["explosiveness"] == 0:
         return {"bonus": bonus, "retroactive_slot": -1}
     target_slot = cobbler_bonus_target_slot(
-        ingredient_id, previous_id, play_slot, last_hand_slot, hand_slots
+        ingredient_id,
+        previous_id,
+        play_slot,
+        last_hand_slot,
+        hand_slots,
+        last_hand_ingredient_id,
     )
+    if target_slot < 0:
+        return {
+            "bonus": bonus,
+            "retroactive_slot": -1,
+            "apply_retroactive_immediately": True,
+        }
     if target_slot == play_slot:
         return {"bonus": bonus, "retroactive_slot": -1}
     return {"bonus": bonus, "retroactive_slot": target_slot}
@@ -78,18 +93,20 @@ def resolve_hand_play_cobbler(
 
 def simulate_hand_play(
     hand_slots: list[str | None],
-    bat_wing_slot: int,
-    bat_wing_pick_id: str,
+    bat_wing_slot: int | None = None,
+    bat_wing_pick_id: str | None = None,
 ) -> dict[str, int]:
     cauldron: list[str] = []
     last_hand_slot = -1
+    last_hand_ingredient_id: str | None = None
     pending: dict[int, dict[str, int]] = {}
     totals = {"score": 0, "explosiveness": 0}
 
     for play_slot in range(len(hand_slots)):
-        if play_slot == bat_wing_slot:
+        if bat_wing_slot is not None and play_slot == bat_wing_slot:
             cauldron.append(BAT_WING_ID)
             last_hand_slot = play_slot
+            last_hand_ingredient_id = BAT_WING_ID
             ingredient_id = bat_wing_pick_id
             play_slot_for_pick = bat_wing_slot
         elif hand_slots[play_slot] is None:
@@ -105,20 +122,31 @@ def simulate_hand_play(
             play_slot_for_pick,
             last_hand_slot,
             hand_slots,
+            last_hand_ingredient_id,
         )
         bonus = resolved["bonus"]
         retroactive_slot = resolved["retroactive_slot"]
         if retroactive_slot >= 0:
-            existing = pending.get(retroactive_slot, {"score": 0, "explosiveness": 0})
-            existing["score"] += bonus["score"]
-            existing["explosiveness"] += bonus["explosiveness"]
-            pending[retroactive_slot] = existing
+            if retroactive_slot < play_slot_for_pick:
+                totals["score"] += bonus["score"]
+                totals["explosiveness"] += bonus["explosiveness"]
+                bonus = {"score": 0, "explosiveness": 0}
+            else:
+                existing = pending.get(retroactive_slot, {"score": 0, "explosiveness": 0})
+                existing["score"] += bonus["score"]
+                existing["explosiveness"] += bonus["explosiveness"]
+                pending[retroactive_slot] = existing
+                bonus = {"score": 0, "explosiveness": 0}
+        elif resolved.get("apply_retroactive_immediately"):
+            totals["score"] += bonus["score"]
+            totals["explosiveness"] += bonus["explosiveness"]
             bonus = {"score": 0, "explosiveness": 0}
 
         totals["score"] += bonus["score"] + pending_bonus["score"]
         totals["explosiveness"] += bonus["explosiveness"] + pending_bonus["explosiveness"]
         cauldron.append(ingredient_id)
         last_hand_slot = play_slot_for_pick
+        last_hand_ingredient_id = ingredient_id
 
     return totals
 
@@ -138,6 +166,25 @@ def main() -> int:
     assert totals["score"] == COBBLER_SCORE, (
         f"expected cobbler in slot 2 to pair with picked boom berry, got {totals['score']}"
     )
+
+    # Boom berry plays before cobbler; cobbler must not buff itself.
+    hand = [BOOM_BERRY_ID, None, COBBLER_ID, None, None]
+    totals = simulate_hand_play(hand)
+    assert totals["score"] == COBBLER_SCORE, (
+        f"expected boom berry to receive cobbler bonus, got score={totals['score']}"
+    )
+    assert totals["explosiveness"] == COBBLER_EXPLOSIVE
+
+    resolved = resolve_hand_play_cobbler(
+        COBBLER_ID,
+        [BOOM_BERRY_ID],
+        2,
+        0,
+        [None, None, COBBLER_ID, None, None],
+        BOOM_BERRY_ID,
+    )
+    assert resolved["retroactive_slot"] == 0, resolved
+    assert resolved["bonus"]["score"] == COBBLER_SCORE
 
     # Bag-drawn bat wing should not use a hand slot.
     source_slot = -1

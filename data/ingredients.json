@@ -487,7 +487,7 @@
 	"id": "honey",
 	"art": "honey",
 	"display_name": "Honey",
-	"description": "The ingredient to the left",
+	"description": "Does not play the ingredient to its left",
 	"point_value": 2,
 	"explosive_value": 0,
 	"shop_cost": 12,

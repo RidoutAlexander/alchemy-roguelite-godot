@@ -4,6 +4,7 @@ extends RefCounted
 var current_level: int = 1
 var difficulty_mode: int = GameDifficulty.Mode.HARD
 var lives: int = GameConstants.STARTING_LIVES
+var bonus_life_slot_unlocked: bool = false
 var gold: int = 0
 var boss_threshold_penalty: int = 0
 var boss_threshold_discount: int = 0
@@ -95,6 +96,7 @@ func start_new_run(difficulty: int = GameDifficulty.Mode.HARD) -> void:
 	current_level = 1
 	difficulty_mode = difficulty
 	lives = GameConstants.STARTING_LIVES
+	bonus_life_slot_unlocked = false
 	gold = 0
 	boss_threshold_penalty = 0
 	boss_threshold_discount = 0
@@ -119,6 +121,7 @@ func load_from_save(data: Dictionary) -> void:
 	current_level = int(data.get("currentLevel", 1))
 	difficulty_mode = GameDifficulty.from_save_value(data.get("difficulty", "hard"))
 	lives = int(data.get("lives", GameConstants.STARTING_LIVES))
+	bonus_life_slot_unlocked = bool(data.get("bonusLifeSlotUnlocked", false))
 	gold = int(data.get("gold", 0))
 	boss_threshold_penalty = int(
 		data.get("bossThresholdPenalty", data.get("bossCarryoverScore", 0))
@@ -142,6 +145,8 @@ func load_from_save(data: Dictionary) -> void:
 	pending_level_advance = bool(data.get("pendingLevelAdvance", false))
 	for trinket_id in data.get("ownedTrinketIds", []):
 		grant_trinket(str(trinket_id))
+	if has_trinket(TrinketEffects.BEATING_HEART_ID):
+		bonus_life_slot_unlocked = true
 	for trinket_id in data.get("pendingTrinketRewardIds", []):
 		_append_unique_pending_trinket_offer(str(trinket_id))
 	_sanitize_pending_trinket_reward_ids()
@@ -202,6 +207,7 @@ func to_save_data() -> Dictionary:
 		"currentLevel": current_level,
 		"difficulty": GameDifficulty.to_save_value(difficulty_mode),
 		"lives": lives,
+		"bonusLifeSlotUnlocked": bonus_life_slot_unlocked,
 		"gold": gold,
 		"bossThresholdPenalty": boss_threshold_penalty,
 		"bossThresholdDiscount": boss_threshold_discount,

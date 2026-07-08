@@ -77,6 +77,7 @@ static func apply_acquire_effects(trinket_id: String, run: RunManager) -> void:
 	if run == null:
 		return
 	if trinket_id == BEATING_HEART_ID:
+		run.bonus_life_slot_unlocked = true
 		run.lives = mini(GameConstants.MAX_LIVES, run.lives + 1)
 		var boom_berry := run.find_ingredient(BEATING_HEART_BOOM_BERRY_ID)
 		if boom_berry != null:

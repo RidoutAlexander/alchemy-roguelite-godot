@@ -88,6 +88,7 @@ class EffectResult:
 	var cobbler_retroactive_slot: int = -1
 	var cobbler_retroactive_score: int = 0
 	var cobbler_retroactive_explosiveness: int = 0
+	var cobbler_apply_retroactive_immediately: bool = false
 
 
 static func apply(
@@ -114,24 +115,24 @@ static func apply(
 			context.cauldron_contents,
 			play_slot,
 			int(hand_play.get("last_hand_slot", -1)),
-			hand_play.get("hand_slots", [])
+			hand_play.get("hand_slots", []),
+			hand_play.get("last_hand_ingredient")
 		)
-		var bonus: Dictionary = resolved.get("bonus", {})
-		var retroactive_slot := int(resolved.get("retroactive_slot", -1))
-		if retroactive_slot >= 0:
-			result.cobbler_retroactive_slot = retroactive_slot
-			result.cobbler_retroactive_score = int(bonus.get("score", 0))
-			result.cobbler_retroactive_explosiveness = int(bonus.get("explosiveness", 0))
-		else:
-			result.bonus_score += int(bonus.get("score", 0))
-			result.bonus_explosiveness += int(bonus.get("explosiveness", 0))
+		_apply_resolved_cobbler_bonus(result, resolved)
 	else:
-		var cobbler_bonus := _cobbler_adjacency_bonus_between(
-			context.cauldron_contents[-1] if not context.cauldron_contents.is_empty() else null,
-			ingredient
+		var previous = (
+			context.cauldron_contents[-1] if not context.cauldron_contents.is_empty() else null
 		)
-		result.bonus_score += int(cobbler_bonus.get("score", 0))
-		result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
+		var cobbler_bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
+		if (
+			ingredient.id == COBBLER_ID
+			and previous != null
+			and is_boom_berry_id(previous.id)
+		):
+			_queue_immediate_cobbler_retroactive(result, cobbler_bonus)
+		else:
+			result.bonus_score += int(cobbler_bonus.get("score", 0))
+			result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
 	context.cauldron_contents.append(ingredient)
 
 	match ingredient.id:
@@ -258,7 +259,8 @@ static func resolve_hand_play_cobbler(
 	cauldron_contents: Array,
 	play_slot: int,
 	last_hand_slot: int,
-	hand_slots: Array
+	hand_slots: Array,
+	last_hand_ingredient: Variant = null
 ) -> Dictionary:
 	var previous = cauldron_contents[-1] if not cauldron_contents.is_empty() else null
 	var bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
@@ -269,11 +271,42 @@ static func resolve_hand_play_cobbler(
 		previous,
 		play_slot,
 		last_hand_slot,
-		hand_slots
+		hand_slots,
+		last_hand_ingredient
 	)
+	if target_slot < 0:
+		return {
+			"bonus": bonus,
+			"retroactive_slot": -1,
+			"apply_retroactive_immediately": true,
+		}
 	if target_slot == play_slot:
 		return {"bonus": bonus, "retroactive_slot": -1}
 	return {"bonus": bonus, "retroactive_slot": target_slot}
+
+
+static func _apply_resolved_cobbler_bonus(result: EffectResult, resolved: Dictionary) -> void:
+	var bonus: Dictionary = resolved.get("bonus", {})
+	var retroactive_slot := int(resolved.get("retroactive_slot", -1))
+	if retroactive_slot >= 0:
+		result.cobbler_retroactive_slot = retroactive_slot
+		result.cobbler_retroactive_score = int(bonus.get("score", 0))
+		result.cobbler_retroactive_explosiveness = int(bonus.get("explosiveness", 0))
+		return
+	if bool(resolved.get("apply_retroactive_immediately", false)):
+		_queue_immediate_cobbler_retroactive(result, bonus)
+		return
+	result.bonus_score += int(bonus.get("score", 0))
+	result.bonus_explosiveness += int(bonus.get("explosiveness", 0))
+
+
+static func _queue_immediate_cobbler_retroactive(
+	result: EffectResult,
+	bonus: Dictionary
+) -> void:
+	result.cobbler_apply_retroactive_immediately = true
+	result.cobbler_retroactive_score = int(bonus.get("score", 0))
+	result.cobbler_retroactive_explosiveness = int(bonus.get("explosiveness", 0))
 
 
 static func _cobbler_adjacency_bonus_between(
@@ -311,19 +344,23 @@ static func _cobbler_bonus_target_slot(
 	previous: IngredientData,
 	play_slot: int,
 	last_hand_slot: int,
-	hand_slots: Array
+	hand_slots: Array,
+	last_hand_ingredient: Variant = null
 ) -> int:
 	if ingredient == null or previous == null:
 		return play_slot
 	if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
-		if last_hand_slot >= 0 and last_hand_slot < hand_slots.size():
-			var last_ingredient: IngredientData = hand_slots[last_hand_slot]
-			if last_ingredient != null and is_boom_berry_id(last_ingredient.id):
-				return last_hand_slot
 		var left_slot := _hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
 		if left_slot >= 0:
 			return left_slot
-		return play_slot
+		var last_ingredient: IngredientData = last_hand_ingredient as IngredientData
+		if (
+			last_hand_slot >= 0
+			and last_ingredient != null
+			and is_boom_berry_id(last_ingredient.id)
+		):
+			return last_hand_slot
+		return -1
 	return play_slot
 
 
@@ -378,6 +415,7 @@ static func compute_hand_cobbler_bonuses(
 
 	var sequence: Array = cauldron_contents.duplicate()
 	var last_hand_slot := -1
+	var last_hand_ingredient: IngredientData = null
 	var play_order: Array[int] = []
 	for slot_index in range(hand_slots.size()):
 		if hand_slots[slot_index] != null:
@@ -393,7 +431,8 @@ static func compute_hand_cobbler_bonuses(
 				previous,
 				play_slot,
 				last_hand_slot,
-				hand_slots
+				hand_slots,
+				last_hand_ingredient
 			)
 			if target_slot >= 0 and target_slot < bonuses.size():
 				bonuses[target_slot]["score"] += int(bonus.get("score", 0))
@@ -401,6 +440,7 @@ static func compute_hand_cobbler_bonuses(
 
 		sequence.append(ingredient)
 		last_hand_slot = play_slot
+		last_hand_ingredient = ingredient
 
 	return bonuses
 
@@ -435,6 +475,7 @@ static func compute_hand_display_stats(
 	var sim_explosiveness := int(modifiers.get("explosiveness", 0))
 	var explosion_limit := int(modifiers.get("explosion_limit", GameConstants.DEFAULT_EXPLOSION_LIMIT))
 	var last_hand_slot := -1
+	var last_hand_ingredient: IngredientData = null
 	var pre_double_stats: Array = []
 	for _slot_index in hand_slot_count:
 		pre_double_stats.append(null)
@@ -457,12 +498,13 @@ static func compute_hand_display_stats(
 				previous,
 				play_slot,
 				last_hand_slot,
-				hand_slots
+				hand_slots,
+				last_hand_ingredient
 			)
 			if target_slot == play_slot:
 				point_value += int(cobbler_bonus.get("score", 0))
 				explosive_value += int(cobbler_bonus.get("explosiveness", 0))
-			else:
+			elif target_slot >= 0:
 				_apply_retroactive_cobbler_bonus_to_slot(
 					target_slot,
 					cobbler_bonus,
@@ -535,6 +577,7 @@ static func compute_hand_display_stats(
 		sim_explosiveness += explosive_add
 		sim_cauldron.append(ingredient)
 		last_hand_slot = play_slot
+		last_hand_ingredient = ingredient
 		cauldron_count += 1
 		if TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
 			var repeat_point := ingredient.point_value

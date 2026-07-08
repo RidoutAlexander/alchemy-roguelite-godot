@@ -71,6 +71,7 @@ var _bat_wing_picker_active: bool = false
 var _bat_wing_reroll_used: bool = false
 var _bat_wing_source_slot_index: int = -1
 var _last_hand_play_slot: int = -1
+var _last_hand_play_ingredient: IngredientData = null
 var _pending_cobbler_slot_bonuses: Dictionary = {}
 var _unicorn_cures_next_explosive: bool = false
 var _ice_cube_shields_remaining: int = 0
@@ -765,6 +766,7 @@ func try_play_hand() -> bool:
 	_honey_skipped_slots = _compute_honey_skipped_slots()
 	_play_slot_cursor = 0
 	_last_hand_play_slot = -1
+	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()
 	_bat_wing_source_slot_index = -1
 	_play_next_hand_card()
@@ -1221,15 +1223,15 @@ func _apply_ingredient_play(
 		hand_play = {
 			"play_slot": hand_slot_index,
 			"last_hand_slot": _last_hand_play_slot,
+			"last_hand_ingredient": _last_hand_play_ingredient,
 			"hand_slots": _hand_slots,
 		}
 	var effect := IngredientEffects.apply(ingredient, context, hand_play)
-	if effect.cobbler_retroactive_slot >= 0:
-		_store_pending_cobbler_bonus(
-			effect.cobbler_retroactive_slot,
-			effect.cobbler_retroactive_score,
-			effect.cobbler_retroactive_explosiveness
-		)
+	_apply_cobbler_retroactive_routing(
+		effect,
+		from_hand_play,
+		hand_slot_index
+	)
 
 	var point_value := (
 		ingredient.point_value
@@ -1347,8 +1349,42 @@ func _apply_ingredient_play(
 
 	if from_hand_play and hand_slot_index >= 0:
 		_last_hand_play_slot = hand_slot_index
+		_last_hand_play_ingredient = ingredient
 
 	_try_bubbling_brew_return(ingredient, cauldron_count_before)
+
+
+func _apply_cobbler_retroactive_routing(
+	effect: IngredientEffects.EffectResult,
+	from_hand_play: bool,
+	hand_slot_index: int
+) -> void:
+	if effect.cobbler_apply_retroactive_immediately:
+		_apply_immediate_cobbler_retroactive_bonus(effect)
+		return
+	if effect.cobbler_retroactive_slot < 0:
+		return
+	if (
+		from_hand_play
+		and hand_slot_index >= 0
+		and effect.cobbler_retroactive_slot < hand_slot_index
+	):
+		_apply_immediate_cobbler_retroactive_bonus(effect)
+		return
+	_store_pending_cobbler_bonus(
+		effect.cobbler_retroactive_slot,
+		effect.cobbler_retroactive_score,
+		effect.cobbler_retroactive_explosiveness
+	)
+
+
+func _apply_immediate_cobbler_retroactive_bonus(
+	effect: IngredientEffects.EffectResult
+) -> void:
+	if effect.cobbler_retroactive_score != 0:
+		context.score += effect.cobbler_retroactive_score
+	if effect.cobbler_retroactive_explosiveness != 0:
+		context.explosiveness += effect.cobbler_retroactive_explosiveness
 
 
 func _try_bubbling_brew_return(
@@ -1857,6 +1893,7 @@ func _reset_draw_flow_state() -> void:
 	_bat_wing_reroll_used = false
 	_bat_wing_source_slot_index = -1
 	_last_hand_play_slot = -1
+	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()
 	_unicorn_cures_next_explosive = false
 	_ice_cube_shields_remaining = 0
