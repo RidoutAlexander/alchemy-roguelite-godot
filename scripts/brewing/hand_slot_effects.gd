@@ -24,6 +24,30 @@ static func compute_entries(
 	return per_slot
 
 
+static func compute_hand_play_locks(
+	hand_slots: Array,
+	hand_slot_count: int,
+	cauldron_count_before_hand: int,
+	owned_trinket_ids: Array
+) -> Dictionary:
+	var honey_skipped := compute_honey_skipped_slots(hand_slots, hand_slot_count)
+	var gecko_stayed := compute_gecko_stay_slots(
+		hand_slots,
+		hand_slot_count,
+		honey_skipped,
+		cauldron_count_before_hand,
+		owned_trinket_ids
+	)
+	var locked := honey_skipped.duplicate()
+	for slot_index in gecko_stayed.keys():
+		locked[slot_index] = true
+	return {
+		"honey_skipped": honey_skipped,
+		"gecko_stayed": gecko_stayed,
+		"locked": locked,
+	}
+
+
 static func compute_honey_skipped_slots(
 	slots: Array,
 	hand_slot_count: int

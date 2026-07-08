@@ -65,6 +65,7 @@ var _pending_hand_draw_target_slots: Array = []
 var _hand_draw_display_reserve: int = 0
 var _honey_skipped_slots: Dictionary = {}
 var _gecko_stayed_slots: Dictionary = {}
+var _hand_locked_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
 var _eyeball_reserved: Array[IngredientData] = []
@@ -348,6 +349,8 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
 	if not slots_override.is_empty():
 		return slots_override
+	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+		return _hand_start_slots.duplicate()
 	return _hand_slots.duplicate()
 
 
@@ -381,6 +384,17 @@ func _build_hand_display_modifiers() -> Dictionary:
 
 func _compute_hand_preview_steps(slots_override: Array = []) -> Array:
 	var slots := _resolve_display_hand_slots(slots_override)
+	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+		return _HandPlayPreview.compute_steps(
+			_hand_start_slots,
+			HAND_SLOT_COUNT,
+			context.cauldron_contents,
+			context.ingredients_added_to_cauldron,
+			context.owned_trinket_ids,
+			context.current_aura,
+			_honey_skipped_slots,
+			_gecko_stayed_slots
+		)
 	return _HandPlayPreview.compute_steps(
 		slots,
 		HAND_SLOT_COUNT,
@@ -819,18 +833,20 @@ func try_play_hand() -> bool:
 		return false
 	_hand_phase = HandPhase.PLAYING
 	_hand_start_slots = _hand_slots.duplicate()
-	_honey_skipped_slots = _compute_honey_skipped_slots()
-	_gecko_stayed_slots = _HandSlotEffects.compute_gecko_stay_slots(
+	var play_locks := _HandSlotEffects.compute_hand_play_locks(
 		_hand_start_slots,
 		HAND_SLOT_COUNT,
-		_honey_skipped_slots,
 		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
 		context.owned_trinket_ids
 	)
+	_honey_skipped_slots = play_locks.get("honey_skipped", {})
+	_gecko_stayed_slots = play_locks.get("gecko_stayed", {})
+	_hand_locked_slots = play_locks.get("locked", {})
 	_play_slot_cursor = 0
 	_last_hand_play_slot = -1
 	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()
+	_discard_pending_cobbler_bonuses_for_locked_slots()
 	_bat_wing_source_slot_index = -1
 	_play_next_hand_card()
 	return true
@@ -1035,13 +1051,10 @@ func _try_boss_early_clear() -> bool:
 
 func _play_next_hand_card() -> void:
 	while _play_slot_cursor < HAND_SLOT_COUNT:
-		if _honey_skipped_slots.has(_play_slot_cursor):
+		if _hand_locked_slots.has(_play_slot_cursor):
 			_play_slot_cursor += 1
 			continue
 		if _hand_slots[_play_slot_cursor] == null:
-			_play_slot_cursor += 1
-			continue
-		if _gecko_stayed_slots.has(_play_slot_cursor):
 			_play_slot_cursor += 1
 			continue
 		break
@@ -1101,6 +1114,7 @@ func _finish_hand_play() -> void:
 	_resolve_lucky_coin_hand_effect()
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
+	_hand_locked_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
 	_hand_phase = HandPhase.BAG
@@ -1295,11 +1309,15 @@ func _apply_ingredient_play(
 	var pending_cobbler := _consume_pending_cobbler_bonus(hand_slot_index, from_hand_play)
 	var hand_play := {}
 	if from_hand_play and hand_slot_index >= 0:
+		var layout_slots := _hand_slots
+		if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+			layout_slots = _hand_start_slots
 		hand_play = {
 			"play_slot": hand_slot_index,
 			"last_hand_slot": _last_hand_play_slot,
 			"last_hand_ingredient": _last_hand_play_ingredient,
-			"hand_slots": _hand_slots,
+			"hand_slots": layout_slots,
+			"locked_slots": _hand_locked_slots,
 		}
 	var effect := IngredientEffects.apply(ingredient, context, hand_play)
 	_apply_cobbler_retroactive_routing(
@@ -1437,6 +1455,8 @@ func _apply_cobbler_retroactive_routing(
 	from_hand_play: bool,
 	hand_slot_index: int
 ) -> void:
+	if effect.cobbler_retroactive_slot >= 0 and _hand_locked_slots.has(effect.cobbler_retroactive_slot):
+		return
 	if effect.cobbler_apply_retroactive_immediately:
 		_apply_immediate_cobbler_retroactive_bonus(effect)
 		return
@@ -1488,6 +1508,8 @@ func _consume_pending_cobbler_bonus(
 	from_hand_play: bool
 ) -> Dictionary:
 	if not from_hand_play or hand_slot_index < 0:
+		return {"score": 0, "explosiveness": 0}
+	if _hand_locked_slots.has(hand_slot_index):
 		return {"score": 0, "explosiveness": 0}
 	if not _pending_cobbler_slot_bonuses.has(hand_slot_index):
 		return {"score": 0, "explosiveness": 0}
@@ -1930,6 +1952,11 @@ func _compute_honey_skipped_slots() -> Dictionary:
 	)
 
 
+func _discard_pending_cobbler_bonuses_for_locked_slots() -> void:
+	for slot_index in _hand_locked_slots.keys():
+		_pending_cobbler_slot_bonuses.erase(slot_index)
+
+
 func _reset_hand_slots() -> void:
 	_hand_slots.clear()
 	for _i in HAND_SLOT_COUNT:
@@ -1989,6 +2016,7 @@ func _reset_draw_flow_state() -> void:
 	_pending_hand_draw_target_slots.clear()
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
+	_hand_locked_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0
 	_eyeball_reserved.clear()

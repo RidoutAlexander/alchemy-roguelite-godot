@@ -10,18 +10,24 @@ static func compute_steps(
 	cauldron_contents: Array,
 	ingredients_added_before: int,
 	owned_trinket_ids: Array,
-	aura: AuraData
+	aura: AuraData,
+	honey_skipped_override: Dictionary = {},
+	gecko_stayed_override: Dictionary = {}
 ) -> Array:
 	var steps: Array = []
-	var honey_skipped := HandSlotEffects.compute_honey_skipped_slots(hand_slots, hand_slot_count)
+	var honey_skipped := honey_skipped_override
+	if honey_skipped.is_empty():
+		honey_skipped = HandSlotEffects.compute_honey_skipped_slots(hand_slots, hand_slot_count)
 	var interval_count_before := IngredientEffects.count_hand_stay_interval_plays(cauldron_contents)
-	var gecko_stayed := HandSlotEffects.compute_gecko_stay_slots(
-		hand_slots,
-		hand_slot_count,
-		honey_skipped,
-		interval_count_before,
-		owned_trinket_ids
-	)
+	var gecko_stayed := gecko_stayed_override
+	if gecko_stayed.is_empty():
+		gecko_stayed = HandSlotEffects.compute_gecko_stay_slots(
+			hand_slots,
+			hand_slot_count,
+			honey_skipped,
+			interval_count_before,
+			owned_trinket_ids
+		)
 
 	var sim_cauldron: Array = cauldron_contents.duplicate()
 	var sim_ingredients_added := ingredients_added_before

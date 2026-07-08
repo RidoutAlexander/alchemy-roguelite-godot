@@ -117,7 +117,8 @@ static func apply(
 			play_slot,
 			int(hand_play.get("last_hand_slot", -1)),
 			hand_play.get("hand_slots", []),
-			hand_play.get("last_hand_ingredient")
+			hand_play.get("last_hand_ingredient"),
+			hand_play.get("locked_slots", {})
 		)
 		_apply_resolved_cobbler_bonus(result, resolved)
 	else:
@@ -273,7 +274,8 @@ static func resolve_hand_play_cobbler(
 	play_slot: int,
 	last_hand_slot: int,
 	hand_slots: Array,
-	last_hand_ingredient: Variant = null
+	last_hand_ingredient: Variant = null,
+	locked_slots: Dictionary = {}
 ) -> Dictionary:
 	var previous = cauldron_contents[-1] if not cauldron_contents.is_empty() else null
 	var bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
@@ -285,9 +287,18 @@ static func resolve_hand_play_cobbler(
 		play_slot,
 		last_hand_slot,
 		hand_slots,
-		last_hand_ingredient
+		last_hand_ingredient,
+		locked_slots
 	)
 	if target_slot < 0:
+		if not locked_slots.is_empty():
+			var blocked_slot := _hand_boom_berry_slot_immediately_left(
+				hand_slots,
+				play_slot,
+				{}
+			)
+			if blocked_slot >= 0 and locked_slots.has(blocked_slot):
+				return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
 		return {
 			"bonus": bonus,
 			"retroactive_slot": -1,
@@ -341,9 +352,16 @@ static func _cobbler_adjacency_bonus_between(
 	return {"score": 0, "explosiveness": 0}
 
 
-static func _hand_boom_berry_slot_immediately_left(hand_slots: Array, slot_index: int) -> int:
+static func _hand_boom_berry_slot_immediately_left(
+	hand_slots: Array,
+	slot_index: int,
+	locked_slots: Dictionary = {}
+) -> int:
 	var left_slot := slot_index - 1
 	while left_slot >= 0:
+		if locked_slots.has(left_slot):
+			left_slot -= 1
+			continue
 		if hand_slots[left_slot] != null:
 			if is_boom_berry_id(hand_slots[left_slot].id):
 				return left_slot
@@ -358,21 +376,29 @@ static func _cobbler_bonus_target_slot(
 	play_slot: int,
 	last_hand_slot: int,
 	hand_slots: Array,
-	last_hand_ingredient: Variant = null
+	last_hand_ingredient: Variant = null,
+	locked_slots: Dictionary = {}
 ) -> int:
 	if ingredient == null or previous == null:
 		return play_slot
 	if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
-		var left_slot := _hand_boom_berry_slot_immediately_left(hand_slots, play_slot)
+		var left_slot := _hand_boom_berry_slot_immediately_left(
+			hand_slots,
+			play_slot,
+			locked_slots
+		)
 		if left_slot >= 0:
 			return left_slot
 		var last_ingredient: IngredientData = last_hand_ingredient as IngredientData
 		if (
 			last_hand_slot >= 0
+			and not locked_slots.has(last_hand_slot)
 			and last_ingredient != null
 			and is_boom_berry_id(last_ingredient.id)
 		):
 			return last_hand_slot
+		return -1
+	if locked_slots.has(play_slot):
 		return -1
 	return play_slot
 
