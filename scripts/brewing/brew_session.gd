@@ -78,6 +78,7 @@ var _bat_wing_choices: Array[IngredientData] = []
 var _bat_wing_picker_active: bool = false
 var _bat_wing_reroll_used: bool = false
 var _bat_wing_source_slot_index: int = -1
+var _bat_wing_pick_preview: IngredientData = null
 var _last_hand_play_slot: int = -1
 var _last_hand_play_ingredient: IngredientData = null
 var _pending_cobbler_slot_bonuses: Dictionary = {}
@@ -482,30 +483,46 @@ func _build_hand_display_modifiers() -> Dictionary:
 		"explosion_limit": context.explosion_limit,
 		"ingredients_added_to_cauldron": context.ingredients_added_to_cauldron,
 		"owned_trinket_ids": context.owned_trinket_ids.duplicate(),
+		"honey_skipped_override": _resolve_honey_skipped_slots_for_display(),
+		"gecko_stayed_override": _resolve_gecko_stayed_slots_for_display(),
+		"bat_wing_pick_overrides": _resolve_bat_wing_pick_previews(),
 	}
 
 
 func _compute_hand_preview_steps(slots_override: Array = []) -> Array:
 	var slots := _resolve_display_hand_slots(slots_override)
-	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
-		return _HandPlayPreview.compute_steps(
-			_hand_start_slots,
-			HAND_SLOT_COUNT,
-			context.cauldron_contents,
-			context.ingredients_added_to_cauldron,
-			context.owned_trinket_ids,
-			context.current_aura,
-			_honey_skipped_slots,
-			_gecko_stayed_slots
-		)
 	return _HandPlayPreview.compute_steps(
 		slots,
 		HAND_SLOT_COUNT,
 		context.cauldron_contents,
 		context.ingredients_added_to_cauldron,
 		context.owned_trinket_ids,
-		context.current_aura
+		context.current_aura,
+		_resolve_honey_skipped_slots_for_display(),
+		_resolve_gecko_stayed_slots_for_display(),
+		_parrot_doubles_next,
+		_resolve_bat_wing_pick_previews()
 	)
+
+
+func set_bat_wing_pick_preview(ingredient: IngredientData) -> void:
+	if _bat_wing_pick_preview == ingredient:
+		return
+	_bat_wing_pick_preview = ingredient
+	brew_updated.emit(context)
+
+
+func clear_bat_wing_pick_preview() -> void:
+	if _bat_wing_pick_preview == null:
+		return
+	_bat_wing_pick_preview = null
+	brew_updated.emit(context)
+
+
+func _resolve_bat_wing_pick_previews() -> Dictionary:
+	if _bat_wing_pick_preview == null or _bat_wing_source_slot_index < 0:
+		return {}
+	return {_bat_wing_source_slot_index: _bat_wing_pick_preview}
 
 
 func get_bag_display_count() -> int:
@@ -842,6 +859,7 @@ func complete_eyeball_puzzle(_ordered: Array = []) -> void:
 func complete_bat_wing_picker(selected: IngredientData) -> void:
 	if selected == null or _bat_wing_choices.is_empty():
 		return
+	_bat_wing_pick_preview = null
 
 	var unselected: Array[IngredientData] = []
 	for choice in _bat_wing_choices:
@@ -854,6 +872,7 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 	_bat_wing_reroll_used = false
 	var source_slot := _bat_wing_source_slot_index
 	_bat_wing_source_slot_index = -1
+	_bat_wing_pick_preview = null
 	var from_hand := source_slot >= 0
 	var parrot_doubled := _apply_ingredient(selected, true, from_hand, source_slot)
 	if context.is_exploded():
@@ -974,6 +993,7 @@ func try_play_hand() -> bool:
 	_seed_pending_cobbler_bonuses_from_hand()
 	_discard_pending_cobbler_bonuses_for_locked_slots()
 	_bat_wing_source_slot_index = -1
+	_bat_wing_pick_preview = null
 	_play_next_hand_card()
 	return true
 
@@ -1573,6 +1593,7 @@ func _apply_ingredient_play(
 			_bat_wing_source_slot_index = hand_slot_index
 		else:
 			_bat_wing_source_slot_index = -1
+	_bat_wing_pick_preview = null
 	if effect.voodoo_doll_arms_copy:
 		_voodoo_doll_arms_copy = true
 	else:
@@ -2104,7 +2125,9 @@ func _seed_pending_cobbler_bonuses_from_hand() -> void:
 		context.owned_trinket_ids,
 		context.current_aura,
 		_honey_skipped_slots,
-		_gecko_stayed_slots
+		_gecko_stayed_slots,
+		_parrot_doubles_next,
+		_resolve_bat_wing_pick_previews()
 	)
 	var sequence: Array = context.cauldron_contents.duplicate()
 	var last_hand_slot := -1
@@ -2219,6 +2242,7 @@ func _reset_draw_flow_state() -> void:
 	_bat_wing_picker_active = false
 	_bat_wing_reroll_used = false
 	_bat_wing_source_slot_index = -1
+	_bat_wing_pick_preview = null
 	_last_hand_play_slot = -1
 	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()

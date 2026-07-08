@@ -8,8 +8,11 @@ import sys
 HAND_SLOT_COUNT = 5
 HONEY_ID = "honey"
 BAT_WING_ID = "bat_wing"
+PARROT_ID = "parrot"
+FEATHER_ID = "feather_1"
 IN_RHYTHM_INTERVAL = 3
 BUBBLING_INTERVAL = 11
+BAT_WING_PICK_PLACEHOLDER = "__bat_wing_pick_preview__"
 
 
 def honey_skipped_slots(hand_slots: list[str | None]) -> set[int]:
@@ -52,16 +55,142 @@ def compute_gecko_stay_slots(
     return stayed
 
 
+def skips_counter(ingredient_id: str | None) -> bool:
+    return ingredient_id == BAT_WING_ID
+
+
+def in_rhythm_doubles(cauldron_count_before: int) -> bool:
+    return (cauldron_count_before + 1) % IN_RHYTHM_INTERVAL == 0
+
+
+def bubbling_returns(ingredients_added_before: int) -> bool:
+    return (ingredients_added_before + 1) % BUBBLING_INTERVAL == 0
+
+
+def feather_plays_twice(ingredient_id: str | None, has_feather_trinket: bool) -> bool:
+    return has_feather_trinket and ingredient_id is not None and ingredient_id.startswith("feather")
+
+
+def generic_bat_wing_pick() -> str:
+    return BAT_WING_PICK_PLACEHOLDER
+
+
+def record_cauldron_play(
+    steps: list[dict],
+    slot_index: int,
+    ingredient_id: str | None,
+    sim_cauldron: int,
+    sim_ingredients_added: int,
+    extra_flags: dict | None = None,
+) -> tuple[int, int]:
+    extra_flags = extra_flags or {}
+    cauldron_count_before = sim_cauldron
+    ingredients_added_before = sim_ingredients_added
+    counts_for_added = ingredient_id is not None and not skips_counter(ingredient_id)
+    returns = counts_for_added and bubbling_returns(ingredients_added_before)
+
+    if ingredient_id is not None:
+        sim_cauldron += 1
+    if returns:
+        sim_cauldron -= 1
+    if counts_for_added:
+        sim_ingredients_added += 1
+
+    steps.append(
+        {
+            "slot_index": slot_index,
+            "ingredient_id": ingredient_id,
+            "plays_to_cauldron": True,
+            "cauldron_count_before": cauldron_count_before,
+            "ingredients_added_before": ingredients_added_before,
+            "in_rhythm_doubles": in_rhythm_doubles(cauldron_count_before),
+            "bubbling_returns": returns,
+            **extra_flags,
+        }
+    )
+    return sim_cauldron, sim_ingredients_added
+
+
+def simulate_bat_wing_pick_chain(
+    steps: list[dict],
+    source_slot: int,
+    sim_cauldron: int,
+    sim_ingredients_added: int,
+    bat_wing_pick_overrides: dict[int, str],
+    use_pick_override: bool,
+) -> tuple[int, int]:
+    pick = generic_bat_wing_pick()
+    if use_pick_override and source_slot in bat_wing_pick_overrides:
+        pick = bat_wing_pick_overrides[source_slot]
+    sim_cauldron, sim_ingredients_added = record_cauldron_play(
+        steps,
+        source_slot,
+        pick,
+        sim_cauldron,
+        sim_ingredients_added,
+        {"bat_wing_pick": True},
+    )
+    if pick == BAT_WING_ID:
+        return simulate_bat_wing_pick_chain(
+            steps,
+            source_slot,
+            sim_cauldron,
+            sim_ingredients_added,
+            bat_wing_pick_overrides,
+            False,
+        )
+    return sim_cauldron, sim_ingredients_added
+
+
+def record_hand_slot_play(
+    steps: list[dict],
+    slot_index: int,
+    ingredient_id: str,
+    sim_cauldron: int,
+    sim_ingredients_added: int,
+    bat_wing_pick_overrides: dict[int, str],
+    parrot_repeat: bool = False,
+    feather_repeat: bool = False,
+) -> tuple[int, int]:
+    sim_cauldron, sim_ingredients_added = record_cauldron_play(
+        steps,
+        slot_index,
+        ingredient_id,
+        sim_cauldron,
+        sim_ingredients_added,
+        {
+            "parrot_repeat": parrot_repeat,
+            "feather_repeat": feather_repeat,
+        },
+    )
+    if ingredient_id == BAT_WING_ID:
+        return simulate_bat_wing_pick_chain(
+            steps,
+            slot_index,
+            sim_cauldron,
+            sim_ingredients_added,
+            bat_wing_pick_overrides,
+            True,
+        )
+    return sim_cauldron, sim_ingredients_added
+
+
 def compute_steps(
     hand_slots: list[str | None],
     cauldron_size: int,
     ingredients_added: int,
+    *,
+    parrot_doubles_next: bool = False,
+    has_feather_trinket: bool = False,
+    bat_wing_pick_overrides: dict[int, str] | None = None,
 ) -> list[dict]:
     steps: list[dict] = []
     honey_skipped = honey_skipped_slots(hand_slots)
     gecko_stayed = compute_gecko_stay_slots(hand_slots, honey_skipped, ingredients_added)
     sim_cauldron = cauldron_size
     sim_ingredients_added = ingredients_added
+    parrot_repeats_next = parrot_doubles_next
+    bat_wing_pick_overrides = bat_wing_pick_overrides or {}
 
     for slot_index in range(HAND_SLOT_COUNT):
         if slot_index in honey_skipped:
@@ -80,31 +209,41 @@ def compute_steps(
             )
             continue
 
-        cauldron_count_before = sim_cauldron
-        ingredients_added_before = sim_ingredients_added
-        counts_for_added = ingredient_id != BAT_WING_ID
-        bubbling_returns = (
-            counts_for_added
-            and (ingredients_added_before + 1) % BUBBLING_INTERVAL == 0
-        )
-        in_rhythm_doubles = (cauldron_count_before + 1) % IN_RHYTHM_INTERVAL == 0
+        parrot_repeat_this = parrot_repeats_next
+        parrot_repeats_next = False
 
-        sim_cauldron += 1
-        if bubbling_returns:
-            sim_cauldron -= 1
-        if counts_for_added:
-            sim_ingredients_added += 1
-
-        steps.append(
-            {
-                "slot_index": slot_index,
-                "ingredient_id": ingredient_id,
-                "plays_to_cauldron": True,
-                "ingredients_added_before": ingredients_added_before,
-                "in_rhythm_doubles": in_rhythm_doubles,
-                "bubbling_returns": bubbling_returns,
-            }
+        sim_cauldron, sim_ingredients_added = record_hand_slot_play(
+            steps,
+            slot_index,
+            ingredient_id,
+            sim_cauldron,
+            sim_ingredients_added,
+            bat_wing_pick_overrides,
         )
+        if ingredient_id == PARROT_ID:
+            parrot_repeats_next = True
+
+        if parrot_repeat_this:
+            sim_cauldron, sim_ingredients_added = record_hand_slot_play(
+                steps,
+                slot_index,
+                ingredient_id,
+                sim_cauldron,
+                sim_ingredients_added,
+                bat_wing_pick_overrides,
+                parrot_repeat=True,
+            )
+
+        if feather_plays_twice(ingredient_id, has_feather_trinket):
+            sim_cauldron, sim_ingredients_added = record_hand_slot_play(
+                steps,
+                slot_index,
+                ingredient_id,
+                sim_cauldron,
+                sim_ingredients_added,
+                bat_wing_pick_overrides,
+                feather_repeat=True,
+            )
 
     return steps
 
@@ -117,9 +256,25 @@ def playing_slots(steps: list[dict]) -> list[int]:
     ]
 
 
+def in_rhythm_slots(steps: list[dict]) -> list[int]:
+    return [
+        int(step["slot_index"])
+        for step in steps
+        if step.get("plays_to_cauldron") and step.get("in_rhythm_doubles")
+    ]
+
+
+def bubbling_slots(steps: list[dict]) -> list[int]:
+    return [
+        int(step["slot_index"])
+        for step in steps
+        if step.get("plays_to_cauldron") and step.get("bubbling_returns")
+    ]
+
+
 def main() -> int:
     # Honey keeps the left card in hand: only honey and cards to its right resolve.
-    steps = compute_steps(["a", "honey", "c", None, None], 0, 0)
+    steps = compute_steps(["a", HONEY_ID, "c", None, None], 0, 0)
     assert playing_slots(steps) == [1, 2], playing_slots(steps)
 
     # Gecko stay removes a slot from cauldron play order.
@@ -127,25 +282,39 @@ def main() -> int:
     assert any(step.get("gecko_stays") for step in steps), steps
     assert playing_slots(steps) == [0], playing_slots(steps)
 
-    # Bat wing plays but should not advance bubbling interval for the next card.
+    # Bat wing plays and adds a pick; pick advances bubbling interval for the next card.
     steps = compute_steps([BAT_WING_ID, "b", None, None, None], 0, 9)
-    assert playing_slots(steps) == [0, 1], playing_slots(steps)
+    assert playing_slots(steps) == [0, 0, 1], playing_slots(steps)
     b_step = next(
         step
         for step in steps
         if step.get("ingredient_id") == "b" and step.get("plays_to_cauldron")
     )
-    assert b_step.get("ingredients_added_before", -1) == 9, b_step
-    assert not b_step.get("bubbling_returns"), b_step
+    assert b_step.get("ingredients_added_before", -1) == 10, b_step
+    assert b_step.get("bubbling_returns"), b_step
 
     # In Rhythm should follow actual cauldron adds, not raw slot positions.
     steps = compute_steps(["a", "b", "c", None, None], 2, 0)
-    in_rhythm_slots = [
-        int(step["slot_index"])
-        for step in steps
-        if step.get("plays_to_cauldron") and step.get("in_rhythm_doubles")
-    ]
-    assert in_rhythm_slots == [0], in_rhythm_slots
+    assert in_rhythm_slots(steps) == [0], in_rhythm_slots(steps)
+
+    # Parrot doubles the next card's cauldron adds.
+    steps = compute_steps([PARROT_ID, "b", "c", None, None], 0, 0)
+    assert playing_slots(steps).count(1) == 2, playing_slots(steps)
+    assert in_rhythm_slots(steps) == [1], in_rhythm_slots(steps)
+
+    # Pristine feather doubles feather plays for interval counting.
+    steps = compute_steps([FEATHER_ID, "b", None, None, None], 0, 9, has_feather_trinket=True)
+    assert playing_slots(steps).count(0) == 2, playing_slots(steps)
+    assert bubbling_slots(steps) == [0], bubbling_slots(steps)
+
+    # Bat wing pick preview can shift bubbling to a later hand slot.
+    steps = compute_steps(
+        [BAT_WING_ID, "b", None, None, None],
+        0,
+        9,
+        bat_wing_pick_overrides={0: "safe_pick"},
+    )
+    assert bubbling_slots(steps) == [1], bubbling_slots(steps)
 
     print("PASS: hand play preview verification checks passed")
     return 0

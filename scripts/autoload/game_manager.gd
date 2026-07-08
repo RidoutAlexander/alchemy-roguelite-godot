@@ -368,6 +368,18 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 	_sync_hand_completion()
 
 
+func set_bat_wing_pick_preview(ingredient: IngredientData) -> void:
+	if run == null:
+		return
+	run.brew_session.set_bat_wing_pick_preview(ingredient)
+
+
+func clear_bat_wing_pick_preview() -> void:
+	if run == null:
+		return
+	run.brew_session.clear_bat_wing_pick_preview()
+
+
 func can_reroll_bat_wing_choices() -> bool:
 	if run == null:
 		return false

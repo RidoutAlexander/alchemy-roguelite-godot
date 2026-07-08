@@ -554,7 +554,11 @@ static func compute_hand_display_stats(
 		cauldron_contents,
 		int(modifiers.get("ingredients_added_to_cauldron", 0)),
 		owned_trinket_ids,
-		aura
+		aura,
+		modifiers.get("honey_skipped_override", {}),
+		modifiers.get("gecko_stayed_override", {}),
+		bool(modifiers.get("parrot_doubles_next", false)),
+		modifiers.get("bat_wing_pick_overrides", {})
 	)
 
 	var sim_cauldron: Array = cauldron_contents.duplicate()
@@ -579,6 +583,19 @@ static func compute_hand_display_stats(
 			continue
 		var ingredient: IngredientData = step.get("ingredient")
 		if ingredient == null:
+			continue
+		if (
+			bool(step.get("parrot_repeat", false))
+			or bool(step.get("feather_repeat", false))
+			or bool(step.get("bat_wing_pick", false))
+		):
+			sim_cauldron.append(ingredient)
+			if bool(step.get("bubbling_returns", false)):
+				sim_cauldron.pop_back()
+			last_hand_slot = play_slot
+			last_hand_ingredient = ingredient
+			if ingredient.id == PARROT_ID:
+				parrot_doubles_next = true
 			continue
 		if ingredient.id == BAT_WING_ID:
 			var bw_point := ingredient.point_value
@@ -617,7 +634,6 @@ static func compute_hand_display_stats(
 			last_hand_ingredient = ingredient
 			continue
 		var cauldron_count := int(step.get("cauldron_count_before", sim_cauldron.size()))
-		var parrot_repeats_play := parrot_doubles_next
 		if parrot_doubles_next:
 			parrot_doubles_next = false
 		var point_value := ingredient.point_value
@@ -715,12 +731,6 @@ static func compute_hand_display_stats(
 		sim_cauldron.append(ingredient)
 		if bool(step.get("bubbling_returns", false)):
 			sim_cauldron.pop_back()
-		if parrot_repeats_play:
-			sim_explosiveness += explosive_add
-			sim_cauldron.append(ingredient)
-		elif TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
-			sim_explosiveness += explosive_add
-			sim_cauldron.append(ingredient)
 		last_hand_slot = play_slot
 		last_hand_ingredient = ingredient
 		cauldron_count = sim_cauldron.size()
