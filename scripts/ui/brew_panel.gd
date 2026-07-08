@@ -1323,10 +1323,11 @@ func _play_next_frog_leg_return_to_bag() -> void:
 
 	var entry: Dictionary = _frog_leg_return_queue.pop_front()
 	var needs_restore := bool(entry.get("needs_restore", false))
+	var played_chip: IngredientData = entry.get("played_chip")
 	var fly_data := _frog_leg_return_fly_data()
 	if fly_data.is_empty():
 		if needs_restore and GameManager.run != null:
-			GameManager.run.brew_session.restore_frog_leg_to_master_bag()
+			GameManager.run.brew_session.restore_frog_leg_to_master_bag(played_chip)
 		GameManager.notify_bag_display_changed()
 		_play_next_frog_leg_return_to_bag()
 		return
@@ -1339,7 +1340,7 @@ func _play_next_frog_leg_return_to_bag() -> void:
 		fly_data["size"],
 		func() -> void:
 			if needs_restore and GameManager.run != null:
-				GameManager.run.brew_session.restore_frog_leg_to_master_bag()
+				GameManager.run.brew_session.restore_frog_leg_to_master_bag(played_chip)
 			GameManager.notify_bag_display_changed()
 			_play_next_frog_leg_return_to_bag()
 	)

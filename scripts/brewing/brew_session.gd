@@ -118,6 +118,8 @@ var _jar_of_dirt_broke_poof_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
 var _pending_time_turner_target_slots: Array = []
 var _frog_legs_played_this_brew: Array[IngredientData] = []
+var _jar_of_froglegs_played_snapshot: Array[IngredientData] = []
+var _jar_frog_leg_restores_remaining: int = 0
 var _jar_of_froglegs_returns_consumed: bool = false
 var last_bag_grant_ingredient: IngredientData = null
 
@@ -172,6 +174,8 @@ func start_brew(
 	_purchased_mulligans_this_brew = 0
 	_mulligans_used = 0
 	_frog_legs_played_this_brew.clear()
+	_jar_of_froglegs_played_snapshot.clear()
+	_jar_frog_leg_restores_remaining = 0
 	_reset_draw_flow_state()
 	_refresh_mulligan_allowance()
 	bag.reset_for_brew(true)
@@ -669,6 +673,10 @@ func complete_frog_leg_save() -> void:
 	brew_updated.emit(context)
 
 
+func _snapshot_jar_of_froglegs_played() -> void:
+	_jar_of_froglegs_played_snapshot = _frog_legs_played_this_brew.duplicate()
+
+
 func consume_jar_of_froglegs_return_entries() -> Array:
 	if _jar_of_froglegs_returns_consumed:
 		return []
@@ -677,21 +685,36 @@ func consume_jar_of_froglegs_return_entries() -> Array:
 	_jar_of_froglegs_returns_consumed = true
 	var entries: Array = []
 	var seen: Dictionary = {}
-	for ingredient in _frog_legs_played_this_brew:
+	var played_source := (
+		_jar_of_froglegs_played_snapshot
+		if not _jar_of_froglegs_played_snapshot.is_empty()
+		else _frog_legs_played_this_brew
+	)
+	_jar_frog_leg_restores_remaining = 0
+	for ingredient in played_source:
 		if ingredient == null or ingredient.id != IngredientEffects.FROG_LEG_ID:
 			continue
 		if seen.has(ingredient):
 			continue
 		seen[ingredient] = true
+		var needs_restore := not context.bag.has_master_chip(ingredient)
+		if needs_restore:
+			_jar_frog_leg_restores_remaining += 1
 		entries.append(
 			{
-				"needs_restore": not context.bag.has_master_chip(ingredient),
+				"needs_restore": needs_restore,
+				"played_chip": ingredient,
 			}
 		)
 	return entries
 
 
-func restore_frog_leg_to_master_bag() -> void:
+func restore_frog_leg_to_master_bag(played_chip: IngredientData = null) -> void:
+	if _jar_frog_leg_restores_remaining <= 0:
+		return
+	if played_chip != null and context.bag.has_master_chip(played_chip):
+		return
+	_jar_frog_leg_restores_remaining -= 1
 	var template := GameManager.run.find_ingredient(IngredientEffects.FROG_LEG_ID)
 	if template != null:
 		context.bag.add_to_master_bag(template)
@@ -1780,6 +1803,7 @@ func _finalize_brew(clear_hand: bool = true) -> void:
 	if _brew_finalized:
 		return
 	_brew_finalized = true
+	_snapshot_jar_of_froglegs_played()
 	_purchased_mulligans_this_brew = 0
 	_refresh_mulligan_allowance()
 	_clear_presented_stat_snapshots()
@@ -2050,6 +2074,8 @@ func _reset_draw_flow_state() -> void:
 	_pending_time_turner_new_hand.clear()
 	_pending_time_turner_target_slots.clear()
 	_frog_legs_played_this_brew.clear()
+	_jar_of_froglegs_played_snapshot.clear()
+	_jar_frog_leg_restores_remaining = 0
 	_jar_of_froglegs_returns_consumed = false
 	_booberry_count_this_hand = 0
 	_poison_apple_pending.clear()
