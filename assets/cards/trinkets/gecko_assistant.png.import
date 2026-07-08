@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d5w24ne5vy7y"
-valid=false
+uid="uid://dhg8qmbjcq8ux"
+path="res://.godot/imported/gecko_assistant.png-46d6b24d9d184df4f93ac0f0f773a49b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/cards/trinkets/gecko_assistant.png"
+dest_files=["res://.godot/imported/gecko_assistant.png-46d6b24d9d184df4f93ac0f0f773a49b.ctex"]
 
 [params]
 
