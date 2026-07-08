@@ -26,6 +26,55 @@ def cobbler_adjacency_bonus(previous_id: str | None, ingredient_id: str) -> dict
     return {"score": 0, "explosiveness": 0}
 
 
+def is_unplayed_hand_slot(slot_index: int, play_cursor: int) -> bool:
+    if slot_index < 0:
+        return False
+    if play_cursor < 0:
+        return True
+    return slot_index >= play_cursor
+
+
+def hand_neighbor_slot(
+    hand_slots: list[str | None],
+    slot_index: int,
+    direction: int,
+) -> int:
+    neighbor_slot = slot_index + direction
+    while 0 <= neighbor_slot < len(hand_slots):
+        ingredient_id = hand_slots[neighbor_slot]
+        if ingredient_id is not None:
+            return neighbor_slot
+        neighbor_slot += direction
+    return -1
+
+
+def cobbler_adjacency_bonus_from_hand_neighbors(
+    ingredient_id: str,
+    play_slot: int,
+    hand_slots: list[str | None],
+    play_cursor: int = -1,
+) -> dict:
+    if is_boom_berry_id(ingredient_id):
+        for direction in (-1, 1):
+            neighbor_slot = play_slot + direction
+            if neighbor_slot < 0 or neighbor_slot >= len(hand_slots):
+                continue
+            if not is_unplayed_hand_slot(neighbor_slot, play_cursor):
+                continue
+            neighbor_id = hand_slots[neighbor_slot]
+            if neighbor_id == COBBLER_ID:
+                return {
+                    "bonus": {
+                        "score": COBBLER_SCORE,
+                        "explosiveness": COBBLER_EXPLOSIVE,
+                    },
+                    "neighbor_slot": neighbor_slot,
+                }
+        return {"bonus": {"score": 0, "explosiveness": 0}, "neighbor_slot": -1}
+
+    return {"bonus": {"score": 0, "explosiveness": 0}, "neighbor_slot": -1}
+
+
 def hand_boom_berry_slot_immediately_left(hand_slots: list[str | None], slot_index: int) -> int:
     left_slot = slot_index - 1
     while left_slot >= 0:
@@ -69,11 +118,32 @@ def resolve_hand_play_cobbler(
     last_hand_slot: int,
     hand_slots: list[str | None],
     last_hand_ingredient_id: str | None = None,
+    play_cursor: int = -1,
 ) -> dict:
     previous_id = cauldron_ids[-1] if cauldron_ids else None
     bonus = cobbler_adjacency_bonus(previous_id, ingredient_id)
     if bonus["score"] == 0 and bonus["explosiveness"] == 0:
+        hand_pair = cobbler_adjacency_bonus_from_hand_neighbors(
+            ingredient_id,
+            play_slot,
+            hand_slots,
+            play_cursor,
+        )
+        bonus = hand_pair["bonus"]
+        if bonus["score"] > 0 or bonus["explosiveness"] > 0:
+            if is_boom_berry_id(ingredient_id):
+                return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": True}
+    if bonus["score"] == 0 and bonus["explosiveness"] == 0:
         return {"bonus": bonus, "retroactive_slot": -1}
+    if (
+        ingredient_id == COBBLER_ID
+        and previous_id is not None
+        and is_boom_berry_id(previous_id)
+        and last_hand_slot >= 0
+        and abs(play_slot - last_hand_slot) == 1
+        and hand_slots[play_slot] == COBBLER_ID
+    ):
+        return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
     target_slot = cobbler_bonus_target_slot(
         ingredient_id,
         previous_id,
@@ -101,6 +171,13 @@ def resolve_hand_play_cobbler(
             return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": True}
         return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
     return {"bonus": bonus, "retroactive_slot": target_slot}
+
+
+def next_unplayed_hand_slot(hand_slots: list[str | None], play_slot: int) -> int:
+    for slot_index in range(play_slot + 1, len(hand_slots)):
+        if hand_slots[slot_index] is not None:
+            return slot_index
+    return play_slot
 
 
 def simulate_hand_play(
@@ -169,6 +246,7 @@ def simulate_hand_play(
             last_hand_slot,
             hand_slots,
             last_hand_ingredient_id,
+            next_unplayed_hand_slot(hand_slots, play_slot_for_pick),
         )
         bonus = resolved["bonus"]
         retroactive_slot = resolved["retroactive_slot"]
@@ -255,6 +333,7 @@ def simulate_hand_play_with_play_breakdown(
             last_hand_slot,
             hand_slots,
             last_hand_ingredient_id,
+            play_slot,
         )
         bonus = resolved["bonus"]
         retroactive_slot = resolved["retroactive_slot"]
@@ -300,6 +379,17 @@ def main() -> int:
     assert totals["score"] == COBBLER_SCORE, (
         f"expected cobbler in slot 2 to pair with picked boom berry, got {totals['score']}"
     )
+    pick_resolve = resolve_hand_play_cobbler(
+        BOOM_BERRY_ID,
+        [BAT_WING_ID],
+        1,
+        1,
+        hand,
+        BAT_WING_ID,
+        2,
+    )
+    assert pick_resolve.get("apply_to_current"), pick_resolve
+    assert pick_resolve["bonus"]["score"] == COBBLER_SCORE, pick_resolve
 
     # Boom berry plays before cobbler; cobbler must not buff itself.
     hand = [BOOM_BERRY_ID, None, COBBLER_ID, None, None]
@@ -339,6 +429,18 @@ def main() -> int:
     assert adjacent["score"] == COBBLER_SCORE
     assert adjacent["explosiveness"] == COBBLER_EXPLOSIVE
 
+    berry_resolve = resolve_hand_play_cobbler(
+        BOOM_BERRY_ID,
+        [],
+        0,
+        -1,
+        [BOOM_BERRY_ID, COBBLER_ID, None, None, None],
+        None,
+        0,
+    )
+    assert berry_resolve.get("apply_to_current"), berry_resolve
+    assert berry_resolve["bonus"]["score"] == COBBLER_SCORE
+
     resolved_adjacent = resolve_hand_play_cobbler(
         COBBLER_ID,
         [BOOM_BERRY_ID],
@@ -346,9 +448,9 @@ def main() -> int:
         0,
         [BOOM_BERRY_ID, COBBLER_ID, None, None, None],
         BOOM_BERRY_ID,
+        1,
     )
-    assert resolved_adjacent["retroactive_slot"] == 0, resolved_adjacent
-    assert "apply_to_current" not in resolved_adjacent
+    assert resolved_adjacent["bonus"]["score"] == 0, resolved_adjacent
 
     # Bag-drawn bat wing should not use a hand slot.
     source_slot = -1

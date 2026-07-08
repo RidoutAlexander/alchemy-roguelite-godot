@@ -485,6 +485,9 @@ func _compute_hand_display_stats(slots_override: Array = []) -> Array:
 
 
 func _build_hand_display_modifiers() -> Dictionary:
+	var layout_hand_slots: Array = _hand_start_slots
+	if layout_hand_slots.is_empty():
+		layout_hand_slots = _hand_slots
 	return {
 		"parrot_doubles_next": _parrot_doubles_next,
 		"unicorn_cures_next": _unicorn_cures_next_explosive,
@@ -496,6 +499,9 @@ func _build_hand_display_modifiers() -> Dictionary:
 		"honey_skipped_override": _resolve_honey_skipped_slots_for_display(),
 		"gecko_stayed_override": _resolve_gecko_stayed_slots_for_display(),
 		"bat_wing_pick_overrides": _resolve_bat_wing_pick_previews(),
+		"locked_slots": _hand_locked_slots,
+		"play_cursor": _play_slot_cursor if _hand_phase == HandPhase.PLAYING else -1,
+		"layout_hand_slots": layout_hand_slots,
 	}
 
 
@@ -559,21 +565,27 @@ func get_bat_wing_choice_preview(ingredient: IngredientData) -> Dictionary:
 		),
 	}
 
-	var hand_slots := _resolve_display_hand_slots()
-	var layout_slots: Array = hand_slots
-	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
-		layout_slots = _hand_start_slots
+	var layout_slots: Array = _hand_start_slots
+	if layout_slots.is_empty():
+		layout_slots = _resolve_display_hand_slots()
 
 	var modifiers := _build_hand_display_modifiers()
 	modifiers["growth_potion_doubles_remaining"] = _growth_potion_doubles_remaining
+	modifiers["layout_hand_slots"] = layout_slots
 	modifiers["severed_layout_slots"] = layout_slots
+	modifiers["locked_slots"] = _hand_locked_slots
+	modifiers["play_cursor"] = _play_slot_cursor
+	modifiers["pending_cobbler_bonus"] = _pending_cobbler_slot_bonuses.get(
+		_bat_wing_source_slot_index,
+		{"score": 0, "explosiveness": 0}
+	)
 
 	return IngredientEffects.compute_immediate_cauldron_play_preview(
 		ingredient,
 		context.cauldron_contents,
 		context.current_aura,
 		_bat_wing_source_slot_index,
-		hand_slots,
+		layout_slots,
 		_last_hand_play_slot,
 		_last_hand_play_ingredient,
 		modifiers,
@@ -1534,6 +1546,7 @@ func _apply_ingredient_play(
 			"last_hand_ingredient": _last_hand_play_ingredient,
 			"hand_slots": layout_slots,
 			"locked_slots": _hand_locked_slots,
+			"play_cursor": _play_slot_cursor,
 		}
 	var effect := IngredientEffects.apply(ingredient, context, hand_play)
 	_apply_cobbler_retroactive_routing(
@@ -2210,7 +2223,8 @@ func _seed_pending_cobbler_bonuses_from_hand() -> void:
 			last_hand_slot,
 			_hand_start_slots,
 			last_hand_ingredient,
-			_hand_locked_slots
+			_hand_locked_slots,
+			play_slot
 		)
 		var retroactive_slot := int(resolved.get("retroactive_slot", -1))
 		if retroactive_slot >= 0 and retroactive_slot < play_slot:
