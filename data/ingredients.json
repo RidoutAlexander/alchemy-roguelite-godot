@@ -300,7 +300,7 @@
     "id": "lucky_coin",
     "art": "lucky_coin",
     "display_name": "Lucky Coin",
-    "description": "If you don't swap this hand, gain 1 extra swap next hand, If you do, gain +2 gold",
+    "description": "If you don't swap this hand, gain +2 gold. If you do, gain 1 extra swap on your next hand.",
     "point_value": 2,
     "explosive_value": 0,
     "shop_cost": 13,
