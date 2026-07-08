@@ -133,15 +133,12 @@ func _update_score_label(
 
 
 func _format_boss_threshold_modifier_suffix(penalty: int, discount: int) -> String:
-	if penalty <= 0 and discount <= 0:
+	var net_adjustment := penalty - discount
+	if net_adjustment == 0:
 		return ""
-
-	var parts: PackedStringArray = []
-	if penalty > 0:
-		parts.append("+%d" % penalty)
-	if discount > 0:
-		parts.append("-%d" % discount)
-	return " (%s boss)" % " ".join(parts)
+	if net_adjustment > 0:
+		return " (+%d boss)" % net_adjustment
+	return " (%d boss)" % net_adjustment
 
 
 func _set_particle_effects_enabled(enabled: bool) -> void:
