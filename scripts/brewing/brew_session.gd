@@ -1212,7 +1212,7 @@ func _try_begin_parrot_repeat_play() -> bool:
 	_clear_parrot_repeat()
 
 	last_play_fly_count = 1
-	_apply_ingredient_play(ingredient, false)
+	_apply_ingredient_play(ingredient, false, from_hand, slot_index)
 	enqueue_presented_stat_snapshot()
 	_resolve_single_ingredient_play_aftermath(ingredient, from_hand, slot_index, true, false)
 	_resolve_explosion_after_play()

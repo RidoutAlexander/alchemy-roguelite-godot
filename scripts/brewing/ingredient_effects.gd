@@ -632,8 +632,10 @@ static func compute_hand_display_stats(
 			explosive_value *= 2
 			doubles_remaining -= 1
 		if parrot_doubles_next:
-			point_value *= 2
-			explosive_value *= 2
+			# Bat Wing resolves again with its picker; parrot is a second full play, not 2x stats.
+			if ingredient.id != BAT_WING_ID:
+				point_value *= 2
+				explosive_value *= 2
 			parrot_doubles_next = false
 		if bool(step.get("in_rhythm_doubles", false)):
 			point_value *= 2
