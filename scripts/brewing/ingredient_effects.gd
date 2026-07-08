@@ -427,7 +427,8 @@ static func _apply_retroactive_cobbler_bonus_to_slot(
 	target_slot: int,
 	cobbler_bonus: Dictionary,
 	pre_double_stats: Array,
-	display_stats: Array
+	display_stats: Array,
+	unicorn_cured_slots: Dictionary = {}
 ) -> void:
 	if target_slot < 0 or target_slot >= pre_double_stats.size():
 		return
@@ -436,6 +437,8 @@ static func _apply_retroactive_cobbler_bonus_to_slot(
 		return
 	var bonus_score := int(cobbler_bonus.get("score", 0))
 	var bonus_explosive := int(cobbler_bonus.get("explosiveness", 0))
+	if unicorn_cured_slots.has(target_slot):
+		bonus_explosive = 0
 	if bonus_score == 0 and bonus_explosive == 0:
 		return
 	var old_prior_pv := int(prior_stats.get("point_value", 0))
@@ -564,6 +567,7 @@ static func compute_hand_display_stats(
 	var last_hand_slot := -1
 	var last_hand_ingredient: IngredientData = null
 	var pre_double_stats: Array = []
+	var unicorn_cured_slot_lookup: Dictionary = {}
 	for _slot_index in hand_slot_count:
 		pre_double_stats.append(null)
 
@@ -604,7 +608,8 @@ static func compute_hand_display_stats(
 					target_slot,
 					cobbler_bonus,
 					pre_double_stats,
-					display_stats
+					display_stats,
+					unicorn_cured_slot_lookup
 				)
 
 		var effect_bonuses := _preview_card_effect_bonuses(
@@ -650,6 +655,7 @@ static func compute_hand_display_stats(
 			unicorn_cures_next = false
 			if unicorn_cured_slots is Array:
 				unicorn_cured_slots.append(play_slot)
+			unicorn_cured_slot_lookup[play_slot] = true
 		if ice_cube_shields > 0:
 			if (
 				explosive_add > 0
@@ -699,6 +705,7 @@ static func compute_hand_display_stats(
 				unicorn_cures_next = false
 				if unicorn_cured_slots is Array:
 					unicorn_cured_slots.append(play_slot)
+				unicorn_cured_slot_lookup[play_slot] = true
 			if ice_cube_shields > 0:
 				if (
 					repeat_explosive_add > 0
