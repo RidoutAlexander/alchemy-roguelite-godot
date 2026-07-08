@@ -26,6 +26,7 @@ const RHYTHM_SHAKE_STEP := 0.07
 
 var _slot_cards: Array[IngredientCard] = []
 var _slot_anchors: Array[Control] = []
+var _last_slot_effect_entries: Array = []
 var _dragging_card: IngredientCard = null
 var _drag_source_slot: int = -1
 var _drag_grab_offset: Vector2 = Vector2.ZERO
@@ -144,6 +145,7 @@ func refresh_hand(
 	hand_display_stats: Array = [],
 	slot_effect_entries: Array = []
 ) -> void:
+	_last_slot_effect_entries = slot_effect_entries
 	_interaction_enabled = interaction_enabled
 	_swap_enabled = swap_enabled and interaction_enabled
 	_cancel_drag()
@@ -238,7 +240,12 @@ func reveal_slot(
 	display_stats: Variant = null
 ) -> void:
 	_suppressed_slots.erase(slot_index)
-	_bind_slot(slot_index, ingredient, display_stats)
+	var effect_entries: Array = (
+		_last_slot_effect_entries[slot_index]
+		if slot_index < _last_slot_effect_entries.size()
+		else []
+	)
+	_bind_slot(slot_index, ingredient, display_stats, effect_entries)
 
 
 func _bind_slot(

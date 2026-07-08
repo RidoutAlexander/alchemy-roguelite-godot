@@ -158,7 +158,10 @@ func bind_hand_card(
 	else:
 		call_deferred("update_hand_stat_display", point_display, explosive_display)
 	_apply_hand_layout()
-	_bind_hand_effect_entries(effect_entries)
+	if is_node_ready():
+		_bind_hand_effect_entries(effect_entries)
+	else:
+		call_deferred("_bind_hand_effect_entries", effect_entries)
 	_sync_hand_input()
 
 
@@ -336,11 +339,14 @@ func _partition_effect_entries(entries: Array) -> Dictionary:
 
 
 func _bind_hand_effect_entries(entries: Array) -> void:
+	if not _hand_mode or not is_node_ready():
+		return
 	var partitioned := _partition_effect_entries(entries)
 	_set_gecko_hand_overlay_visible(partitioned.get("has_gecko", false))
 	_set_honey_splatter_overlay_visible(partitioned.get("has_honey", false))
 	_set_unicorn_sparkle_visible(partitioned.get("has_unicorn_sparkle", false))
 	_bind_effect_icon_entries(partitioned.get("icon_entries", []))
+	_apply_hand_effect_layout()
 	_update_hand_effect_icon_position()
 
 
@@ -351,6 +357,7 @@ func _bind_effect_icon_entries(icon_entries: Array) -> void:
 		_hand_effect_icons.clear_icons()
 	else:
 		_hand_effect_icons.bind_entries(icon_entries, _lookup_effect_ingredient)
+		_hand_effect_icons.visible = true
 
 
 func _clear_hand_effect_entries() -> void:
@@ -485,9 +492,21 @@ func _sync_hand_visual_z_order(elevated: bool) -> void:
 
 
 func _lookup_effect_ingredient(ingredient_id: String) -> IngredientData:
-	if GameManager.run == null:
+	if ingredient_id.is_empty():
 		return null
-	return GameManager.run.find_ingredient(ingredient_id)
+	if GameManager.run != null:
+		var ingredient := GameManager.run.find_ingredient(ingredient_id)
+		if ingredient != null:
+			return ingredient
+	return IngredientData.new(
+		ingredient_id,
+		ingredient_id,
+		"",
+		0,
+		0,
+		0,
+		IngredientData.Rarity.COMMON
+	)
 
 
 func _sync_hand_input() -> void:
@@ -533,6 +552,7 @@ func bind_picker_card(ingredient: IngredientData) -> void:
 	_puzzle_drag_enabled = false
 	_hover_enabled = false
 	_is_hovered = false
+	_clear_hand_effect_entries()
 	bind_preview(ingredient)
 	apply_puzzle_layout()
 	_apply_picker_visual_pivot()
@@ -595,6 +615,8 @@ func set_picker_preview_shake(enabled: bool) -> void:
 
 
 func _bind_picker_effect_entries(entries: Array) -> void:
+	if not _picker_mode or not is_node_ready():
+		return
 	var partitioned := _partition_effect_entries(entries)
 	_set_gecko_hand_overlay_visible(partitioned.get("has_gecko", false))
 	_set_honey_splatter_overlay_visible(partitioned.get("has_honey", false))
@@ -735,8 +757,6 @@ func bind_preview(ingredient: IngredientData) -> void:
 		_reset_hand_stat_label_colors()
 	elif _picker_mode:
 		_reset_hand_stat_label_colors()
-		update_picker_stat_display(_base_point_value, _base_explosive_value)
-		_clear_hand_effect_entries()
 	else:
 		_points_value.text = "%d" % ingredient.point_value
 		if ingredient.explosive_value > 0:
