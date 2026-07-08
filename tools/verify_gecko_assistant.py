@@ -7,6 +7,11 @@ import sys
 
 INTERVAL = 11
 HAND_SLOT_COUNT = 5
+BAT_WING_ID = "bat_wing"
+
+
+def skips_hand_stay_interval_counter(ingredient_id: str | None) -> bool:
+    return ingredient_id == BAT_WING_ID
 
 
 def stays_in_hand(
@@ -36,6 +41,8 @@ def compute_gecko_stay_slots(
         if slot_index in honey_skipped:
             continue
         if slot_index >= len(hand_slots) or hand_slots[slot_index] is None:
+            continue
+        if skips_hand_stay_interval_counter(hand_slots[slot_index]):
             continue
         if stays_in_hand(cauldron_count, gecko_stays_consumed):
             stayed.add(slot_index)
@@ -99,6 +106,14 @@ def main() -> int:
     assert stayed_slots == {1}
     assert slots_after[1] == "gecko"
     assert slots_after[0] is None
+
+    # Bat wing should not advance the gecko interval; the next real card triggers stay.
+    stayed = compute_gecko_stay_slots(
+        [BAT_WING_ID, "b", None, None, None],
+        set(),
+        10,
+    )
+    assert stayed == {1}, stayed
 
     print("PASS: gecko assistant verification checks passed")
     return 0

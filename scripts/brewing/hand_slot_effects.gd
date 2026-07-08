@@ -69,6 +69,9 @@ static func compute_gecko_stay_slots(
 			continue
 		if slot_index >= hand_slots.size() or hand_slots[slot_index] == null:
 			continue
+		var ingredient: IngredientData = hand_slots[slot_index]
+		if IngredientEffects.skips_hand_stay_interval_counter(ingredient):
+			continue
 		if TrinketEffects.gecko_assistant_stays_in_hand(
 			cauldron_count,
 			owned_trinket_ids,

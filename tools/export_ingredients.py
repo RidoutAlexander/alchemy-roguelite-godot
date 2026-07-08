@@ -65,7 +65,7 @@ DEFAULT_TRINKETS = [
     [
         "pumpkin_trinket",
         "Pumpkin Necklace",
-        "Pumpkins gain +1 score for each pumpkin played before it in a row",
+        "Pumpkins gain +1 score for each pumpkin played before it in a row (maximum of +3)",
     ],
     [
         "red_mushroom_trinket",

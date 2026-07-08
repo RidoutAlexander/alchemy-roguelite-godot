@@ -42,7 +42,7 @@ const BOOBERRY_HAND_END_PENALTY := 2
 const GROWTH_POTION_DOUBLE_COUNT := 4
 const COBBLER_ADJACENT_BOOM_BERRY_SCORE := 10
 const COBBLER_ADJACENT_BOOM_BERRY_EXPLOSIVENESS := 2
-const POISON_APPLE_DELAY_HANDS := 2
+const POISON_APPLE_DELAY_HANDS := 1
 const POISON_APPLE_EXPLOSIVENESS_GAIN := 3
 const STIRRING_SPOON_BONUS_HAND_COUNT := 1
 const JUGGLING_CLUB_BONUS_HAND_COUNT := 3
@@ -134,7 +134,8 @@ static func apply(
 			result.bonus_score += int(cobbler_bonus.get("score", 0))
 			result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
 	context.cauldron_contents.append(ingredient)
-	context.ingredients_added_to_cauldron += 1
+	if not skips_hand_stay_interval_counter(ingredient):
+		context.ingredients_added_to_cauldron += 1
 
 	match ingredient.id:
 		RED_MUSHROOM_ID:
@@ -616,6 +617,19 @@ static func compute_hand_display_stats(
 			ice_cube_shields = ICE_CUBE_SHIELD_COUNT
 
 	return display_stats
+
+
+static func skips_hand_stay_interval_counter(ingredient: IngredientData) -> bool:
+	return ingredient != null and ingredient.id == BAT_WING_ID
+
+
+static func count_hand_stay_interval_plays(cauldron_contents: Array) -> int:
+	var count := 0
+	for entry in cauldron_contents:
+		if entry == null or skips_hand_stay_interval_counter(entry):
+			continue
+		count += 1
+	return count
 
 
 static func count_trailing_pumpkin_streak(

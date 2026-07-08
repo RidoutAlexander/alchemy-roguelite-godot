@@ -559,11 +559,14 @@ func _sync_hand_ui() -> void:
 		_refresh_mulligan_label(session)
 
 	if _player_hand != null:
-		var show_hand := (
-			hand_phase != BrewSession.HandPhase.BAG
-			or _hand_has_any_card(session.get_hand_slots())
-			or _hand_has_any_card(_player_hand.get_current_hand_slots())
-		)
+		var show_hand := false
+		if hand_phase == BrewSession.HandPhase.BAG:
+			show_hand = _hand_has_any_card(session.get_hand_slots())
+		else:
+			show_hand = (
+				_hand_has_any_card(session.get_hand_slots())
+				or _hand_has_any_card(_player_hand.get_current_hand_slots())
+			)
 		_player_hand.visible = show_hand
 		if hand_phase == BrewSession.HandPhase.DRAWING:
 			var drawing_slots := _player_hand.get_current_hand_slots()
@@ -751,10 +754,14 @@ func _refresh_undo_label(session: BrewSession) -> void:
 
 
 func _refresh_mulligan_label(session: BrewSession) -> void:
+	var remaining := session.get_mulligans_remaining()
 	if _hand_mulligan_label != null:
-		_hand_mulligan_label.text = _format_mulligan_label(session.get_mulligans_remaining())
+		_hand_mulligan_label.text = _format_mulligan_label(
+			remaining,
+			_mulligan_needs_card_selection(session)
+		)
 	if _hand_mulligan_button != null:
-		_hand_mulligan_button.disabled = false
+		_hand_mulligan_button.disabled = remaining <= 0 or not _can_use_mulligan_now()
 	_refresh_buy_brew_mulligan_visibility()
 	if _buy_brew_mulligan_button != null and _buy_brew_mulligan_button.visible:
 		_buy_brew_mulligan_button.disabled = false
@@ -762,9 +769,21 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 
 
-func _format_mulligan_label(mulligans_remaining: int) -> String:
+func _format_mulligan_label(mulligans_remaining: int, needs_selection: bool = false) -> String:
 	var noun := "mulligan" if mulligans_remaining == 1 else "mulligans"
+	if needs_selection:
+		return "Mulligan (%d %s left) - pick a card" % [mulligans_remaining, noun]
 	return "Mulligan (%d %s left)" % [mulligans_remaining, noun]
+
+
+func _mulligan_needs_card_selection(session: BrewSession) -> bool:
+	if session.get_mulligans_remaining() <= 0:
+		return false
+	if session.get_hand_phase() != BrewSession.HandPhase.HAND:
+		return false
+	if _player_hand == null:
+		return false
+	return _player_hand.get_selected_slot() < 0
 
 
 func _format_undo_label(swaps_remaining: int) -> String:
@@ -1523,6 +1542,7 @@ func _play_mulligan_animation(
 		return
 
 	GameManager.set_presentation_in_progress(true)
+	GameManager.complete_mulligan(slot_index, old_ingredient, new_ingredient)
 	if _player_hand != null:
 		_player_hand.suppress_slot(slot_index)
 		_player_hand.clear_selection()
@@ -1540,7 +1560,6 @@ func _play_mulligan_animation(
 		return_fly["target_center"],
 		return_fly["size"],
 		func() -> void:
-			GameManager.complete_mulligan(slot_index, old_ingredient, new_ingredient)
 			_play_mulligan_draw_in(new_ingredient, slot_index)
 	)
 

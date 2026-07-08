@@ -43,7 +43,7 @@ var _active_rhythm_shake_slots: Array = []
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_slots()
 	set_process(false)
 	set_process_input(false)
@@ -184,6 +184,11 @@ func refresh_hand(
 	_layout_slots()
 	_update_hover_process()
 	set_in_rhythm_shake_slots(in_rhythm_shake_slots)
+	mouse_filter = (
+		Control.MOUSE_FILTER_STOP
+		if _interaction_enabled
+		else Control.MOUSE_FILTER_IGNORE
+	)
 
 
 func get_slot_global_center(slot_index: int) -> Vector2:

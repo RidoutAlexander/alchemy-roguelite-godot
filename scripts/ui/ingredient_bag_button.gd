@@ -18,8 +18,10 @@ var _base_scale := Vector2.ONE
 
 func _ready() -> void:
 	custom_minimum_size = Vector2.ZERO
+	z_index = 14
 	if _label:
 		_label.custom_minimum_size = Vector2.ZERO
+		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_update_pivot()
 	_base_scale = scale
 	mouse_entered.connect(_on_mouse_entered)

@@ -335,7 +335,7 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		slots,
 		HAND_SLOT_COUNT,
 		layout_slots,
-		context.cauldron_contents.size(),
+		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
 		context.owned_trinket_ids
 	)
 
@@ -525,7 +525,7 @@ func get_pocket_watch_countdown() -> int:
 
 func get_gecko_assistant_countdown() -> int:
 	return TrinketEffects.gecko_assistant_countdown(
-		context.cauldron_contents.size(),
+		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
 		context.owned_trinket_ids
 	)
 
@@ -789,7 +789,7 @@ func try_play_hand() -> bool:
 		_hand_start_slots,
 		HAND_SLOT_COUNT,
 		_honey_skipped_slots,
-		context.cauldron_contents.size(),
+		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
 		context.owned_trinket_ids
 	)
 	_play_slot_cursor = 0

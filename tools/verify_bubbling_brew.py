@@ -6,6 +6,28 @@ from __future__ import annotations
 import sys
 
 INTERVAL = 11
+BAT_WING_ID = "bat_wing"
+
+
+def skips_hand_stay_interval_counter(ingredient_id: str | None) -> bool:
+    return ingredient_id == BAT_WING_ID
+
+
+def bubbling_brew_hand_slots(
+    hand_slots: list[str | None],
+    ingredients_added_before_hand: int,
+) -> list[int]:
+    bubbling_slots: list[int] = []
+    ingredients_added = ingredients_added_before_hand
+    for slot_index, ingredient_id in enumerate(hand_slots):
+        if ingredient_id is None:
+            continue
+        if skips_hand_stay_interval_counter(ingredient_id):
+            continue
+        if returns_to_bag(ingredients_added):
+            bubbling_slots.append(slot_index)
+        ingredients_added += 1
+    return bubbling_slots
 
 
 def returns_to_bag(ingredients_added_before: int) -> bool:
@@ -54,6 +76,10 @@ def main() -> int:
     assert returned[21]
     assert cauldron_size == 20
     assert added == 22
+
+    # Bat wing in hand should not advance the bubbling brew interval.
+    slots = bubbling_brew_hand_slots([BAT_WING_ID, "b", None, None, None], 10)
+    assert slots == [1], slots
 
     print("PASS: bubbling brew verification checks passed")
     return 0
