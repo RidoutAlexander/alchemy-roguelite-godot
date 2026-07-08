@@ -431,7 +431,7 @@ static func _cobbler_adjacency_bonus_from_hand_neighbors(
 
 	if is_boom_berry_id(ingredient.id):
 		for direction in [-1, 1]:
-			var neighbor_slot := play_slot + direction
+			var neighbor_slot: int = play_slot + int(direction)
 			if neighbor_slot < 0 or neighbor_slot >= hand_slots.size():
 				continue
 			if locked_slots.has(neighbor_slot):
