@@ -120,7 +120,7 @@ static func apply(
 			hand_play.get("last_hand_ingredient"),
 			hand_play.get("locked_slots", {})
 		)
-		_apply_resolved_cobbler_bonus(result, resolved)
+		_apply_resolved_cobbler_bonus(ingredient, result, resolved)
 	else:
 		var previous = (
 			context.cauldron_contents[-1] if not context.cauldron_contents.is_empty() else null
@@ -299,17 +299,33 @@ static func resolve_hand_play_cobbler(
 			)
 			if blocked_slot >= 0 and locked_slots.has(blocked_slot):
 				return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
+		if ingredient.id == COBBLER_ID:
+			var last_ingredient: IngredientData = last_hand_ingredient as IngredientData
+			if (
+				last_hand_slot >= 0
+				and not locked_slots.has(last_hand_slot)
+				and last_ingredient != null
+				and is_boom_berry_id(last_ingredient.id)
+			):
+				return {"bonus": bonus, "retroactive_slot": last_hand_slot}
+			return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
 		return {
 			"bonus": bonus,
 			"retroactive_slot": -1,
 			"apply_retroactive_immediately": true,
 		}
 	if target_slot == play_slot:
-		return {"bonus": bonus, "retroactive_slot": -1}
+		if is_boom_berry_id(ingredient.id):
+			return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": true}
+		return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
 	return {"bonus": bonus, "retroactive_slot": target_slot}
 
 
-static func _apply_resolved_cobbler_bonus(result: EffectResult, resolved: Dictionary) -> void:
+static func _apply_resolved_cobbler_bonus(
+	ingredient: IngredientData,
+	result: EffectResult,
+	resolved: Dictionary
+) -> void:
 	var bonus: Dictionary = resolved.get("bonus", {})
 	var retroactive_slot := int(resolved.get("retroactive_slot", -1))
 	if retroactive_slot >= 0:
@@ -319,6 +335,8 @@ static func _apply_resolved_cobbler_bonus(result: EffectResult, resolved: Dictio
 		return
 	if bool(resolved.get("apply_retroactive_immediately", false)):
 		_queue_immediate_cobbler_retroactive(result, bonus)
+		return
+	if not bool(resolved.get("apply_to_current", false)):
 		return
 	result.bonus_score += int(bonus.get("score", 0))
 	result.bonus_explosiveness += int(bonus.get("explosiveness", 0))
@@ -380,7 +398,7 @@ static func _cobbler_bonus_target_slot(
 	locked_slots: Dictionary = {}
 ) -> int:
 	if ingredient == null or previous == null:
-		return play_slot
+		return -1 if ingredient != null and ingredient.id == COBBLER_ID else play_slot
 	if ingredient.id == COBBLER_ID and is_boom_berry_id(previous.id):
 		var left_slot := _hand_boom_berry_slot_immediately_left(
 			hand_slots,
@@ -397,6 +415,8 @@ static func _cobbler_bonus_target_slot(
 			and is_boom_berry_id(last_ingredient.id)
 		):
 			return last_hand_slot
+		return -1
+	if ingredient.id == COBBLER_ID:
 		return -1
 	if locked_slots.has(play_slot):
 		return -1
@@ -576,7 +596,7 @@ static func compute_hand_display_stats(
 				hand_slots,
 				last_hand_ingredient
 			)
-			if target_slot == play_slot:
+			if target_slot == play_slot and is_boom_berry_id(ingredient.id):
 				point_value += int(cobbler_bonus.get("score", 0))
 				explosive_value += int(cobbler_bonus.get("explosiveness", 0))
 			elif target_slot >= 0:

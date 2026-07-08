@@ -57,6 +57,8 @@ def cobbler_bonus_target_slot(
         ):
             return last_hand_slot
         return -1
+    if ingredient_id == COBBLER_ID:
+        return -1
     return play_slot
 
 
@@ -81,13 +83,23 @@ def resolve_hand_play_cobbler(
         last_hand_ingredient_id,
     )
     if target_slot < 0:
+        if ingredient_id == COBBLER_ID:
+            if (
+                last_hand_slot >= 0
+                and last_hand_ingredient_id is not None
+                and is_boom_berry_id(last_hand_ingredient_id)
+            ):
+                return {"bonus": bonus, "retroactive_slot": last_hand_slot}
+            return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
         return {
             "bonus": bonus,
             "retroactive_slot": -1,
             "apply_retroactive_immediately": True,
         }
     if target_slot == play_slot:
-        return {"bonus": bonus, "retroactive_slot": -1}
+        if is_boom_berry_id(ingredient_id):
+            return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": True}
+        return {"bonus": {"score": 0, "explosiveness": 0}, "retroactive_slot": -1}
     return {"bonus": bonus, "retroactive_slot": target_slot}
 
 
@@ -141,6 +153,8 @@ def simulate_hand_play(
             totals["score"] += bonus["score"]
             totals["explosiveness"] += bonus["explosiveness"]
             bonus = {"score": 0, "explosiveness": 0}
+        elif not resolved.get("apply_to_current", False):
+            bonus = {"score": 0, "explosiveness": 0}
 
         totals["score"] += bonus["score"] + pending_bonus["score"]
         totals["explosiveness"] += bonus["explosiveness"] + pending_bonus["explosiveness"]
@@ -185,6 +199,22 @@ def main() -> int:
     )
     assert resolved["retroactive_slot"] == 0, resolved
     assert resolved["bonus"]["score"] == COBBLER_SCORE
+
+    # Adjacent boom berry + cobbler: bonus belongs to berry, not cobbler.
+    adjacent = simulate_hand_play([BOOM_BERRY_ID, COBBLER_ID, None, None, None])
+    assert adjacent["score"] == COBBLER_SCORE
+    assert adjacent["explosiveness"] == COBBLER_EXPLOSIVE
+
+    resolved_adjacent = resolve_hand_play_cobbler(
+        COBBLER_ID,
+        [BOOM_BERRY_ID],
+        1,
+        0,
+        [BOOM_BERRY_ID, COBBLER_ID, None, None, None],
+        BOOM_BERRY_ID,
+    )
+    assert resolved_adjacent["retroactive_slot"] == 0, resolved_adjacent
+    assert "apply_to_current" not in resolved_adjacent
 
     # Bag-drawn bat wing should not use a hand slot.
     source_slot = -1

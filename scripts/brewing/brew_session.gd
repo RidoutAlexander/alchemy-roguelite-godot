@@ -1321,6 +1321,7 @@ func _apply_ingredient_play(
 		}
 	var effect := IngredientEffects.apply(ingredient, context, hand_play)
 	_apply_cobbler_retroactive_routing(
+		ingredient,
 		effect,
 		from_hand_play,
 		hand_slot_index
@@ -1451,6 +1452,7 @@ func _apply_ingredient_play(
 
 
 func _apply_cobbler_retroactive_routing(
+	ingredient: IngredientData,
 	effect: IngredientEffects.EffectResult,
 	from_hand_play: bool,
 	hand_slot_index: int
@@ -1458,7 +1460,7 @@ func _apply_cobbler_retroactive_routing(
 	if effect.cobbler_retroactive_slot >= 0 and _hand_locked_slots.has(effect.cobbler_retroactive_slot):
 		return
 	if effect.cobbler_apply_retroactive_immediately:
-		_apply_immediate_cobbler_retroactive_bonus(effect)
+		_apply_cobbler_pairing_bonus(effect, ingredient)
 		return
 	if effect.cobbler_retroactive_slot < 0:
 		return
@@ -1467,7 +1469,7 @@ func _apply_cobbler_retroactive_routing(
 		and hand_slot_index >= 0
 		and effect.cobbler_retroactive_slot < hand_slot_index
 	):
-		_apply_immediate_cobbler_retroactive_bonus(effect)
+		_apply_cobbler_pairing_bonus(effect, ingredient)
 		return
 	_store_pending_cobbler_bonus(
 		effect.cobbler_retroactive_slot,
@@ -1476,13 +1478,17 @@ func _apply_cobbler_retroactive_routing(
 	)
 
 
-func _apply_immediate_cobbler_retroactive_bonus(
-	effect: IngredientEffects.EffectResult
+func _apply_cobbler_pairing_bonus(
+	effect: IngredientEffects.EffectResult,
+	ingredient: IngredientData
 ) -> void:
 	if effect.cobbler_retroactive_score != 0:
 		context.score += effect.cobbler_retroactive_score
 	if effect.cobbler_retroactive_explosiveness != 0:
 		context.explosiveness += effect.cobbler_retroactive_explosiveness
+	if ingredient != null and ingredient.id == IngredientEffects.COBBLER_ID:
+		presented_score = context.score
+		presented_explosiveness = context.explosiveness
 
 
 func _try_bubbling_brew_return(
