@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://honeysplatteroverlay01"
-path="res://.godot/imported/honey_splatter_overlay.png-honeysplatter01.ctex"
+uid="uid://02fmieotp53e"
+path="res://.godot/imported/honey_splatter_overlay.png-f0259ca3fe2884d5ba5abc04571a99a3.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/cards/ingredients/honey_splatter_overlay.png"
-dest_files=["res://.godot/imported/honey_splatter_overlay.png-honeysplatter01.ctex"]
+dest_files=["res://.godot/imported/honey_splatter_overlay.png-f0259ca3fe2884d5ba5abc04571a99a3.ctex"]
 
 [params]
 

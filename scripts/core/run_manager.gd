@@ -88,6 +88,10 @@ func consume_trinket(trinket_id: String) -> bool:
 func _init(content: DefaultContent) -> void:
 	_content = content
 	brew_session = BrewSession.new()
+	brew_session.bind_ingredient_lookup(
+		func(ingredient_id: String) -> IngredientData:
+			return _content.find_ingredient(ingredient_id)
+	)
 	_aura_selector = AuraSelector.new(content)
 	_shop_service = ShopService.new(content)
 

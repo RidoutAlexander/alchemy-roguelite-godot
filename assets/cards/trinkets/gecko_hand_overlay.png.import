@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cgeckohandoverlay01"
-path="res://.godot/imported/gecko_hand_overlay.png-geckohandoverlay01.ctex"
+uid="uid://d4nivh36yfbia"
+path="res://.godot/imported/gecko_hand_overlay.png-73eda07c2eb0e2e25cf900ac54d60d20.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/cards/trinkets/gecko_hand_overlay.png"
-dest_files=["res://.godot/imported/gecko_hand_overlay.png-geckohandoverlay01.ctex"]
+dest_files=["res://.godot/imported/gecko_hand_overlay.png-73eda07c2eb0e2e25cf900ac54d60d20.ctex"]
 
 [params]
 

@@ -126,6 +126,18 @@ var _jar_frog_leg_restores_remaining: int = 0
 var _jar_of_froglegs_returns_consumed: bool = false
 var last_bag_grant_ingredient: IngredientData = null
 
+var _ingredient_lookup: Callable = Callable()
+
+
+func bind_ingredient_lookup(lookup: Callable) -> void:
+	_ingredient_lookup = lookup
+
+
+func _find_ingredient_template(ingredient_id: String) -> IngredientData:
+	if ingredient_id == "" or not _ingredient_lookup.is_valid():
+		return null
+	return _ingredient_lookup.call(ingredient_id) as IngredientData
+
 
 func _init() -> void:
 	_reset_hand_slots()
@@ -780,7 +792,7 @@ func restore_frog_leg_to_master_bag(played_chip: IngredientData = null) -> void:
 	if played_chip != null and context.bag.has_master_chip(played_chip):
 		return
 	_jar_frog_leg_restores_remaining -= 1
-	var template := GameManager.run.find_ingredient(IngredientEffects.FROG_LEG_ID)
+	var template := _find_ingredient_template(IngredientEffects.FROG_LEG_ID)
 	if template != null:
 		context.bag.add_to_master_bag(template)
 
@@ -1504,7 +1516,7 @@ func _apply_ingredient_play(
 	if effect.next_hand_draw_count > 0:
 		_next_hand_draw_count = effect.next_hand_draw_count
 	if effect.bag_grant_ingredient_id != "":
-		var granted := GameManager.run.find_ingredient(effect.bag_grant_ingredient_id)
+		var granted := _find_ingredient_template(effect.bag_grant_ingredient_id)
 		if granted != null:
 			context.bag.grant_ingredient_during_brew(granted)
 			last_bag_grant_ingredient = granted
