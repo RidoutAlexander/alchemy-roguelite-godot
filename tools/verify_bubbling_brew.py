@@ -63,6 +63,10 @@ def main() -> int:
     assert countdown(10) == 1
     assert countdown(11) == 11
 
+    # Banner countdown should tick down one per ingredient added.
+    for added in range(12):
+        assert countdown(added) == (11 if added % 11 == 0 else 11 - (added % 11))
+
     returned, cauldron_size, added = simulate_brew(12)
     assert returned.count(True) == 1
     assert returned[10]

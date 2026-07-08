@@ -320,17 +320,13 @@ func get_bubbling_brew_hand_slots(slots_override: Array = []) -> Array[int]:
 	return _HandPlayPreview.bubbling_brew_slots(_compute_hand_preview_steps(slots_override))
 
 
-func get_aura_interval_countdown(slots_override: Array = []) -> int:
+func get_aura_interval_countdown() -> int:
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS or context.current_aura == null:
 		return 0
-	if not _AuraEffects.uses_interval_countdown(context.current_aura):
-		return 0
-	var steps := _compute_hand_preview_steps(slots_override)
-	return _HandPlayPreview.countdown_for_aura(
-		steps,
+	return _AuraEffects.interval_countdown_from_state(
+		context.current_aura,
 		context.cauldron_contents.size(),
-		context.ingredients_added_to_cauldron,
-		context.current_aura
+		context.ingredients_added_to_cauldron
 	)
 
 
