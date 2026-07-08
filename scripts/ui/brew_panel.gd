@@ -149,10 +149,6 @@ func _refresh_cauldron_contents_if_open() -> void:
 func _on_brew_updated(_ctx: BrewContext) -> void:
 	_refresh_cauldron_contents_if_open()
 	_sync_hand_ui()
-
-
-func _on_run_changed() -> void:
-	_sync_hand_ui()
 	if _ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
 		_brew_ambience_suppressed = false
 		if GameManager.run.brew_session.presented_score <= 0:
@@ -160,6 +156,10 @@ func _on_run_changed() -> void:
 			if _cauldron_liquid != null:
 				_reset_cauldron_liquid()
 		_sync_brew_ambience()
+
+
+func _on_run_changed() -> void:
+	_sync_hand_ui()
 
 
 func _on_hand_draw_batch_started(drawn: Array) -> void:
