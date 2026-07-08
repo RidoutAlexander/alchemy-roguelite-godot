@@ -134,6 +134,7 @@ static func apply(
 			result.bonus_score += int(cobbler_bonus.get("score", 0))
 			result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
 	context.cauldron_contents.append(ingredient)
+	context.ingredients_added_to_cauldron += 1
 
 	match ingredient.id:
 		RED_MUSHROOM_ID:

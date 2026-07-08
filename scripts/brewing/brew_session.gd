@@ -146,6 +146,7 @@ func start_brew(
 	context.outcome = BrewOutcome.Outcome.IN_PROGRESS
 	context.drawn_this_brew.clear()
 	context.cauldron_contents.clear()
+	context.ingredients_added_to_cauldron = 0
 	context.gold_gained_this_brew = 0
 	context.boss_threshold_discount_gained = 0
 	context.free_shop_rerolls_gained = 0
@@ -191,6 +192,7 @@ func try_practice_restart() -> bool:
 	context.explosion_limit = _compute_base_explosion_limit(context.current_aura)
 	context.drawn_this_brew.clear()
 	context.cauldron_contents.clear()
+	context.ingredients_added_to_cauldron = 0
 	context.gold_gained_this_brew = 0
 	context.boss_threshold_discount_gained = 0
 	context.free_shop_rerolls_gained = 0
@@ -291,7 +293,7 @@ func get_bubbling_brew_hand_slots(slots_override: Array = []) -> Array[int]:
 		return []
 	return _AuraEffects.bubbling_brew_hand_slots(
 		_resolve_display_hand_slots(slots_override),
-		context.cauldron_contents.size(),
+		context.ingredients_added_to_cauldron,
 		context.current_aura,
 		HAND_SLOT_COUNT
 	)
@@ -1204,6 +1206,7 @@ func _apply_ingredient_play(
 		_frog_legs_played_this_brew.append(ingredient)
 
 	var cauldron_count_before := context.cauldron_contents.size()
+	var ingredients_added_before := context.ingredients_added_to_cauldron
 	var pending_cobbler := _consume_pending_cobbler_bonus(hand_slot_index, from_hand_play)
 	var hand_play := {}
 	if from_hand_play and hand_slot_index >= 0:
@@ -1338,7 +1341,7 @@ func _apply_ingredient_play(
 		_last_hand_play_slot = hand_slot_index
 		_last_hand_play_ingredient = ingredient
 
-	_try_bubbling_brew_return(ingredient, cauldron_count_before)
+	_try_bubbling_brew_return(ingredient, ingredients_added_before)
 
 
 func _apply_cobbler_retroactive_routing(
@@ -1376,14 +1379,14 @@ func _apply_immediate_cobbler_retroactive_bonus(
 
 func _try_bubbling_brew_return(
 	ingredient: IngredientData,
-	cauldron_count_before: int
+	ingredients_added_before: int
 ) -> void:
 	if ingredient == null:
 		return
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return
 	if not _AuraEffects.bubbling_brew_returns_ingredient(
-		cauldron_count_before,
+		ingredients_added_before,
 		context.current_aura
 	):
 		return
@@ -1582,6 +1585,7 @@ func _trigger_phoenix_save() -> void:
 	context.explosiveness = 0
 	context.bag.reshuffle_after_phoenix(context.cauldron_contents)
 	context.cauldron_contents.clear()
+	context.ingredients_added_to_cauldron = 0
 
 
 func _remove_from_cauldron(ingredient: IngredientData) -> void:

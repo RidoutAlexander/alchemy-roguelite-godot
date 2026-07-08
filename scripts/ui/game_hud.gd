@@ -327,7 +327,10 @@ func _should_shake_rhythm_aura(ctx: BrewContext) -> bool:
 		return false
 	if ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return false
-	if ctx.cauldron_contents.size() % 3 != 2:
+	var rhythm_count := ctx.cauldron_contents.size()
+	if ctx.current_aura.id == GameConstants.BUBBLING_BREW_AURA_ID:
+		rhythm_count = ctx.ingredients_added_to_cauldron
+	if rhythm_count % 3 != 2:
 		return false
 	return (
 		ctx.current_aura.id == GameConstants.IN_RHYTHM_AURA_ID
