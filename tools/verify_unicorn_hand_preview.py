@@ -82,7 +82,7 @@ def compute_steps(
 
         cauldron_count_before = sim_cauldron
         ingredients_added_before = sim_ingredients_added
-        counts_for_added = ingredient_id != BAT_WING_ID
+        counts_for_added = ingredient_id is not None
         bubbling_returns = (
             counts_for_added
             and (ingredients_added_before + 1) % BUBBLING_INTERVAL == 0

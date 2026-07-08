@@ -193,10 +193,7 @@ static func _record_cauldron_play(
 ) -> void:
 	var cauldron_count_before := sim_cauldron.size()
 	var ingredients_added_before := sim_ingredients_added
-	var counts_for_added := (
-		ingredient != null
-		and not IngredientEffects.skips_hand_stay_interval_counter(ingredient)
-	)
+	var counts_for_added := ingredient != null
 	var bubbling_returns := (
 		counts_for_added
 		and _AuraEffects.bubbling_brew_returns_ingredient(
@@ -337,10 +334,7 @@ static func countdown_to_bubbling_brew(
 		if not bool(step.get("plays_to_cauldron", false)):
 			continue
 		var ingredient: IngredientData = step.get("ingredient")
-		var counts_for_added := (
-			ingredient != null
-			and not IngredientEffects.skips_hand_stay_interval_counter(ingredient)
-		)
+		var counts_for_added := ingredient != null
 		if not counts_for_added:
 			continue
 		adds_until += 1

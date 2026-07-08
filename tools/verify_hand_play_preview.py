@@ -55,10 +55,6 @@ def compute_gecko_stay_slots(
     return stayed
 
 
-def skips_counter(ingredient_id: str | None) -> bool:
-    return ingredient_id == BAT_WING_ID
-
-
 def in_rhythm_doubles(cauldron_count_before: int) -> bool:
     return (cauldron_count_before + 1) % IN_RHYTHM_INTERVAL == 0
 
@@ -86,7 +82,7 @@ def record_cauldron_play(
     extra_flags = extra_flags or {}
     cauldron_count_before = sim_cauldron
     ingredients_added_before = sim_ingredients_added
-    counts_for_added = ingredient_id is not None and not skips_counter(ingredient_id)
+    counts_for_added = ingredient_id is not None
     returns = counts_for_added and bubbling_returns(ingredients_added_before)
 
     if ingredient_id is not None:
@@ -306,7 +302,7 @@ def countdown_to_bubbling(steps: list[dict], ingredients_added: int) -> int:
         if not step.get("plays_to_cauldron"):
             continue
         ingredient_id = step.get("ingredient_id")
-        if ingredient_id is None or skips_counter(ingredient_id):
+        if ingredient_id is None:
             continue
         adds_until += 1
         if step.get("bubbling_returns"):
@@ -325,16 +321,23 @@ def main() -> int:
     assert any(step.get("gecko_stays") for step in steps), steps
     assert playing_slots(steps) == [0], playing_slots(steps)
 
-    # Bat wing plays and adds a pick; pick advances bubbling interval for the next card.
+    # Bat wing counts as a cauldron add; its pick is the next add and can trigger bubbling.
     steps = compute_steps([BAT_WING_ID, "b", None, None, None], 0, 9)
     assert playing_slots(steps) == [0, 0, 1], playing_slots(steps)
+    pick_step = next(
+        step
+        for step in steps
+        if step.get("bat_wing_pick") and step.get("plays_to_cauldron")
+    )
+    assert pick_step.get("ingredients_added_before", -1) == 10, pick_step
+    assert pick_step.get("bubbling_returns"), pick_step
     b_step = next(
         step
         for step in steps
         if step.get("ingredient_id") == "b" and step.get("plays_to_cauldron")
     )
-    assert b_step.get("ingredients_added_before", -1) == 10, b_step
-    assert b_step.get("bubbling_returns"), b_step
+    assert b_step.get("ingredients_added_before", -1) == 11, b_step
+    assert not b_step.get("bubbling_returns"), b_step
 
     # In Rhythm should follow actual cauldron adds, not raw slot positions.
     steps = compute_steps(["a", "b", "c", None, None], 2, 0)
@@ -350,14 +353,14 @@ def main() -> int:
     assert playing_slots(steps).count(0) == 2, playing_slots(steps)
     assert bubbling_slots(steps) == [0], bubbling_slots(steps)
 
-    # Bat wing pick preview can shift bubbling to a later hand slot.
+    # Bat wing counts; pick preview can be the bubbling trigger instead of the next hand card.
     steps = compute_steps(
         [BAT_WING_ID, "b", None, None, None],
         0,
         9,
         bat_wing_pick_overrides={0: "safe_pick"},
     )
-    assert bubbling_slots(steps) == [1], bubbling_slots(steps)
+    assert bubbling_slots(steps) == [0], bubbling_slots(steps)
 
     # Interval countdowns follow previewed play order.
     steps = compute_steps(["a", "b", "c", None, None], 2, 0)

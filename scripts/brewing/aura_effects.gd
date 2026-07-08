@@ -110,9 +110,6 @@ static func bubbling_brew_hand_slots(
 	for slot_index in hand_slot_count:
 		if slot_index >= hand_slots.size() or hand_slots[slot_index] == null:
 			continue
-		var ingredient: IngredientData = hand_slots[slot_index]
-		if IngredientEffects.skips_hand_stay_interval_counter(ingredient):
-			continue
 		if bubbling_brew_returns_ingredient(ingredients_added, aura):
 			bubbling_slots.append(slot_index)
 		ingredients_added += 1
