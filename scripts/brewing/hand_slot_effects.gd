@@ -12,13 +12,13 @@ static func compute_entries(
 	owned_trinket_ids: Array = [],
 	unicorn_cured_slots: Array = [],
 	parrot_repeats_next: bool = false,
-	gecko_stayed_override: Dictionary = {}
+	gecko_stayed_override: Dictionary = {},
+	honey_skipped_override: Dictionary = {}
 ) -> Array:
-	var reference := layout_slots if not layout_slots.is_empty() else hand_slots
 	var per_slot: Array = []
 	for _i in hand_slot_count:
 		per_slot.append([])
-	_append_honey_entries(per_slot, reference, hand_slot_count)
+	_append_honey_entries_from_skipped_slots(per_slot, honey_skipped_override)
 	_append_gecko_assistant_entries_from_stayed_slots(per_slot, gecko_stayed_override)
 	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
 	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
@@ -101,23 +101,15 @@ static func compute_gecko_stay_slots(
 	return stayed
 
 
-static func _append_honey_entries(
+static func _append_honey_entries_from_skipped_slots(
 	per_slot: Array,
-	slots: Array,
-	hand_slot_count: int
+	honey_skipped: Dictionary
 ) -> void:
-	for slot_index in range(1, hand_slot_count):
-		if slot_index >= slots.size():
+	for slot_key in honey_skipped.keys():
+		var slot_index := int(slot_key)
+		if slot_index < 0 or slot_index >= per_slot.size():
 			continue
-		var honey: IngredientData = slots[slot_index]
-		if honey == null or honey.id != HONEY_ID:
-			continue
-		var left_ingredient: IngredientData = slots[slot_index - 1]
-		if left_ingredient == null:
-			continue
-		if slot_index - 1 >= per_slot.size():
-			continue
-		per_slot[slot_index - 1].append(
+		per_slot[slot_index].append(
 			{
 				"ingredient_id": HONEY_ID,
 				"overlay_text": "",

@@ -21,7 +21,11 @@ signal hand_hover_changed(hovered: bool)
 
 const CARD_TINT_SHADER := preload("res://shaders/card_rarity_tint.gdshader")
 const _TrinketEffects := preload("res://scripts/brewing/trinket_effects.gd")
+const _IngredientEffects := preload("res://scripts/brewing/ingredient_effects.gd")
 const GECKO_HAND_OVERLAY_TEXTURE := preload("res://assets/cards/trinkets/gecko_hand_overlay.png")
+const HONEY_SPLATTER_OVERLAY_TEXTURE := preload(
+	"res://assets/cards/ingredients/honey_splatter_overlay.png"
+)
 
 const HOVER_SCALE := 1.08
 const PICKER_SELECT_SCALE := 1.04
@@ -35,7 +39,7 @@ const HAND_EFFECT_ICON_GAP := 4.0
 const HAND_EFFECT_ICON_CLEARANCE := 6.0
 const HAND_SCROLL_TOP_LOCAL_Y := -81.0
 const GECKO_HAND_ROTATION_DEG := 30.0
-const GECKO_HAND_Z_INDEX := 2
+const HAND_EFFECT_OVERLAY_Z_INDEX := 2
 const VISUAL_ROOT_HOVER_Z_INDEX := 3
 const _DEFAULT_STAT_COLOR := Color(0.05, 0.05, 0.05, 1)
 const _SCORE_UP_COLOR := Color(0.12, 0.62, 0.18, 1)
@@ -61,6 +65,7 @@ const _MODIFIED_STAT_OUTLINE_SIZE := 4
 @onready var _cost_label: Label = $VisualRoot/CostRow/CostLabel
 @onready var _hand_effect_icons: HandSlotEffectIcons = $HandSlotEffectIcons
 @onready var _gecko_hand_overlay: TextureRect = $GeckoHandOverlay
+@onready var _honey_splatter_overlay: TextureRect = $HoneySplatterOverlay
 
 var _name_plate_bg: TextureRect
 var _description_plate_bg: TextureRect
@@ -281,6 +286,7 @@ func _apply_hand_layout() -> void:
 	pivot_offset = Vector2(HAND_CARD_BASE_SIZE.x * 0.5, HAND_CARD_BASE_SIZE.y) * HAND_CARD_SCALE
 	_apply_hand_effect_layout()
 	_apply_gecko_hand_layout()
+	_apply_honey_splatter_layout()
 
 
 func _snap_hand_highlight(active: bool) -> void:
@@ -300,14 +306,19 @@ func _snap_hand_highlight(active: bool) -> void:
 func _bind_hand_effect_entries(entries: Array) -> void:
 	var icon_entries: Array = []
 	var has_gecko := false
+	var has_honey := false
 	for entry in entries:
 		if not entry is Dictionary:
 			continue
 		if str(entry.get("trinket_id", "")) == _TrinketEffects.GECKO_ASSISTANT_ID:
 			has_gecko = true
 			continue
+		if str(entry.get("ingredient_id", "")) == _IngredientEffects.HONEY_ID:
+			has_honey = true
+			continue
 		icon_entries.append(entry)
 	_set_gecko_hand_overlay_visible(has_gecko)
+	_set_honey_splatter_overlay_visible(has_honey)
 	if _hand_effect_icons == null:
 		return
 	if icon_entries.is_empty():
@@ -319,6 +330,7 @@ func _bind_hand_effect_entries(entries: Array) -> void:
 
 func _clear_hand_effect_entries() -> void:
 	_set_gecko_hand_overlay_visible(false)
+	_set_honey_splatter_overlay_visible(false)
 	if _hand_effect_icons != null:
 		_hand_effect_icons.clear_icons()
 
@@ -376,7 +388,7 @@ func _apply_gecko_hand_layout() -> void:
 	if _gecko_hand_overlay == null:
 		return
 	_gecko_hand_overlay.texture = GECKO_HAND_OVERLAY_TEXTURE
-	_gecko_hand_overlay.z_index = GECKO_HAND_Z_INDEX
+	_gecko_hand_overlay.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
 	_gecko_hand_overlay.scale = Vector2.ONE / HAND_CARD_SCALE
 	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0 * 0.5
 	var overlay_width := HAND_CARD_BASE_SIZE.x * 0.9 * 0.5
@@ -388,6 +400,32 @@ func _apply_gecko_hand_layout() -> void:
 	)
 	_gecko_hand_overlay.pivot_offset = Vector2(overlay_width * 0.52, overlay_height * 0.18)
 	_gecko_hand_overlay.rotation_degrees = GECKO_HAND_ROTATION_DEG
+
+
+func _set_honey_splatter_overlay_visible(visible_overlay: bool) -> void:
+	if _honey_splatter_overlay == null:
+		return
+	_honey_splatter_overlay.visible = visible_overlay and _hand_mode
+	if visible_overlay:
+		_apply_honey_splatter_layout()
+
+
+func _apply_honey_splatter_layout() -> void:
+	if _honey_splatter_overlay == null:
+		return
+	_honey_splatter_overlay.texture = HONEY_SPLATTER_OVERLAY_TEXTURE
+	_honey_splatter_overlay.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
+	_honey_splatter_overlay.scale = Vector2.ONE / HAND_CARD_SCALE
+	var overlay_width := HAND_CARD_BASE_SIZE.x / 3.0
+	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0
+	_honey_splatter_overlay.custom_minimum_size = Vector2(overlay_width, overlay_height)
+	_honey_splatter_overlay.size = Vector2(overlay_width, overlay_height)
+	_honey_splatter_overlay.position = Vector2(
+		(HAND_CARD_BASE_SIZE.x - overlay_width) * 0.5,
+		(HAND_CARD_BASE_SIZE.y - overlay_height) * 0.5
+	)
+	_honey_splatter_overlay.pivot_offset = Vector2(overlay_width * 0.5, overlay_height * 0.5)
+	_honey_splatter_overlay.rotation_degrees = 0.0
 
 
 func _sync_hand_visual_z_order(elevated: bool) -> void:

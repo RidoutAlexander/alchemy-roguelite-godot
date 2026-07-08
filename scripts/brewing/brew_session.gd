@@ -66,6 +66,7 @@ var _hand_draw_display_reserve: int = 0
 var _honey_skipped_slots: Dictionary = {}
 var _gecko_stayed_slots: Dictionary = {}
 var _hand_preview_gecko_slots: Dictionary = {}
+var _hand_preview_honey_slots: Dictionary = {}
 var _hand_locked_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
@@ -350,9 +351,10 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		context.owned_trinket_ids,
 		unicorn_cured_slots,
 		_parrot_doubles_next,
-		_resolve_gecko_stayed_slots_for_display()
+		_resolve_gecko_stayed_slots_for_display(),
+		_resolve_honey_skipped_slots_for_display()
 	)
-	_sanitize_gecko_effect_entries(effect_entries)
+	_sanitize_hand_overlay_effect_entries(effect_entries)
 	return effect_entries
 
 
@@ -372,8 +374,17 @@ func _resolve_gecko_stayed_slots_for_display() -> Dictionary:
 	return {}
 
 
+func _resolve_honey_skipped_slots_for_display() -> Dictionary:
+	if _hand_phase == HandPhase.PLAYING:
+		return _honey_skipped_slots
+	if _hand_phase == HandPhase.HAND:
+		return _hand_preview_honey_slots
+	return {}
+
+
 func _refresh_hand_preview_locks() -> void:
 	_hand_preview_gecko_slots.clear()
+	_hand_preview_honey_slots.clear()
 	if _hand_phase != HandPhase.HAND:
 		return
 	var play_locks := _HandSlotEffects.compute_hand_play_locks(
@@ -382,11 +393,13 @@ func _refresh_hand_preview_locks() -> void:
 		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
 		context.owned_trinket_ids
 	)
+	_hand_preview_honey_slots = play_locks.get("honey_skipped", {})
 	_hand_preview_gecko_slots = play_locks.get("gecko_stayed", {})
 
 
-func _sanitize_gecko_effect_entries(per_slot: Array) -> void:
-	var allowed_slots := _resolve_gecko_stayed_slots_for_display()
+func _sanitize_hand_overlay_effect_entries(per_slot: Array) -> void:
+	var allowed_gecko_slots := _resolve_gecko_stayed_slots_for_display()
+	var allowed_honey_slots := _resolve_honey_skipped_slots_for_display()
 	for slot_index in range(per_slot.size()):
 		var entries: Array = per_slot[slot_index]
 		if entries.is_empty():
@@ -398,7 +411,12 @@ func _sanitize_gecko_effect_entries(per_slot: Array) -> void:
 				continue
 			if (
 				str(entry.get("trinket_id", "")) == TrinketEffects.GECKO_ASSISTANT_ID
-				and not allowed_slots.has(slot_index)
+				and not allowed_gecko_slots.has(slot_index)
+			):
+				continue
+			if (
+				str(entry.get("ingredient_id", "")) == IngredientEffects.HONEY_ID
+				and not allowed_honey_slots.has(slot_index)
 			):
 				continue
 			filtered.append(entry)
@@ -1192,6 +1210,7 @@ func _finish_hand_play() -> void:
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
 	_hand_preview_gecko_slots.clear()
+	_hand_preview_honey_slots.clear()
 	_hand_locked_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
@@ -2151,6 +2170,7 @@ func _reset_draw_flow_state() -> void:
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
 	_hand_preview_gecko_slots.clear()
+	_hand_preview_honey_slots.clear()
 	_hand_locked_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0
