@@ -10,7 +10,8 @@ static func compute_entries(
 	layout_slots: Array = [],
 	play_steps: Array = [],
 	owned_trinket_ids: Array = [],
-	unicorn_cured_slots: Array = []
+	unicorn_cured_slots: Array = [],
+	parrot_repeats_next: bool = false
 ) -> Array:
 	var reference := layout_slots if not layout_slots.is_empty() else hand_slots
 	var per_slot: Array = []
@@ -20,6 +21,7 @@ static func compute_entries(
 	_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
 	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
 	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
+	_append_parrot_repeat_entries(per_slot, play_steps, parrot_repeats_next)
 	_append_pristine_feather_entries(per_slot, hand_slots, owned_trinket_ids)
 	return per_slot
 
@@ -167,6 +169,31 @@ static func _append_unicorn_horn_entries(
 				"overlay_text": "",
 			}
 		)
+
+
+static func _append_parrot_repeat_entries(
+	per_slot: Array,
+	play_steps: Array,
+	parrot_repeats_next: bool = false
+) -> void:
+	var pending := parrot_repeats_next
+	for step in play_steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		var ingredient: IngredientData = step.get("ingredient")
+		if ingredient == null:
+			continue
+		var slot_index := int(step.get("slot_index", -1))
+		if pending and slot_index >= 0 and slot_index < per_slot.size():
+			per_slot[slot_index].append(
+				{
+					"ingredient_id": IngredientEffects.PARROT_ID,
+					"overlay_text": "",
+				}
+			)
+			pending = false
+		if ingredient.id == IngredientEffects.PARROT_ID:
+			pending = true
 
 
 static func _append_pristine_feather_entries(

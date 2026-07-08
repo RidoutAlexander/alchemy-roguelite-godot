@@ -347,7 +347,8 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		layout_slots,
 		_compute_hand_preview_steps(slots_override),
 		context.owned_trinket_ids,
-		unicorn_cured_slots
+		unicorn_cured_slots,
+		_parrot_doubles_next
 	)
 
 

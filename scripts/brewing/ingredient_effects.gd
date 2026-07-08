@@ -580,7 +580,46 @@ static func compute_hand_display_stats(
 		var ingredient: IngredientData = step.get("ingredient")
 		if ingredient == null:
 			continue
+		if ingredient.id == BAT_WING_ID:
+			var bw_point := ingredient.point_value
+			var bw_explosive := ingredient.explosive_value
+			pre_double_stats[play_slot] = {
+				"point_value": bw_point,
+				"explosive_value": bw_explosive,
+			}
+			if doubles_remaining > 0:
+				bw_point *= 2
+				bw_explosive *= 2
+				doubles_remaining -= 1
+			if parrot_doubles_next:
+				parrot_doubles_next = false
+			if bool(step.get("in_rhythm_doubles", false)):
+				bw_point *= 2
+				bw_explosive *= 2
+			if bool(step.get("pocket_watch_doubles", false)):
+				bw_point *= 2
+				bw_explosive *= 2
+			var bw_explosive_add := bw_explosive
+			if unicorn_cures_next:
+				if bw_explosive_add > 0:
+					bw_explosive_add = 0
+					if unicorn_cured_slots is Array:
+						unicorn_cured_slots.append(play_slot)
+					unicorn_cured_slot_lookup[play_slot] = true
+				unicorn_cures_next = false
+			display_stats[play_slot] = {
+				"point_value": bw_point,
+				"explosive_value": bw_explosive_add,
+			}
+			sim_explosiveness += bw_explosive_add
+			sim_cauldron.append(ingredient)
+			last_hand_slot = play_slot
+			last_hand_ingredient = ingredient
+			continue
 		var cauldron_count := int(step.get("cauldron_count_before", sim_cauldron.size()))
+		var parrot_repeats_play := parrot_doubles_next
+		if parrot_doubles_next:
+			parrot_doubles_next = false
 		var point_value := ingredient.point_value
 		var explosive_value := ingredient.explosive_value
 
@@ -631,12 +670,6 @@ static func compute_hand_display_stats(
 			point_value *= 2
 			explosive_value *= 2
 			doubles_remaining -= 1
-		if parrot_doubles_next:
-			# Bat Wing resolves again with its picker; parrot is a second full play, not 2x stats.
-			if ingredient.id != BAT_WING_ID:
-				point_value *= 2
-				explosive_value *= 2
-			parrot_doubles_next = false
 		if bool(step.get("in_rhythm_doubles", false)):
 			point_value *= 2
 			explosive_value *= 2
@@ -682,46 +715,15 @@ static func compute_hand_display_stats(
 		sim_cauldron.append(ingredient)
 		if bool(step.get("bubbling_returns", false)):
 			sim_cauldron.pop_back()
+		if parrot_repeats_play:
+			sim_explosiveness += explosive_add
+			sim_cauldron.append(ingredient)
+		elif TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
+			sim_explosiveness += explosive_add
+			sim_cauldron.append(ingredient)
 		last_hand_slot = play_slot
 		last_hand_ingredient = ingredient
 		cauldron_count = sim_cauldron.size()
-		if TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
-			var repeat_point := ingredient.point_value
-			var repeat_explosive := ingredient.explosive_value
-			if doubles_remaining > 0:
-				repeat_point *= 2
-				repeat_explosive *= 2
-				doubles_remaining -= 1
-			var repeat_cauldron_count := sim_cauldron.size()
-			if _AuraEffects.in_rhythm_doubles_ingredient(repeat_cauldron_count, aura):
-				repeat_point *= 2
-				repeat_explosive *= 2
-			if TrinketEffects.pocket_watch_doubles_ingredient(
-				repeat_cauldron_count,
-				owned_trinket_ids
-			):
-				repeat_point *= 2
-				repeat_explosive *= 2
-			var repeat_explosive_add := repeat_explosive
-			if unicorn_cures_next:
-				if repeat_explosive_add > 0:
-					repeat_explosive_add = 0
-					if unicorn_cured_slots is Array:
-						unicorn_cured_slots.append(play_slot)
-					unicorn_cured_slot_lookup[play_slot] = true
-				unicorn_cures_next = false
-			if ice_cube_shields > 0:
-				if (
-					repeat_explosive_add > 0
-					and sim_explosiveness + repeat_explosive_add >= explosion_limit
-				):
-					repeat_explosive_add = 0
-				ice_cube_shields -= 1
-			display_stats[play_slot]["point_value"] += repeat_point
-			display_stats[play_slot]["explosive_value"] += repeat_explosive_add
-			sim_explosiveness += repeat_explosive_add
-			sim_cauldron.append(ingredient)
-			cauldron_count = sim_cauldron.size()
 		if ingredient.id == PARROT_ID:
 			parrot_doubles_next = true
 		if ingredient.id == UNICORN_HORN_ID:

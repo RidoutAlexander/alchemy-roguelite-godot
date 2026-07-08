@@ -135,7 +135,7 @@ func bind_hand_card(
 		display_point_value if display_point_value >= 0 else _base_point_value
 	)
 	var explosive_display := (
-		display_explosive_value if display_point_value >= 0 else _base_explosive_value
+		display_explosive_value if display_explosive_value >= 0 else _base_explosive_value
 	)
 	if is_node_ready():
 		update_hand_stat_display(point_display, explosive_display)
