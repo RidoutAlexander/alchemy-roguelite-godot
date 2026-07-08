@@ -75,6 +75,19 @@ def cobbler_adjacency_bonus_from_hand_neighbors(
     return {"bonus": {"score": 0, "explosiveness": 0}, "neighbor_slot": -1}
 
 
+def hand_neighbor_slot(
+    hand_slots: list[str | None],
+    slot_index: int,
+    direction: int,
+) -> int:
+    neighbor_slot = slot_index + direction
+    while 0 <= neighbor_slot < len(hand_slots):
+        if hand_slots[neighbor_slot] is not None:
+            return neighbor_slot
+        neighbor_slot += direction
+    return -1
+
+
 def cobbler_adjacency_bonus_from_played_left_neighbor(
     ingredient_id: str,
     play_slot: int,
@@ -82,14 +95,17 @@ def cobbler_adjacency_bonus_from_played_left_neighbor(
     cauldron_ids: list[str],
     play_cursor: int = -1,
 ) -> dict:
-    if play_cursor < 0 or not is_boom_berry_id(ingredient_id):
+    if not is_boom_berry_id(ingredient_id):
         return {"bonus": {"score": 0, "explosiveness": 0}}
-    left_slot = play_slot - 1
-    if left_slot < 0 or left_slot >= len(hand_slots):
-        return {"bonus": {"score": 0, "explosiveness": 0}}
-    if is_unplayed_hand_slot(left_slot, play_cursor):
+    left_slot = hand_neighbor_slot(hand_slots, play_slot, -1)
+    if left_slot < 0:
         return {"bonus": {"score": 0, "explosiveness": 0}}
     if hand_slots[left_slot] != COBBLER_ID:
+        return {"bonus": {"score": 0, "explosiveness": 0}}
+    was_played = left_slot < play_slot
+    if not was_played and play_cursor >= 0:
+        was_played = not is_unplayed_hand_slot(left_slot, play_cursor)
+    if not was_played:
         return {"bonus": {"score": 0, "explosiveness": 0}}
     if COBBLER_ID not in cauldron_ids:
         return {"bonus": {"score": 0, "explosiveness": 0}}

@@ -472,19 +472,20 @@ static func _cobbler_adjacency_bonus_from_played_left_neighbor(
 	play_cursor: int = -1
 ) -> Dictionary:
 	var empty := {"bonus": {"score": 0, "explosiveness": 0}}
-	if ingredient == null or play_slot < 0 or play_cursor < 0:
+	if ingredient == null or play_slot < 0:
 		return empty
 	if not is_boom_berry_id(ingredient.id):
 		return empty
-	var left_slot := play_slot - 1
+	var left_slot := _hand_neighbor_slot(hand_slots, play_slot, -1, locked_slots)
 	if left_slot < 0 or left_slot >= hand_slots.size():
-		return empty
-	if locked_slots.has(left_slot):
-		return empty
-	if _is_unplayed_hand_slot(left_slot, play_cursor):
 		return empty
 	var neighbor: IngredientData = hand_slots[left_slot]
 	if neighbor == null or neighbor.id != COBBLER_ID:
+		return empty
+	var was_played := left_slot < play_slot
+	if not was_played and play_cursor >= 0:
+		was_played = not _is_unplayed_hand_slot(left_slot, play_cursor)
+	if not was_played:
 		return empty
 	if not _cauldron_contains_ingredient_id(cauldron_contents, COBBLER_ID):
 		return empty
