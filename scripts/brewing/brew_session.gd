@@ -909,10 +909,9 @@ func try_mulligan(slot_index: int) -> bool:
 	if old_ingredient == null:
 		return false
 
-	var replacements := context.bag.take_random_excluding_ids(
-		_blocked_bag_draw_ingredient_ids() + [old_ingredient.id],
-		1
-	)
+	var excluded_ids := _blocked_bag_draw_ingredient_ids()
+	excluded_ids.append(old_ingredient.id)
+	var replacements := context.bag.take_random_excluding_ids(excluded_ids, 1)
 	if replacements.is_empty():
 		return false
 	var new_ingredient: IngredientData = replacements[0]

@@ -307,7 +307,11 @@ func _on_hand_undo_pressed() -> void:
 
 
 func _on_hand_mulligan_pressed() -> void:
-	if _player_hand == null:
+	if _player_hand == null or GameManager.run == null:
+		return
+	var session := GameManager.run.brew_session
+	if session.get_mulligans_remaining() <= 0 or not GameManager.can_mulligan():
+		_shake_hand_action_button(_hand_mulligan_button)
 		return
 	if not _can_use_mulligan_now():
 		_shake_hand_action_button(_hand_mulligan_button)
@@ -772,7 +776,12 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 			_mulligan_needs_card_selection(session)
 		)
 	if _hand_mulligan_button != null:
-		_hand_mulligan_button.disabled = remaining <= 0 or not _can_use_mulligan_now()
+		_hand_mulligan_button.disabled = false
+		_hand_mulligan_button.modulate = (
+			Color.WHITE
+			if _can_use_mulligan_now()
+			else Color(0.55, 0.55, 0.55, 1.0)
+		)
 	_refresh_buy_brew_mulligan_visibility()
 	if _buy_brew_mulligan_button != null and _buy_brew_mulligan_button.visible:
 		_buy_brew_mulligan_button.disabled = false

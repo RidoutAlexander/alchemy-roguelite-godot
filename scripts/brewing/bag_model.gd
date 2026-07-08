@@ -113,7 +113,7 @@ func try_draw() -> IngredientData:
 	return try_draw_excluding_ids([])
 
 
-func try_draw_excluding_ids(excluded_ids: Array[String]) -> IngredientData:
+func try_draw_excluding_ids(excluded_ids: Array = []) -> IngredientData:
 	var excluded: Dictionary = _excluded_id_lookup(excluded_ids)
 	if not _forced_draw_queue.is_empty():
 		for index in _forced_draw_queue.size():
@@ -202,7 +202,7 @@ func count_drawable_excluding_instances(excluded_instances: Array) -> int:
 func take_random_excluding_instances(
 	excluded_instances: Array,
 	count: int,
-	excluded_ids: Array[String] = []
+	excluded_ids: Array = []
 ) -> Array[IngredientData]:
 	var excluded: Dictionary = {}
 	for item in excluded_instances:
@@ -233,7 +233,7 @@ func take_random_excluding_id(excluded_id: String, count: int = 1) -> Array[Ingr
 	return take_random_excluding_ids([excluded_id], count)
 
 
-func take_random_excluding_ids(excluded_ids: Array[String], count: int = 1) -> Array[IngredientData]:
+func take_random_excluding_ids(excluded_ids: Array = [], count: int = 1) -> Array[IngredientData]:
 	var excluded: Dictionary = _excluded_id_lookup(excluded_ids)
 	var pool: Array[IngredientData] = []
 	for chip in _working_chips:
@@ -342,7 +342,7 @@ func _chip_for_bag(ingredient: IngredientData) -> IngredientData:
 	return ingredient.duplicate_for_bag()
 
 
-func _excluded_id_lookup(excluded_ids: Array[String]) -> Dictionary:
+func _excluded_id_lookup(excluded_ids: Array) -> Dictionary:
 	var excluded: Dictionary = {}
 	for ingredient_id in excluded_ids:
 		var normalized := str(ingredient_id).strip_edges()
