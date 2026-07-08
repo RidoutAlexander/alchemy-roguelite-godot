@@ -293,6 +293,19 @@ static func resolve_hand_play_cobbler(
 			if is_boom_berry_id(ingredient.id):
 				return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": true}
 	if int(bonus.get("score", 0)) == 0 and int(bonus.get("explosiveness", 0)) == 0:
+		var played_pair := _cobbler_adjacency_bonus_from_played_left_neighbor(
+			ingredient,
+			play_slot,
+			hand_slots,
+			cauldron_contents,
+			locked_slots,
+			play_cursor
+		)
+		bonus = played_pair.get("bonus", bonus)
+		if int(bonus.get("score", 0)) > 0 or int(bonus.get("explosiveness", 0)) > 0:
+			if is_boom_berry_id(ingredient.id):
+				return {"bonus": bonus, "retroactive_slot": -1, "apply_to_current": true}
+	if int(bonus.get("score", 0)) == 0 and int(bonus.get("explosiveness", 0)) == 0:
 		return {"bonus": bonus, "retroactive_slot": -1}
 	if (
 		ingredient.id == COBBLER_ID
@@ -448,6 +461,49 @@ static func _cobbler_adjacency_bonus_from_hand_neighbors(
 					"neighbor_slot": neighbor_slot,
 				}
 	return empty
+
+
+static func _cobbler_adjacency_bonus_from_played_left_neighbor(
+	ingredient: IngredientData,
+	play_slot: int,
+	hand_slots: Array,
+	cauldron_contents: Array,
+	locked_slots: Dictionary = {},
+	play_cursor: int = -1
+) -> Dictionary:
+	var empty := {"bonus": {"score": 0, "explosiveness": 0}}
+	if ingredient == null or play_slot < 0 or play_cursor < 0:
+		return empty
+	if not is_boom_berry_id(ingredient.id):
+		return empty
+	var left_slot := play_slot - 1
+	if left_slot < 0 or left_slot >= hand_slots.size():
+		return empty
+	if locked_slots.has(left_slot):
+		return empty
+	if _is_unplayed_hand_slot(left_slot, play_cursor):
+		return empty
+	var neighbor: IngredientData = hand_slots[left_slot]
+	if neighbor == null or neighbor.id != COBBLER_ID:
+		return empty
+	if not _cauldron_contains_ingredient_id(cauldron_contents, COBBLER_ID):
+		return empty
+	return {
+		"bonus": {
+			"score": COBBLER_ADJACENT_BOOM_BERRY_SCORE,
+			"explosiveness": COBBLER_ADJACENT_BOOM_BERRY_EXPLOSIVENESS,
+		},
+	}
+
+
+static func _cauldron_contains_ingredient_id(
+	cauldron_contents: Array,
+	ingredient_id: String
+) -> bool:
+	for entry in cauldron_contents:
+		if entry != null and entry.id == ingredient_id:
+			return true
+	return false
 
 
 static func _hand_boom_berry_slot_immediately_left(
@@ -934,21 +990,13 @@ static func compute_immediate_cauldron_play_preview(
 	):
 		explosive_add = 0
 
-	var effect_entries: Array = []
-	if bool(step_flags.get("pocket_watch_doubles", false)):
-		effect_entries.append(
-			{
-				"trinket_id": TrinketEffects.POCKET_WATCH_ID,
-				"overlay_text": "",
-			}
-		)
-	if unicorn_cured:
-		effect_entries.append(
-			{
-				"ingredient_id": UNICORN_HORN_ID,
-				"overlay_text": "",
-			}
-		)
+	var effect_entries := build_immediate_play_effect_entries(
+		ingredient,
+		resolved,
+		step_flags,
+		unicorn_cured,
+		owned_trinket_ids
+	)
 
 	var shake := (
 		bool(step_flags.get("in_rhythm_doubles", false))
@@ -962,6 +1010,60 @@ static func compute_immediate_cauldron_play_preview(
 		"effect_entries": effect_entries,
 		"shake": shake,
 	}
+
+
+static func build_immediate_play_effect_entries(
+	ingredient: IngredientData,
+	resolved_cobbler: Dictionary,
+	step_flags: Dictionary,
+	unicorn_cured: bool,
+	owned_trinket_ids: Array = []
+) -> Array:
+	var effect_entries: Array = []
+	if bool(step_flags.get("pocket_watch_doubles", false)):
+		effect_entries.append(
+			{
+				"trinket_id": TrinketEffects.POCKET_WATCH_ID,
+				"overlay_text": "",
+			}
+		)
+	if bool(step_flags.get("parrot_doubles", false)):
+		effect_entries.append(
+			{
+				"ingredient_id": PARROT_ID,
+				"overlay_text": "",
+			}
+		)
+	if unicorn_cured:
+		effect_entries.append(
+			{
+				"ingredient_id": UNICORN_HORN_ID,
+				"overlay_text": "",
+			}
+		)
+	if bool(resolved_cobbler.get("apply_to_current", false)):
+		var cobbler_bonus: Dictionary = resolved_cobbler.get("bonus", {})
+		if (
+			int(cobbler_bonus.get("score", 0)) > 0
+			or int(cobbler_bonus.get("explosiveness", 0)) > 0
+		):
+			effect_entries.append(
+				{
+					"ingredient_id": COBBLER_ID,
+					"overlay_text": "",
+				}
+			)
+	if (
+		ingredient != null
+		and TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids)
+	):
+		effect_entries.append(
+			{
+				"trinket_id": TrinketEffects.PRISTINE_FEATHER_ID,
+				"overlay_text": "",
+			}
+		)
+	return effect_entries
 
 
 static func skips_hand_stay_interval_counter(ingredient: IngredientData) -> bool:

@@ -309,7 +309,7 @@ func _snap_hand_highlight(active: bool) -> void:
 	_update_hand_effect_icon_position()
 
 
-func _bind_hand_effect_entries(entries: Array) -> void:
+func _partition_effect_entries(entries: Array) -> Dictionary:
 	var icon_entries: Array = []
 	var has_gecko := false
 	var has_honey := false
@@ -327,16 +327,30 @@ func _bind_hand_effect_entries(entries: Array) -> void:
 			has_unicorn_sparkle = true
 			continue
 		icon_entries.append(entry)
-	_set_gecko_hand_overlay_visible(has_gecko)
-	_set_honey_splatter_overlay_visible(has_honey)
-	_set_unicorn_sparkle_visible(has_unicorn_sparkle)
+	return {
+		"icon_entries": icon_entries,
+		"has_gecko": has_gecko,
+		"has_honey": has_honey,
+		"has_unicorn_sparkle": has_unicorn_sparkle,
+	}
+
+
+func _bind_hand_effect_entries(entries: Array) -> void:
+	var partitioned := _partition_effect_entries(entries)
+	_set_gecko_hand_overlay_visible(partitioned.get("has_gecko", false))
+	_set_honey_splatter_overlay_visible(partitioned.get("has_honey", false))
+	_set_unicorn_sparkle_visible(partitioned.get("has_unicorn_sparkle", false))
+	_bind_effect_icon_entries(partitioned.get("icon_entries", []))
+	_update_hand_effect_icon_position()
+
+
+func _bind_effect_icon_entries(icon_entries: Array) -> void:
 	if _hand_effect_icons == null:
 		return
 	if icon_entries.is_empty():
 		_hand_effect_icons.clear_icons()
 	else:
 		_hand_effect_icons.bind_entries(icon_entries, _lookup_effect_ingredient)
-	_update_hand_effect_icon_position()
 
 
 func _clear_hand_effect_entries() -> void:
@@ -388,10 +402,14 @@ func _update_hand_effect_icon_position() -> void:
 	_hand_effect_icons.position.y = _hand_effect_icon_y()
 
 
+func _effect_overlay_card_scale() -> float:
+	return HAND_CARD_SCALE if _hand_mode else EyeballPuzzleLayout.CARD_SCALE
+
+
 func _set_gecko_hand_overlay_visible(visible_overlay: bool) -> void:
 	if _gecko_hand_overlay == null:
 		return
-	_gecko_hand_overlay.visible = visible_overlay and _hand_mode
+	_gecko_hand_overlay.visible = visible_overlay and (_hand_mode or _picker_mode)
 	if visible_overlay:
 		_apply_gecko_hand_layout()
 
@@ -401,7 +419,7 @@ func _apply_gecko_hand_layout() -> void:
 		return
 	_gecko_hand_overlay.texture = GECKO_HAND_OVERLAY_TEXTURE
 	_gecko_hand_overlay.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
-	_gecko_hand_overlay.scale = Vector2.ONE / HAND_CARD_SCALE
+	_gecko_hand_overlay.scale = Vector2.ONE / _effect_overlay_card_scale()
 	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0 * 0.5
 	var overlay_width := HAND_CARD_BASE_SIZE.x * 0.9 * 0.5
 	_gecko_hand_overlay.custom_minimum_size = Vector2(overlay_width, overlay_height)
@@ -417,7 +435,7 @@ func _apply_gecko_hand_layout() -> void:
 func _set_honey_splatter_overlay_visible(visible_overlay: bool) -> void:
 	if _honey_splatter_overlay == null:
 		return
-	_honey_splatter_overlay.visible = visible_overlay and _hand_mode
+	_honey_splatter_overlay.visible = visible_overlay and (_hand_mode or _picker_mode)
 	if visible_overlay:
 		_apply_honey_splatter_layout()
 
@@ -427,7 +445,7 @@ func _apply_honey_splatter_layout() -> void:
 		return
 	_honey_splatter_overlay.texture = HONEY_SPLATTER_OVERLAY_TEXTURE
 	_honey_splatter_overlay.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
-	_honey_splatter_overlay.scale = Vector2.ONE / HAND_CARD_SCALE
+	_honey_splatter_overlay.scale = Vector2.ONE / _effect_overlay_card_scale()
 	var overlay_width := HAND_CARD_BASE_SIZE.x / 3.0
 	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0
 	_honey_splatter_overlay.custom_minimum_size = Vector2(overlay_width, overlay_height)
@@ -454,8 +472,10 @@ func _apply_unicorn_sparkle_layout() -> void:
 		return
 	_unicorn_sparkle_fx.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
 	_unicorn_sparkle_fx.position = Vector2.ZERO
-	var card_scale := HAND_CARD_SCALE if _hand_mode else EyeballPuzzleLayout.CARD_SCALE
-	_unicorn_sparkle_fx.configure_for_card(HAND_CARD_BASE_SIZE, card_scale)
+	_unicorn_sparkle_fx.configure_for_card(
+		HAND_CARD_BASE_SIZE,
+		_effect_overlay_card_scale()
+	)
 
 
 func _sync_hand_visual_z_order(elevated: bool) -> void:
@@ -575,22 +595,11 @@ func set_picker_preview_shake(enabled: bool) -> void:
 
 
 func _bind_picker_effect_entries(entries: Array) -> void:
-	var icon_entries: Array = []
-	var has_unicorn_sparkle := false
-	for entry in entries:
-		if not entry is Dictionary:
-			continue
-		if str(entry.get("ingredient_id", "")) == _IngredientEffects.UNICORN_HORN_ID:
-			has_unicorn_sparkle = true
-			continue
-		icon_entries.append(entry)
-	_set_unicorn_sparkle_visible(has_unicorn_sparkle)
-	if _hand_effect_icons == null:
-		return
-	if icon_entries.is_empty():
-		_hand_effect_icons.clear_icons()
-	else:
-		_hand_effect_icons.bind_entries(icon_entries, _lookup_effect_ingredient)
+	var partitioned := _partition_effect_entries(entries)
+	_set_gecko_hand_overlay_visible(partitioned.get("has_gecko", false))
+	_set_honey_splatter_overlay_visible(partitioned.get("has_honey", false))
+	_set_unicorn_sparkle_visible(partitioned.get("has_unicorn_sparkle", false))
+	_bind_effect_icon_entries(partitioned.get("icon_entries", []))
 	_apply_picker_effect_icon_layout()
 
 
@@ -598,6 +607,7 @@ func _apply_picker_effect_icon_layout() -> void:
 	if _hand_effect_icons == null:
 		return
 	_hand_effect_icons.z_index = 1
+	_hand_effect_icons.scale = Vector2.ONE / _effect_overlay_card_scale()
 	var strip_size := _hand_effect_icons.custom_minimum_size
 	if _hand_effect_icons.size != Vector2.ZERO:
 		strip_size = _hand_effect_icons.size

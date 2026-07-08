@@ -367,7 +367,8 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		unicorn_cured_slots,
 		_parrot_doubles_next,
 		_resolve_gecko_stayed_slots_for_display(),
-		_resolve_honey_skipped_slots_for_display()
+		_resolve_honey_skipped_slots_for_display(),
+		_hand_locked_slots if _hand_phase == HandPhase.PLAYING else {}
 	)
 	_sanitize_hand_overlay_effect_entries(effect_entries)
 	return effect_entries
@@ -563,6 +564,7 @@ func get_bat_wing_choice_preview(ingredient: IngredientData) -> Dictionary:
 			ingredients_added_before,
 			context.current_aura
 		),
+		"parrot_doubles": _parrot_doubles_next,
 	}
 
 	var layout_slots: Array = _hand_start_slots

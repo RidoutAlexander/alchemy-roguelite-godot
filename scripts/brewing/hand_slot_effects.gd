@@ -2,6 +2,7 @@ class_name HandSlotEffects
 extends RefCounted
 
 const HONEY_ID := IngredientEffects.HONEY_ID
+const COBBLER_ID := IngredientEffects.COBBLER_ID
 
 
 static func compute_entries(
@@ -13,7 +14,8 @@ static func compute_entries(
 	unicorn_cured_slots: Array = [],
 	parrot_repeats_next: bool = false,
 	gecko_stayed_override: Dictionary = {},
-	honey_skipped_override: Dictionary = {}
+	honey_skipped_override: Dictionary = {},
+	locked_slots: Dictionary = {}
 ) -> Array:
 	var per_slot: Array = []
 	for _i in hand_slot_count:
@@ -24,6 +26,13 @@ static func compute_entries(
 	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
 	_append_parrot_repeat_entries(per_slot, play_steps, parrot_repeats_next)
 	_append_pristine_feather_entries(per_slot, hand_slots, owned_trinket_ids)
+	_append_cobbler_entries_from_steps(
+		per_slot,
+		play_steps,
+		hand_slots,
+		layout_slots,
+		locked_slots
+	)
 	return per_slot
 
 
@@ -203,6 +212,77 @@ static func _append_parrot_repeat_entries(
 			pending = false
 		if ingredient.id == IngredientEffects.PARROT_ID:
 			pending = true
+
+
+static func _append_cobbler_entries_from_steps(
+	per_slot: Array,
+	play_steps: Array,
+	hand_slots: Array,
+	layout_hand_slots: Array = [],
+	locked_slots: Dictionary = {}
+) -> void:
+	var layout := layout_hand_slots if not layout_hand_slots.is_empty() else hand_slots
+	var sim_cauldron: Array = []
+	var last_hand_slot := -1
+	var last_hand_ingredient: IngredientData = null
+	for step in play_steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		var play_slot := int(step.get("slot_index", -1))
+		if play_slot < 0:
+			continue
+		var ingredient: IngredientData = step.get("ingredient")
+		if ingredient == null:
+			continue
+		if bool(step.get("bat_wing_pick", false)):
+			sim_cauldron.append(ingredient)
+			last_hand_slot = play_slot
+			last_hand_ingredient = ingredient
+			continue
+		var resolved := IngredientEffects.resolve_hand_play_cobbler(
+			ingredient,
+			sim_cauldron,
+			play_slot,
+			last_hand_slot,
+			layout,
+			last_hand_ingredient,
+			locked_slots,
+			play_slot
+		)
+		var target_slot := -1
+		var retroactive_slot := int(resolved.get("retroactive_slot", -1))
+		if retroactive_slot >= 0:
+			target_slot = retroactive_slot
+		elif bool(resolved.get("apply_to_current", false)):
+			target_slot = play_slot
+		elif bool(resolved.get("apply_retroactive_immediately", false)):
+			target_slot = play_slot
+		if target_slot >= 0:
+			var cobbler_bonus: Dictionary = resolved.get("bonus", {})
+			if (
+				int(cobbler_bonus.get("score", 0)) > 0
+				or int(cobbler_bonus.get("explosiveness", 0)) > 0
+			):
+				_append_cobbler_effect_entry(per_slot, target_slot)
+		sim_cauldron.append(ingredient)
+		last_hand_slot = play_slot
+		last_hand_ingredient = ingredient
+
+
+static func _append_cobbler_effect_entry(per_slot: Array, slot_index: int) -> void:
+	if slot_index < 0 or slot_index >= per_slot.size():
+		return
+	for entry in per_slot[slot_index]:
+		if not entry is Dictionary:
+			continue
+		if str(entry.get("ingredient_id", "")) == COBBLER_ID:
+			return
+	per_slot[slot_index].append(
+		{
+			"ingredient_id": COBBLER_ID,
+			"overlay_text": "",
+		}
+	)
 
 
 static func _append_pristine_feather_entries(
