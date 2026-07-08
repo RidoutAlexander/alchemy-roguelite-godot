@@ -47,6 +47,11 @@ var _brew_completion_queued: bool = false
 var _pending_time_turner_poof_center: Vector2 = Vector2.ZERO
 var _pending_time_turner_poof_texture: Texture2D = null
 
+const RUN_PREP_SCENE_PATH := "res://scenes/run_prep.tscn"
+const GAME_SCENE_PATH := "res://scenes/game.tscn"
+
+var _allow_game_scene: bool = false
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -70,11 +75,47 @@ func has_save() -> bool:
 
 
 func start_new_run(difficulty: int = GameDifficulty.Mode.HARD) -> void:
+	open_prep_screen(difficulty)
+
+
+func open_prep_screen(difficulty: int) -> void:
 	SaveService.delete_save()
 	run.start_new_run(difficulty)
 	last_brew_cleared = false
+	run.ensure_aura_locked_for_upcoming_brew()
+	_allow_game_scene = false
+	current_phase = GamePhase.Phase.RUN_PREP
+	phase_changed.emit(current_phase)
 	run_changed.emit()
-	_enter_brewing()
+
+
+func may_enter_game_scene() -> bool:
+	return _allow_game_scene
+
+
+func is_prep_confirmed() -> bool:
+	return _allow_game_scene
+
+
+func press_ready_to_start_first_brew() -> bool:
+	if _allow_game_scene:
+		return false
+	if current_phase != GamePhase.Phase.RUN_PREP:
+		push_error("GameManager: first brew can only start from run prep")
+		return false
+	_allow_game_scene = true
+	_cancel_hand_end_effects_delay()
+	_brew_completion_queued = false
+	_brew_transition_pending = false
+	run.begin_brew()
+	run_changed.emit()
+	current_phase = GamePhase.Phase.BREWING
+	phase_changed.emit(current_phase)
+	return true
+
+
+func prepare_continue_game() -> void:
+	_allow_game_scene = true
 
 
 func continue_run() -> void:
@@ -87,11 +128,14 @@ func continue_run() -> void:
 	if run.has_pending_trinket_reward():
 		_set_phase(GamePhase.Phase.TRINKET_REWARD)
 	else:
+		run.ensure_aura_locked_for_upcoming_brew()
 		_set_phase(GamePhase.Phase.SHOP)
 	run_changed.emit()
 
 
 func enter_brewing() -> void:
+	if not _allow_game_scene:
+		return
 	_enter_brewing()
 
 
@@ -482,10 +526,13 @@ func save_and_quit() -> void:
 
 
 func return_to_main_menu() -> void:
+	_allow_game_scene = false
 	_set_phase(GamePhase.Phase.MAIN_MENU)
 
 
 func _enter_brewing() -> void:
+	if not _allow_game_scene:
+		return
 	_cancel_hand_end_effects_delay()
 	_brew_completion_queued = false
 	_brew_transition_pending = false
@@ -520,6 +567,7 @@ func _complete_brew() -> void:
 		_end_run()
 		return
 	_save_at_shop()
+	run.ensure_aura_locked_for_upcoming_brew()
 	if last_brew_cleared and run.has_pending_trinket_reward():
 		_set_phase(GamePhase.Phase.TRINKET_REWARD)
 	else:
@@ -547,6 +595,7 @@ func finalize_trinket_reward_to_shop() -> void:
 	notify_bag_display_changed()
 	run_changed.emit()
 	_save_at_shop()
+	run.ensure_aura_locked_for_upcoming_brew()
 	_set_phase(GamePhase.Phase.SHOP)
 
 
@@ -567,6 +616,13 @@ func _save_at_shop() -> void:
 
 
 func _set_phase(phase: int) -> void:
+	if (
+		phase == GamePhase.Phase.BREWING
+		and not _allow_game_scene
+		and not has_save()
+	):
+		push_warning("GameManager: blocked BREWING phase until run prep is confirmed")
+		phase = GamePhase.Phase.RUN_PREP
 	current_phase = phase
 	phase_changed.emit(phase)
 

@@ -3,8 +3,14 @@ extends Control
 
 const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
 
+@onready var _level_label: Label = $LevelLabel
+@onready var _aura_name_label: Label = $AuraNameLabel
+@onready var _aura_description_label: Label = $AuraDescriptionLabel
 @onready var _countdown_label: Label = $AuraCountdownLabel
 @onready var _countdown_caption: Label = $AuraCountdownCaption
+@onready var _practice_restart_button: Control = $PracticeRestartButton
+
+var _preview_mode: bool = false
 
 
 func _ready() -> void:
@@ -50,7 +56,39 @@ func _on_hand_card_played(
 	refresh_interval_countdown()
 
 
+func bind_preview(level: int, aura: AuraData) -> void:
+	_preview_mode = true
+	if _level_label != null:
+		_level_label.text = "Level %d" % level
+	if aura == null:
+		if _aura_name_label != null:
+			_aura_name_label.text = ""
+		if _aura_description_label != null:
+			_aura_description_label.text = ""
+		modulate = Color.WHITE
+	else:
+		if _aura_name_label != null:
+			_aura_name_label.text = aura.display_name
+		var is_boss := GameConstants.is_boss_level(level)
+		if _aura_description_label != null:
+			if is_boss:
+				_aura_description_label.text = (
+					"%s\n%s" % [aura.description, GameConstants.BOSS_AURA_WARNING]
+				)
+			else:
+				_aura_description_label.text = aura.description
+		modulate = Color(1.0, 0.58, 0.58, 1.0) if is_boss else Color.WHITE
+	if _countdown_label != null:
+		_countdown_label.visible = false
+	if _countdown_caption != null:
+		_countdown_caption.visible = false
+	if _practice_restart_button != null:
+		_practice_restart_button.visible = false
+
+
 func refresh_interval_countdown() -> void:
+	if _preview_mode:
+		return
 	var show_countdown := false
 	var countdown := 0
 	if GameManager.run != null and GameManager.run.brew_session != null:

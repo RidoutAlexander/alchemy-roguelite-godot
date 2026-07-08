@@ -147,7 +147,7 @@ func _play_intro_then_start_new_run() -> void:
 	var has_video := _intro_video != null and _intro_video.stream != null
 	var has_audio := _intro_audio != null and _intro_audio.stream != null
 	if not has_video and not has_audio:
-		await _start_game_scene(true)
+		_open_prep_scene()
 		return
 
 	_intro_playing = true
@@ -177,20 +177,19 @@ func _on_intro_clip_finished() -> void:
 		return
 	_stop_intro_media()
 	_intro_playing = false
-	await _start_game_scene(true)
+	_open_prep_scene()
+
+
+func _open_prep_scene() -> void:
+	GameManager.open_prep_screen(_selected_difficulty)
+	await SceneTransition.go_to(GameManager.RUN_PREP_SCENE_PATH)
 
 
 func _on_continue_pressed() -> void:
-	await _start_game_scene(false)
+	GameManager.continue_run()
+	GameManager.prepare_continue_game()
+	await SceneTransition.go_to(GameManager.GAME_SCENE_PATH)
 
 
 func _on_exit_pressed() -> void:
 	get_tree().quit()
-
-
-func _start_game_scene(new_run: bool) -> void:
-	if new_run:
-		GameManager.start_new_run(_selected_difficulty)
-	else:
-		GameManager.continue_run()
-	await SceneTransition.go_to("res://scenes/game.tscn")

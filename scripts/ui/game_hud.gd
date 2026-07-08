@@ -55,6 +55,9 @@ var _rhythm_shake_active: bool = false
 
 
 func _ready() -> void:
+	if not GameManager.may_enter_game_scene():
+		SceneTransition.go_to(GameManager.RUN_PREP_SCENE_PATH)
+		return
 	_connect_button(_add_ingredient_button, GameManager.try_draw_ingredient)
 	if _add_ingredient_button != null:
 		if not _add_ingredient_button.mouse_entered.is_connected(_align_bag_remaining_count_label):

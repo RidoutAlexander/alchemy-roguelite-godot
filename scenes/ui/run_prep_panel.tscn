@@ -1,0 +1,69 @@
+[gd_scene load_steps=6 format=3 uid="uid://runpreppanel01"]
+
+[ext_resource type="Texture2D" path="res://assets/run_prep/run_prep_background.jpg" id="2_bg"]
+[ext_resource type="Texture2D" path="res://assets/sprites/ingredient_bag_button.png" id="3_bag"]
+[ext_resource type="PackedScene" uid="uid://bn0p2bxvpej5q" path="res://scenes/ui/wooden_button.tscn" id="4_ready"]
+[ext_resource type="PackedScene" uid="uid://ddoc3v3nf2mce" path="res://scenes/ui/level_aura_banner.tscn" id="5_banner"]
+[ext_resource type="PackedScene" uid="uid://cr5syaod6s2ge" path="res://scenes/ui/bag_contents_overlay.tscn" id="6_bag_contents"]
+
+[node name="RunPrepPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="LevelAuraBanner" parent="." instance=ExtResource("5_banner")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -688.0
+offset_top = 10.0
+offset_right = -382.0
+offset_bottom = 162.0
+grow_horizontal = 0
+
+[node name="BagColumn" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -70.0
+offset_right = 140.0
+offset_bottom = 270.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="BagButton" type="TextureButton" parent="BagColumn"]
+custom_minimum_size = Vector2(280, 280)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+texture_normal = ExtResource("3_bag")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="ReadyButton" parent="BagColumn" instance=ExtResource("4_ready")]
+custom_minimum_size = Vector2(320, 130)
+layout_mode = 2
+label_text = "Ready"
+
+[node name="BagContentsOverlay" parent="." instance=ExtResource("6_bag_contents")]

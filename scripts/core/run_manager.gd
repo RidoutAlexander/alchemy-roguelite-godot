@@ -245,7 +245,20 @@ func to_save_data() -> Dictionary:
 	}
 
 
+func get_upcoming_brew_level() -> int:
+	if pending_level_advance:
+		return current_level + 1
+	return current_level
+
+
+func ensure_aura_locked_for_upcoming_brew() -> AuraData:
+	return _ensure_aura_locked_for_level(get_upcoming_brew_level())
+
+
 func begin_brew() -> void:
+	if not GameManager.may_enter_game_scene():
+		push_error("begin_brew blocked until Ready is pressed on run prep")
+		return
 	current_aura = _pick_aura_for_brew()
 	if current_aura != null:
 		last_aura_id = current_aura.id
@@ -399,14 +412,18 @@ func try_purchase_offer(index: int) -> bool:
 
 
 func _pick_aura_for_brew() -> AuraData:
-	if locked_level_aura_level == current_level and locked_level_aura_id != "":
+	return _ensure_aura_locked_for_level(current_level)
+
+
+func _ensure_aura_locked_for_level(level: int) -> AuraData:
+	if locked_level_aura_level == level and locked_level_aura_id != "":
 		var locked := _content.find_aura(locked_level_aura_id)
 		if locked != null:
 			return locked
-	var picked := _aura_selector.pick_aura_for_level(current_level, last_aura_id)
+	var picked := _aura_selector.pick_aura_for_level(level, last_aura_id)
 	if picked != null:
 		locked_level_aura_id = picked.id
-		locked_level_aura_level = current_level
+		locked_level_aura_level = level
 	return picked
 
 

@@ -24,6 +24,7 @@ const BAG_COUNT_LABEL_INSET := Vector2(0.0, 6.0)
 @onready var _bag_button: TextureButton = $BagTarget/BagButton
 @onready var _bag_count_label: Label = $BagTarget/BagCountLabel
 @onready var _bag_contents: BagContentsOverlay = $BagContentsOverlay
+@onready var _level_aura_banner: LevelAuraBanner = $LevelAuraBanner
 
 var offer_cards: Array[IngredientCard] = []
 var _purchase_animations_pending: int = 0
@@ -500,6 +501,7 @@ func refresh_stats_only() -> void:
 	if GameManager.run == null:
 		return
 	var run := GameManager.run
+	_refresh_upcoming_aura_preview(run)
 	if _bag_count_label != null:
 		_bag_count_label.text = str(run.bag.master_count())
 		call_deferred("_align_bag_count_label")
@@ -524,6 +526,14 @@ func _refresh_buy_mulligan_controls(run: RunManager) -> void:
 	_buy_mulligan_button.modulate = (
 		Color(0.55, 0.55, 0.55, 1.0) if _buy_mulligan_button.disabled else Color.WHITE
 	)
+
+
+func _refresh_upcoming_aura_preview(run: RunManager) -> void:
+	if _level_aura_banner == null:
+		return
+	var level := run.get_upcoming_brew_level()
+	var aura := run.ensure_aura_locked_for_upcoming_brew()
+	_level_aura_banner.bind_preview(level, aura)
 
 
 func _show_gold_spent(amount: int) -> void:

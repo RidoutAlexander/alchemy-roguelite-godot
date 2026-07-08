@@ -11,11 +11,12 @@
 [ext_resource type="PackedScene" uid="uid://nt6f30xuyjt5" path="res://scenes/ui/shop_reroll_button.tscn" id="10_reroll_button"]
 [ext_resource type="PackedScene" uid="uid://cn2p7ghly6x2s" path="res://scenes/ui/gold_cost_badge.tscn" id="11_reroll_cost"]
 [ext_resource type="FontFile" uid="uid://bc6j6q1yher43" path="res://assets/fonts/ChildHood.otf" id="12_font"]
-[ext_resource type="PackedScene" uid="uid://bagcontentsoverlay01" path="res://scenes/ui/bag_contents_overlay.tscn" id="13_bag_contents"]
-[ext_resource type="Script" path="res://scripts/ui/shop_gold_spent_popups.gd" id="14_shop_gold_popups"]
-[ext_resource type="Script" uid="uid://c8k2mulligancost" path="res://scripts/ui/shop_button_cost_overlay.gd" id="15_cost_overlay"]
+[ext_resource type="PackedScene" uid="uid://cr5syaod6s2ge" path="res://scenes/ui/bag_contents_overlay.tscn" id="13_bag_contents"]
+[ext_resource type="Script" uid="uid://bahneuuyb581g" path="res://scripts/ui/shop_gold_spent_popups.gd" id="14_shop_gold_popups"]
+[ext_resource type="Script" uid="uid://idbexsjthqu6" path="res://scripts/ui/shop_button_cost_overlay.gd" id="15_cost_overlay"]
 [ext_resource type="Texture2D" uid="uid://bjtevet3r7nux" path="res://assets/cards/icons/gold_icon.png" id="16_gold_icon"]
 [ext_resource type="PackedScene" path="res://scenes/ui/trinkets_display.tscn" id="17_trinkets_display"]
+[ext_resource type="PackedScene" uid="uid://ddoc3v3nf2mce" path="res://scenes/ui/level_aura_banner.tscn" id="18_level_banner"]
 
 [node name="ShopPanel" type="Control" unique_id=1019768551]
 layout_mode = 3
@@ -47,6 +48,7 @@ layer = 50
 follow_viewport_enabled = true
 
 [node name="BagTarget" type="Control" parent="." unique_id=283375916]
+z_index = 12
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -57,22 +59,18 @@ offset_right = -245.0
 offset_bottom = 407.0
 grow_horizontal = 0
 mouse_filter = 2
-z_index = 12
 
 [node name="BoomBerryRewardNote" type="Label" parent="BagTarget" unique_id=1093847261]
 visible = false
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = 5
 anchor_left = 0.5
-anchor_top = 0.0
 anchor_right = 0.5
-anchor_bottom = 0.0
 offset_left = -220.0
 offset_top = -118.0
 offset_right = 220.0
 offset_bottom = -42.0
 grow_horizontal = 2
-mouse_filter = 2
 theme_override_colors/font_color = Color(0.98, 0.93, 0.78, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.05, 0.02, 1)
 theme_override_constants/outline_size = 4
@@ -99,7 +97,7 @@ texture = ExtResource("5_bag")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="BagButton" type="TextureButton" parent="BagTarget"]
+[node name="BagButton" type="TextureButton" parent="BagTarget" unique_id=2111371774]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -115,13 +113,12 @@ texture_normal = ExtResource("5_bag")
 ignore_texture_size = true
 stretch_mode = 5
 
-[node name="BagCountLabel" type="Label" parent="BagTarget"]
+[node name="BagCountLabel" type="Label" parent="BagTarget" unique_id=1980971825]
 layout_mode = 0
 offset_left = 58.0
 offset_top = 196.0
 offset_right = 126.0
 offset_bottom = 224.0
-mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
@@ -131,6 +128,20 @@ text = "0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="LevelAuraBanner" parent="." unique_id=975142445 instance=ExtResource("18_level_banner")]
+z_index = 8
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -692.0
+offset_top = 25.0
+offset_right = -386.0
+offset_bottom = 177.0
+grow_horizontal = 0
+scale = Vector2(0.6805453, 0.6805453)
+pivot_offset = Vector2(306, 0)
+
 [node name="GoldCounter" parent="." unique_id=380044565 instance=ExtResource("6_gold_display")]
 anchors_preset = 0
 offset_left = 620.0
@@ -139,14 +150,16 @@ offset_right = 784.0
 offset_bottom = 65.0
 
 [node name="LivesDisplay" parent="." unique_id=2113263304 instance=ExtResource("8_lives_display")]
+custom_minimum_size = Vector2(156, 52)
 anchors_preset = 0
 offset_left = 767.0
 offset_top = 15.0
-offset_right = 935.0
+offset_right = 923.0
 offset_bottom = 67.0
 
-[node name="TrinketsDisplay" parent="." instance=ExtResource("17_trinkets_display")]
+[node name="TrinketsDisplay" parent="." unique_id=603575871 instance=ExtResource("17_trinkets_display")]
 z_index = 6
+anchors_preset = 0
 offset_left = 58.0
 offset_top = 18.0
 offset_right = 318.0
@@ -227,10 +240,10 @@ offset_top = 176.0
 offset_right = 658.0
 offset_bottom = 220.0
 
-[node name="BuyMulliganCost" type="Control" parent="."]
+[node name="BuyMulliganCost" type="Control" parent="." unique_id=1523793024]
 z_index = 5
 custom_minimum_size = Vector2(40, 36)
-layout_mode = 0
+anchors_preset = 0
 offset_left = 723.0
 offset_top = 241.0
 offset_right = 763.0
@@ -238,7 +251,7 @@ offset_bottom = 277.0
 mouse_filter = 2
 script = ExtResource("15_cost_overlay")
 
-[node name="CoinIcon" type="TextureRect" parent="BuyMulliganCost"]
+[node name="CoinIcon" type="TextureRect" parent="BuyMulliganCost" unique_id=772277060]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -250,14 +263,13 @@ texture = ExtResource("16_gold_icon")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="AmountLabel" type="Label" parent="BuyMulliganCost"]
+[node name="AmountLabel" type="Label" parent="BuyMulliganCost" unique_id=669483521]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_colors/font_color = Color(0, 0, 0, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 2
@@ -267,21 +279,20 @@ text = "5"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="BuyMulliganButton" parent="." instance=ExtResource("10_reroll_button")]
+[node name="BuyMulliganButton" parent="." unique_id=1252224592 instance=ExtResource("10_reroll_button")]
 z_index = 5
 offset_left = 767.0
 offset_top = 215.0
 offset_right = 855.0
 offset_bottom = 303.0
 
-[node name="BuyMulliganLabel" type="Label" parent="."]
+[node name="BuyMulliganLabel" type="Label" parent="." unique_id=475015683]
 z_index = 5
 layout_mode = 0
 offset_left = 863.0
 offset_top = 241.0
 offset_right = 1005.0
 offset_bottom = 277.0
-mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
@@ -290,8 +301,8 @@ theme_override_font_sizes/font_size = 22
 text = "Buy Mulligan"
 vertical_alignment = 1
 
-[node name="ShopGoldPopups" type="Node" parent="."]
+[node name="ShopGoldPopups" type="Node" parent="." unique_id=1015319634]
 script = ExtResource("14_shop_gold_popups")
 
-[node name="BagContentsOverlay" parent="." instance=ExtResource("13_bag_contents")]
-z_index = 100
+[node name="BagContentsOverlay" parent="." unique_id=1715952472 instance=ExtResource("13_bag_contents")]
+layout_mode = 1

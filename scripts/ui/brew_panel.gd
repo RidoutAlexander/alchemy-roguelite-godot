@@ -63,6 +63,10 @@ var _pending_finish_after_phoenix: Callable = Callable()
 
 
 func _ready() -> void:
+	if not GameManager.may_enter_game_scene():
+		visible = false
+		SceneTransition.go_to(GameManager.RUN_PREP_SCENE_PATH)
+		return
 	if _cauldron_liquid != null:
 		_cauldron_base_scale = _cauldron_liquid.scale
 		_cauldron_base_modulate = _cauldron_liquid.modulate
