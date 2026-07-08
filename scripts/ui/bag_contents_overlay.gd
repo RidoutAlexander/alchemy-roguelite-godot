@@ -43,6 +43,7 @@ var _dev_trinket_selection: Dictionary = {}
 var _dev_trinket_slot_by_id: Dictionary = {}
 var _hovered_ingredient: IngredientData
 var _hovered_slot: BagInventorySlot
+var _active_hover_rect: Rect2 = Rect2()
 var _preview_rest_position: Vector2 = Vector2.ZERO
 
 
@@ -90,6 +91,9 @@ func _process(_delta: float) -> void:
 		_hide_preview()
 		return
 
+	if _hovered_slot != null and _hovered_slot != hovered_slot:
+		_hovered_slot.set_count_visible(true)
+
 	var needs_bind := (
 		not _preview_layer.visible
 		or _hovered_ingredient == null
@@ -106,6 +110,7 @@ func _process(_delta: float) -> void:
 
 	_align_preview_to_slot(hovered_slot)
 	_update_hover_count(hovered_slot)
+	_update_active_hover_rect()
 
 
 func _find_hovered_slot() -> BagInventorySlot:
@@ -114,7 +119,29 @@ func _find_hovered_slot() -> BagInventorySlot:
 		var slot := child as BagInventorySlot
 		if slot != null and slot.get_global_rect().has_point(mouse_pos):
 			return slot
+	if _is_mouse_over_active_hover(mouse_pos):
+		return _hovered_slot
 	return null
+
+
+func _is_mouse_over_active_hover(mouse_pos: Vector2) -> bool:
+	if _hovered_slot == null or _preview_layer == null or not _preview_layer.visible:
+		return false
+	if not _active_hover_rect.has_point(mouse_pos):
+		return false
+	return true
+
+
+func _update_active_hover_rect() -> void:
+	if _hovered_slot == null:
+		_active_hover_rect = Rect2()
+		return
+	var hover_rect := _hovered_slot.get_global_rect()
+	if _preview_card != null and _preview_card.visible:
+		hover_rect = hover_rect.merge(_preview_card.get_global_rect())
+	if _hover_count_label != null and _hover_count_label.visible:
+		hover_rect = hover_rect.merge(_hover_count_label.get_global_rect())
+	_active_hover_rect = hover_rect
 
 
 func _align_preview_to_slot(slot: BagInventorySlot) -> void:
@@ -532,6 +559,7 @@ func _hide_preview() -> void:
 	_hovered_ingredient = null
 	_hide_hover_count()
 	_hovered_slot = null
+	_active_hover_rect = Rect2()
 	_hide_canvas_layers()
 
 

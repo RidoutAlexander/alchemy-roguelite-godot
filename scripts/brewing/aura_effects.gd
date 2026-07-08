@@ -50,16 +50,17 @@ static func bubbling_brew_returns_ingredient(
 	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
 		return false
 	var count_after := ingredients_added_before + 1
-	return count_after % 3 == 0
+	return count_after % GameConstants.BUBBLING_BREW_INTERVAL == 0
 
 
 static func bubbling_brew_countdown(ingredients_added: int, aura: AuraData) -> int:
 	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
 		return 0
-	var remainder := ingredients_added % 3
+	var interval := GameConstants.BUBBLING_BREW_INTERVAL
+	var remainder := ingredients_added % interval
 	if remainder == 0:
-		return 3
-	return 3 - remainder
+		return interval
+	return interval - remainder
 
 
 static func bubbling_brew_hand_slots(

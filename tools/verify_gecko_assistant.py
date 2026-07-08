@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 
-INTERVAL = 9
+INTERVAL = 11
 HAND_SLOT_COUNT = 5
 
 
@@ -51,11 +51,9 @@ def simulate_locked_hand_play(
     cauldron_before: int,
     cauldron_after_chain_draws: int,
 ) -> tuple[set[int], list[str | None]]:
-    """Play hand using slots locked at press; chain draws only change live count."""
     stayed_slots = compute_gecko_stay_slots(hand_slots, honey_skipped, cauldron_before)
     slots = hand_slots.copy()
     live_count = cauldron_after_chain_draws
-    played: list[str | None] = []
     for slot_index in range(HAND_SLOT_COUNT):
         if slot_index in honey_skipped:
             continue
@@ -63,25 +61,24 @@ def simulate_locked_hand_play(
             continue
         if slot_index in stayed_slots:
             continue
-        played.append(slots[slot_index])
         slots[slot_index] = None
         live_count += 1
     return stayed_slots, slots
 
 
 def main() -> int:
-    assert stays_in_hand(8)
-    assert not stays_in_hand(7)
-    assert stays_in_hand(17)
-    assert not stays_in_hand(8, stays_consumed_this_hand=1)
-    assert countdown(0) == 9
-    assert countdown(8) == 1
-    assert countdown(9) == 9
+    assert stays_in_hand(10)
+    assert not stays_in_hand(9)
+    assert stays_in_hand(21)
+    assert not stays_in_hand(10, stays_consumed_this_hand=1)
+    assert countdown(0) == 11
+    assert countdown(10) == 1
+    assert countdown(11) == 11
 
     stayed = compute_gecko_stay_slots(
         ["a", "b", None, None, None],
         set(),
-        8,
+        10,
     )
     assert stayed == {0}
     assert 1 not in stayed
@@ -89,15 +86,15 @@ def main() -> int:
     stayed = compute_gecko_stay_slots(
         ["a", "b", None, None, None],
         set(),
-        7,
+        9,
     )
     assert stayed == {1}
 
     stayed_slots, slots_after = simulate_locked_hand_play(
         ["chain", "gecko", None, None, None],
         set(),
-        7,
-        8,
+        9,
+        10,
     )
     assert stayed_slots == {1}
     assert slots_after[1] == "gecko"

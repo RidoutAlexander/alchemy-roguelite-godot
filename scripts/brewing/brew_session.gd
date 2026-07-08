@@ -108,6 +108,9 @@ var last_presented_stat_deltas: Dictionary = {
 var last_play_fly_count: int = 1
 var last_play_fairy_poof: bool = false
 var _pending_bubbling_brew_return: IngredientData = null
+var _pending_phoenix_save_presentation: bool = false
+var _phoenix_save_from_explosiveness: int = 0
+var _phoenix_save_visual_active: bool = false
 var _jar_of_dirt_broke_poof_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
 var _pending_time_turner_target_slots: Array = []
@@ -173,6 +176,8 @@ func start_brew(
 
 func can_practice_restart() -> bool:
 	if _practice_restart_used:
+		return false
+	if _hand_phase != HandPhase.BAG:
 		return false
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return false
@@ -529,6 +534,32 @@ func consume_bubbling_brew_return_presentation() -> IngredientData:
 	var ingredient := _pending_bubbling_brew_return
 	_pending_bubbling_brew_return = null
 	return ingredient
+
+
+func consume_phoenix_save_presentation() -> Dictionary:
+	if not _pending_phoenix_save_presentation:
+		return {"triggered": false}
+	_pending_phoenix_save_presentation = false
+	return {
+		"triggered": true,
+		"from_explosiveness": _phoenix_save_from_explosiveness,
+	}
+
+
+func set_presented_explosiveness(value: int) -> void:
+	presented_explosiveness = maxi(0, value)
+
+
+func set_phoenix_save_visual_active(active: bool) -> void:
+	_phoenix_save_visual_active = active
+
+
+func is_phoenix_save_visual_active() -> bool:
+	return _phoenix_save_visual_active
+
+
+func complete_phoenix_save_presentation() -> void:
+	advance_presented_stats()
 
 
 
@@ -1233,8 +1264,6 @@ func _apply_ingredient_play(
 		+ effect.bonus_explosiveness
 		+ int(pending_cobbler.get("explosiveness", 0))
 	)
-	if effect.score_penalty > 0:
-		point_value = maxi(0, point_value - effect.score_penalty)
 	if from_hand_play and hand_slot_index >= 0:
 		if ingredient.id == IngredientEffects.SEVERED_RIGHT_HAND_ID:
 			point_value += _count_hand_ingredients_to_left_from_start(hand_slot_index)
@@ -1262,6 +1291,8 @@ func _apply_ingredient_play(
 		context.explosion_limit += effect.explosion_limit_bonus
 
 	context.score += point_value
+	if effect.score_penalty > 0:
+		context.score = maxi(0, context.score - effect.score_penalty)
 	var unicorn_blocks_explosive := _unicorn_cures_next_explosive
 	if unicorn_blocks_explosive:
 		if explosive_add > 0:
@@ -1582,10 +1613,21 @@ func _replace_voodoo_in_cauldron_with(ingredient: IngredientData) -> void:
 
 
 func _trigger_phoenix_save() -> void:
+	_phoenix_save_from_explosiveness = context.explosiveness
 	context.explosiveness = 0
 	context.bag.reshuffle_after_phoenix(context.cauldron_contents)
 	context.cauldron_contents.clear()
 	context.ingredients_added_to_cauldron = 0
+	_pending_phoenix_save_presentation = true
+	_sync_last_snapshot_after_phoenix_save()
+
+
+func _sync_last_snapshot_after_phoenix_save() -> void:
+	if _presented_stat_snapshots.is_empty():
+		enqueue_presented_stat_snapshot()
+		return
+	var last_snapshot: Dictionary = _presented_stat_snapshots[-1]
+	last_snapshot["explosiveness"] = 0
 
 
 func _remove_from_cauldron(ingredient: IngredientData) -> void:
@@ -1890,6 +1932,9 @@ func _reset_draw_flow_state() -> void:
 	_fairy_vanish_next_ingredient = false
 	_jar_of_dirt_broke_poof_pending = false
 	_pending_bubbling_brew_return = null
+	_pending_phoenix_save_presentation = false
+	_phoenix_save_from_explosiveness = 0
+	_phoenix_save_visual_active = false
 	_pending_time_turner_new_hand.clear()
 	_pending_time_turner_target_slots.clear()
 	_frog_legs_played_this_brew.clear()

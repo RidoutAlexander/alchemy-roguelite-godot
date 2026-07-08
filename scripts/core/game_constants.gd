@@ -17,6 +17,7 @@ const BOSS_AURA_WARNING := "You must complete the potion this round."
 const PRACTICE_BREW_AURA_ID := "practice brew"
 const IN_RHYTHM_AURA_ID := "in_rhythm"
 const BUBBLING_BREW_AURA_ID := "bubbling_brew"
+const BUBBLING_BREW_INTERVAL := 11
 const THRESHOLD_START := 5
 const THRESHOLD_STEP_BASE := 3
 const EASY_THRESHOLD_STEP := 2

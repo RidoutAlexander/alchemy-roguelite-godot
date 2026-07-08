@@ -4,6 +4,7 @@ extends Control
 const _IngredientFlyUtil := preload("res://scripts/ui/ingredient_fly_util.gd")
 const _CauldronExplosionEffect := preload("res://scripts/effects/cauldron_explosion_effect.gd")
 const _BossVictoryConfettiEffect := preload("res://scripts/effects/boss_victory_confetti_effect.gd")
+const _PhoenixSaveEffect := preload("res://scripts/effects/phoenix_save_effect.gd")
 const FLY_ART_SIZE := Vector2(96.0, 96.0)
 const POST_PLOP_EXPLOSION_DELAY := 0.2
 const BOILING_BASE_PITCH := 0.9
@@ -56,6 +57,8 @@ var _boiling_base_volume_db: float = 0.0
 var _pending_hand_draw: Array = []
 var _pending_hand_draw_index: int = 0
 var _frog_leg_return_queue: Array = []
+var _phoenix_save_presentation_active: bool = false
+var _pending_finish_after_phoenix: Callable = Callable()
 
 
 func _ready() -> void:
@@ -72,6 +75,7 @@ func _ready() -> void:
 	GameManager.ingredient_drawn.connect(_on_ingredient_drawn)
 	GameManager.frog_leg_escaped.connect(_on_frog_leg_escaped)
 	GameManager.brew_updated.connect(_on_brew_updated)
+	GameManager.run_changed.connect(_on_run_changed)
 	GameManager.brew_completion_requested.connect(_on_brew_completion_requested)
 	GameManager.presentation_idle.connect(_on_presentation_idle)
 	GameManager.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
@@ -117,6 +121,8 @@ func _ready() -> void:
 func _on_visibility_changed() -> void:
 	if not visible:
 		_hide_cauldron_contents()
+		return
+	_sync_hand_ui()
 
 
 func _on_cauldron_button_pressed() -> void:
@@ -142,6 +148,10 @@ func _refresh_cauldron_contents_if_open() -> void:
 
 func _on_brew_updated(_ctx: BrewContext) -> void:
 	_refresh_cauldron_contents_if_open()
+	_sync_hand_ui()
+
+
+func _on_run_changed() -> void:
 	_sync_hand_ui()
 	if _ctx.outcome == BrewOutcome.Outcome.IN_PROGRESS:
 		_brew_ambience_suppressed = false
@@ -688,7 +698,9 @@ func _hand_action_control_width(label: Label) -> float:
 
 
 func _should_show_brew_mulligan() -> bool:
-	if not visible or GameManager.run == null:
+	if GameManager.run == null:
+		return false
+	if GameManager.current_phase != GamePhase.Phase.BREWING:
 		return false
 	return (
 		GameManager.run.brew_session.context.outcome == BrewOutcome.Outcome.IN_PROGRESS
@@ -709,7 +721,7 @@ func _set_mulligan_visible(show_controls: bool) -> void:
 		_hand_mulligan_button.visible = show_controls
 	if _hand_mulligan_label != null:
 		_hand_mulligan_label.visible = show_controls
-	_set_buy_brew_mulligan_visible(show_controls and _can_afford_buy_brew_mulligan())
+	_refresh_buy_brew_mulligan_visibility()
 
 
 func _set_buy_brew_mulligan_visible(show_buy: bool) -> void:
@@ -743,8 +755,7 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 		_hand_mulligan_label.text = _format_mulligan_label(session.get_mulligans_remaining())
 	if _hand_mulligan_button != null:
 		_hand_mulligan_button.disabled = false
-	var show_buy := _hand_mulligan_button != null and _hand_mulligan_button.visible
-	_set_buy_brew_mulligan_visible(show_buy and _can_afford_buy_brew_mulligan())
+	_refresh_buy_brew_mulligan_visibility()
 	if _buy_brew_mulligan_button != null and _buy_brew_mulligan_button.visible:
 		_buy_brew_mulligan_button.disabled = false
 	if _buy_brew_mulligan_cost != null and _buy_brew_mulligan_cost.visible:
@@ -797,6 +808,12 @@ func _can_afford_buy_brew_mulligan() -> bool:
 	if not GameManager.run.brew_session.can_purchase_mulligan():
 		return false
 	return GameManager.run.gold >= GameManager.run.get_brew_mulligan_cost()
+
+
+func _refresh_buy_brew_mulligan_visibility() -> void:
+	_set_buy_brew_mulligan_visible(
+		_should_show_brew_mulligan() and _can_afford_buy_brew_mulligan()
+	)
 
 
 func _should_show_buy_brew_mulligan() -> bool:
@@ -877,8 +894,12 @@ func _play_fairy_poof_with_data(
 		_brew_exit_animations_pending += 1
 
 	if fly_data.is_empty():
-		GameManager.present_card_stats()
-		_finish_card_presentation(ingredient, track_for_exit)
+		_present_card_stats_after_play(
+			ingredient,
+			track_for_exit,
+			func() -> void:
+				_finish_card_presentation(ingredient, track_for_exit)
+		)
 		return
 
 	_IngredientFlyUtil.play_poof(
@@ -887,8 +908,12 @@ func _play_fairy_poof_with_data(
 		fly_data["start_center"],
 		fly_data.get("size", FLY_ART_SIZE),
 		func() -> void:
-			GameManager.present_card_stats()
-			_finish_card_presentation(ingredient, track_for_exit)
+			_present_card_stats_after_play(
+				ingredient,
+				track_for_exit,
+				func() -> void:
+					_finish_card_presentation(ingredient, track_for_exit)
+			)
 	)
 
 
@@ -921,8 +946,12 @@ func _play_cauldron_fly_with_data(
 		if track_for_exit:
 			_on_brew_exit_animation_finished()
 			_try_play_pending_brew_exit_effects()
-		GameManager.present_card_stats()
-		_complete_card_fly_sequence(ingredient, track_for_exit)
+		_present_card_stats_after_play(
+			ingredient,
+			track_for_exit,
+			func() -> void:
+				_complete_card_fly_sequence(ingredient, track_for_exit)
+		)
 		return
 
 	if track_for_exit:
@@ -960,7 +989,7 @@ func _play_cauldron_fly_repeat(
 				_complete_card_fly_sequence(ingredient, track_for_exit),
 		func() -> void:
 			_play_cauldron_plop()
-			GameManager.present_card_stats()
+			_present_card_stats_after_play(ingredient, track_for_exit)
 			if track_for_exit and remaining_flies == 1:
 				_try_play_pending_brew_exit_effects_after_plop()
 	)
@@ -1060,12 +1089,113 @@ func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> v
 		_cauldron_target.get_global_rect().get_center(),
 		FLY_ART_SIZE,
 		func() -> void:
-			GameManager.present_card_stats()
-			_finish_card_presentation(ingredient, track_for_exit)
+			_present_card_stats_after_play(
+				ingredient,
+				track_for_exit,
+				func() -> void:
+					_finish_card_presentation(ingredient, track_for_exit)
+			)
 	)
 
 
+func _present_card_stats_after_play(
+	ingredient: IngredientData,
+	track_for_exit: bool,
+	on_presented: Callable = Callable()
+) -> void:
+	if GameManager.run == null:
+		GameManager.present_card_stats()
+		if on_presented.is_valid():
+			on_presented.call()
+		return
+
+	var phoenix := GameManager.run.brew_session.consume_phoenix_save_presentation()
+	if bool(phoenix.get("triggered", false)):
+		_play_phoenix_save_presentation(ingredient, track_for_exit, on_presented)
+		return
+
+	GameManager.present_card_stats()
+	if on_presented.is_valid():
+		on_presented.call()
+
+
+func _play_phoenix_save_presentation(
+	ingredient: IngredientData,
+	track_for_exit: bool,
+	on_presented: Callable = Callable()
+) -> void:
+	if GameManager.run == null:
+		GameManager.present_card_stats()
+		if on_presented.is_valid():
+			on_presented.call()
+		return
+
+	var session := GameManager.run.brew_session
+	var ctx := session.context
+	_phoenix_save_presentation_active = true
+	session.set_phoenix_save_visual_active(true)
+	GameManager.set_presentation_in_progress(true)
+	_refresh_cauldron_contents_if_open()
+	GameManager.notify_bag_display_changed()
+	_pulse_cauldron_for_phoenix_save()
+
+	var origin := _get_cauldron_effect_origin()
+	var presentation_finished := false
+
+	session.set_presented_explosiveness(0)
+	session.complete_phoenix_save_presentation()
+	GameManager.brew_stats_presented.emit(ctx)
+	GameManager.brew_updated.emit(ctx)
+
+	var finish_presentation := func() -> void:
+		if presentation_finished:
+			return
+		presentation_finished = true
+		_phoenix_save_presentation_active = false
+		session.set_phoenix_save_visual_active(false)
+		if _pending_finish_after_phoenix.is_valid():
+			var pending_finish := _pending_finish_after_phoenix
+			_pending_finish_after_phoenix = Callable()
+			pending_finish.call()
+		if on_presented.is_valid():
+			on_presented.call()
+
+	_PhoenixSaveEffect.play(
+		_explosion_layer,
+		origin,
+		finish_presentation
+	)
+
+
+func _get_cauldron_effect_origin() -> Vector2:
+	if _cauldron_liquid != null:
+		return _cauldron_liquid.get_global_rect().get_center()
+	if _cauldron_target != null:
+		return _cauldron_target.get_global_rect().get_center()
+	return get_global_rect().get_center()
+
+
+func _pulse_cauldron_for_phoenix_save() -> void:
+	if _cauldron_liquid == null:
+		return
+	var bright := Color(1.45, 1.2, 0.82, 1.0)
+	var tween := create_tween()
+	tween.tween_property(_cauldron_liquid, "modulate", bright, 0.16)
+	tween.tween_property(_cauldron_liquid, "modulate", _cauldron_base_modulate, 0.55)
+	if _cauldron_liquid.has_method("set_activity_level"):
+		_cauldron_liquid.set_activity_level(1.0)
+		tween.tween_callback(
+			func() -> void:
+				if _cauldron_liquid != null and _cauldron_liquid.has_method("set_activity_level"):
+					_cauldron_liquid.set_activity_level(0.0)
+		)
+
+
 func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
+	if _phoenix_save_presentation_active:
+		_pending_finish_after_phoenix = func() -> void:
+			_finish_card_presentation(ingredient, track_for_exit)
+		return
 	if _pending_frog_escape != null:
 		var escaping_frog := _pending_frog_escape
 		_pending_frog_escape = null

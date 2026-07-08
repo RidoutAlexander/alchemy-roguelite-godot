@@ -82,7 +82,7 @@
   {
     "id": "practice brew",
     "display_name": "Practice Brew",
-    "description": "You may restart the brew at anypoint before it explodes",
+    "description": "You may restart the brew once between hands, before it explodes",
     "pool": "normal",
     "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,
@@ -112,7 +112,7 @@
   {
     "id": "bubbling_brew",
     "display_name": "Bubbling Brew",
-    "description": "every 3rd ingredient added to the cauldron jumps back into your bag.",
+    "description": "every 11th ingredient added to the cauldron jumps back into your bag.",
     "pool": "normal",
     "pool_unlock_level": 1,
     "explosion_limit_modifier": 0,

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 
-INTERVAL = 3
+INTERVAL = 11
 
 
 def returns_to_bag(ingredients_added_before: int) -> bool:
@@ -34,22 +34,26 @@ def simulate_brew(plays: int) -> tuple[list[bool], int, int]:
 
 
 def main() -> int:
-    assert returns_to_bag(2)
-    assert not returns_to_bag(1)
-    assert returns_to_bag(5)
-    assert countdown(0) == 3
-    assert countdown(2) == 1
-    assert countdown(3) == 3
+    assert returns_to_bag(10)
+    assert not returns_to_bag(9)
+    assert returns_to_bag(21)
+    assert countdown(0) == 11
+    assert countdown(10) == 1
+    assert countdown(11) == 11
 
-    returned, cauldron_size, added = simulate_brew(6)
-    assert returned == [False, False, True, False, False, True]
-    assert cauldron_size == 4
-    assert added == 6
+    returned, cauldron_size, added = simulate_brew(12)
+    assert returned.count(True) == 1
+    assert returned[10]
+    assert not returned[11]
+    assert cauldron_size == 11
+    assert added == 12
 
-    returned, cauldron_size, added = simulate_brew(4)
-    assert returned == [False, False, True, False]
-    assert cauldron_size == 3
-    assert added == 4
+    returned, cauldron_size, added = simulate_brew(22)
+    assert returned.count(True) == 2
+    assert returned[10]
+    assert returned[21]
+    assert cauldron_size == 20
+    assert added == 22
 
     print("PASS: bubbling brew verification checks passed")
     return 0

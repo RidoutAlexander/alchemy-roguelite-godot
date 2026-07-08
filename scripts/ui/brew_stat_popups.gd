@@ -48,11 +48,13 @@ func _on_brew_stats_presented(_ctx: BrewContext) -> void:
 	var explosive_delta := int(deltas.get("explosiveness", 0))
 	var gold_delta := int(deltas.get("gold_reward", 0))
 
-	if score_delta > 0 and _score_flask != null:
+	if score_delta != 0 and _score_flask != null:
+		var score_color := SCORE_COLOR if score_delta > 0 else EXPLOSIVE_COLOR
+		var score_text := "+%d" % score_delta if score_delta > 0 else "%d" % score_delta
 		_show_popup(
 			func(label_size: Vector2) -> Vector2: return _score_popup_center(label_size),
-			"+%d" % score_delta,
-			SCORE_COLOR
+			score_text,
+			score_color
 		)
 	if explosive_delta > 0 and _explosiveness_counter != null:
 		_show_popup(

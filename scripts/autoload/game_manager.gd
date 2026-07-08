@@ -638,7 +638,8 @@ func _wait_and_apply_hand_end_effects(delay_id: int) -> void:
 		return
 
 	var session := run.brew_session
-	set_presentation_in_progress(false)
+	if not session.is_phoenix_save_visual_active():
+		set_presentation_in_progress(false)
 	if not session.has_pending_hand_end_effects():
 		brew_updated.emit(session.context)
 		call_deferred("_mark_presentation_idle")

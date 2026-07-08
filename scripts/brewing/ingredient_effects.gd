@@ -522,8 +522,7 @@ static func compute_hand_display_stats(
 		)
 		point_value += int(effect_bonuses.get("bonus_score", 0))
 		explosive_value += int(effect_bonuses.get("bonus_explosiveness", 0))
-		if int(effect_bonuses.get("score_penalty", 0)) > 0:
-			point_value = maxi(0, point_value - int(effect_bonuses.get("score_penalty", 0)))
+		point_value -= int(effect_bonuses.get("score_penalty", 0))
 
 		pre_double_stats[play_slot] = {
 			"point_value": point_value,
