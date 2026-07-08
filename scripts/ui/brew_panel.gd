@@ -1204,6 +1204,7 @@ func _play_fairy_escape_to_trinket(source_ingredient: IngredientData, track_for_
 		FLY_ART_SIZE,
 		func() -> void:
 			_apply_fairy_escape_rewards(source_ingredient, track_for_exit),
+		Callable(),
 		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
 	)
 
@@ -1246,6 +1247,7 @@ func _play_empty_cage_recapture(source_ingredient: IngredientData, track_for_exi
 		FLY_ART_SIZE,
 		func() -> void:
 			_apply_empty_cage_recapture_reward(source_ingredient, track_for_exit),
+		Callable(),
 		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
 	)
 

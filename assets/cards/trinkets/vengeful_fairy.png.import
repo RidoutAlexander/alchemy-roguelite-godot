@@ -2,16 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvengefulfairy01"
-path="res://.godot/imported/vengeful_fairy.png-vengefulfairy01.ctex"
-metadata={
-"vram_texture": false
-}
+uid="uid://bu87ft2yt64yi"
+valid=false
 
 [deps]
 
 source_file="res://assets/cards/trinkets/vengeful_fairy.png"
-dest_files=["res://.godot/imported/vengeful_fairy.png-vengefulfairy01.ctex"]
 
 [params]
 
