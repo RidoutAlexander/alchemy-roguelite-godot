@@ -336,9 +336,11 @@ texture = ExtResource("17_honey_splatter")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="UnicornSparkleFX" type="Node2D" parent="."]
+[node name="UnicornSparkleFX" type="Control" parent="."]
 visible = false
 z_index = 2
+mouse_filter = 2
+clip_contents = true
 script = ExtResource("18_unicorn_sparkles")
 
 [node name="HandSlotEffectIcons" parent="." instance=ExtResource("15_effect_icons")]

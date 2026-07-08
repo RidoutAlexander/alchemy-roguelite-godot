@@ -448,6 +448,7 @@ func _apply_unicorn_sparkle_layout() -> void:
 	if _unicorn_sparkle_fx == null:
 		return
 	_unicorn_sparkle_fx.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
+	_unicorn_sparkle_fx.position = Vector2.ZERO
 	_unicorn_sparkle_fx.configure_for_card(HAND_CARD_BASE_SIZE, HAND_CARD_SCALE)
 
 
