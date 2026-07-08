@@ -485,7 +485,11 @@ func refresh() -> void:
 		if i < run.current_shop_offers.size():
 			var offer = run.current_shop_offers[i]
 			if offer != null:
-				offer_cards[i].bind_offer(offer.ingredient, offer.price, i)
+				var display_rarity := TrinketEffects.shop_rarity_for_ingredient(
+					offer.ingredient,
+					run.owned_trinket_ids
+				)
+				offer_cards[i].bind_offer(offer.ingredient, offer.price, i, int(display_rarity))
 			else:
 				offer_cards[i].bind_offer(null, 0, i)
 		else:

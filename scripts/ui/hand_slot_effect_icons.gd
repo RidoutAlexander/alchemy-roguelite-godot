@@ -29,14 +29,22 @@ func bind_entries(entries: Array, ingredient_lookup: Callable) -> void:
 		var entry = entries[index]
 		if not entry is Dictionary:
 			continue
+		var trinket_id := str(entry.get("trinket_id", ""))
 		var ingredient_id := str(entry.get("ingredient_id", ""))
-		if ingredient_id.is_empty():
-			continue
-		var ingredient: IngredientData = ingredient_lookup.call(ingredient_id)
-		if ingredient == null:
-			continue
+		var ingredient: IngredientData = null
+		if trinket_id.is_empty():
+			if ingredient_id.is_empty():
+				continue
+			ingredient = ingredient_lookup.call(ingredient_id)
+			if ingredient == null:
+				continue
 		var icon := _get_or_create_icon(index)
-		icon.bind(ingredient, str(entry.get("overlay_text", "")), icon_size)
+		icon.bind(
+			ingredient,
+			str(entry.get("overlay_text", "")),
+			icon_size,
+			trinket_id
+		)
 		icon.visible = true
 
 	for index in range(visible_count, _icon_pool.size()):

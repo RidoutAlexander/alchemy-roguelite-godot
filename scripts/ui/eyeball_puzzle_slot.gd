@@ -59,9 +59,17 @@ func get_card() -> IngredientCard:
 	if _card_host == null:
 		return null
 	for child in _card_host.get_children():
-		if child is IngredientCard:
+		if child is IngredientCard and not child.is_queued_for_deletion():
 			return child
 	return null
+
+
+func clear_hosted_card() -> void:
+	var card := get_card()
+	if card == null:
+		return
+	_detach_card(card)
+	card.queue_free()
 
 
 func place_card(card: IngredientCard, swap_to_slot: EyeballPuzzleSlot = null) -> void:
@@ -115,9 +123,8 @@ func _attach_card(card: IngredientCard) -> void:
 	card.position = Vector2.ZERO
 	card.visible = true
 	if card.has_method("is_picker_mode") and card.is_picker_mode():
-		card.set_picker_drag_enabled(false)
 		if card.has_method("sync_picker_input"):
 			card.sync_picker_input()
-	else:
+	elif card.has_method("set_puzzle_drag_enabled"):
 		card.set_puzzle_drag_enabled(true)
 	card.z_index = 0

@@ -5,9 +5,18 @@ const PUMPKIN_TRINKET_ID := "pumpkin_trinket"
 const RED_MUSHROOM_TRINKET_ID := "red_mushroom_trinket"
 const RAT_TRINKET_ID := "rat_trinket"
 const JAR_OF_FLIES_ID := "jar_of_flies"
+const POCKET_WATCH_ID := "pocket_watch"
+const TIME_TURNER_ID := "time_turner"
+const JAR_OF_FROGLEGS_ID := "jar_of_froglegs"
+const VOODOO_DOLL_TRINKET_ID := "voodoo_doll_trinket"
+const PRISTINE_FEATHER_ID := "pristine_feather"
+
+const POCKET_WATCH_INTERVAL := 21
+const VOODOO_DOLL_TRINKET_SHOP_COST := 6
 
 const RED_MUSHROOM_BASE_MAX_PRE_DOUBLE_SCORE := 4
 const RED_MUSHROOM_TRINKET_MAX_PRE_DOUBLE_SCORE := 6
+const PUMPKIN_TRINKET_STREAK_CAP := 3
 const RAT_BASE_STREAK_CAP := 4
 const RAT_TRINKET_STREAK_CAP := 6
 
@@ -32,13 +41,95 @@ static func has_jar_of_flies(trinket_ids: Array) -> bool:
 	return has_trinket(trinket_ids, JAR_OF_FLIES_ID)
 
 
+static func has_pocket_watch(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, POCKET_WATCH_ID)
+
+
+static func has_time_turner(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, TIME_TURNER_ID)
+
+
+static func has_jar_of_froglegs(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, JAR_OF_FROGLEGS_ID)
+
+
+static func has_voodoo_doll_trinket(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, VOODOO_DOLL_TRINKET_ID)
+
+
+static func has_pristine_feather(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, PRISTINE_FEATHER_ID)
+
+
+static func feather_plays_twice(ingredient: IngredientData, trinket_ids: Array) -> bool:
+	return (
+		ingredient != null
+		and ingredient.id == IngredientEffects.FEATHER_ID
+		and has_pristine_feather(trinket_ids)
+	)
+
+
+static func shop_price_for_ingredient(ingredient: IngredientData, trinket_ids: Array) -> int:
+	if ingredient == null:
+		return 0
+	if (
+		has_voodoo_doll_trinket(trinket_ids)
+		and ingredient.id == IngredientEffects.VOODOO_DOLL_ID
+	):
+		return VOODOO_DOLL_TRINKET_SHOP_COST
+	return ingredient.shop_cost
+
+
+static func shop_rarity_for_ingredient(
+	ingredient: IngredientData,
+	trinket_ids: Array
+) -> IngredientData.Rarity:
+	if ingredient == null:
+		return IngredientData.Rarity.COMMON
+	if (
+		has_voodoo_doll_trinket(trinket_ids)
+		and ingredient.id == IngredientEffects.VOODOO_DOLL_ID
+	):
+		return IngredientData.Rarity.COMMON
+	return ingredient.rarity
+
+
+static func pocket_watch_doubles_ingredient(
+	cauldron_count_before_add: int,
+	trinket_ids: Array
+) -> bool:
+	if not has_pocket_watch(trinket_ids):
+		return false
+	var count_after := cauldron_count_before_add + 1
+	return count_after % POCKET_WATCH_INTERVAL == 0
+
+
+static func pocket_watch_countdown(cauldron_count: int, trinket_ids: Array) -> int:
+	if not has_pocket_watch(trinket_ids):
+		return 0
+	var remainder := cauldron_count % POCKET_WATCH_INTERVAL
+	if remainder == 0:
+		return POCKET_WATCH_INTERVAL
+	return POCKET_WATCH_INTERVAL - remainder
+
+
 static func pumpkin_trinket_bonus_score(
 	cauldron_contents: Array,
 	for_current_play: bool
 ) -> int:
-	return IngredientEffects.count_trailing_pumpkin_streak(
-		cauldron_contents,
-		for_current_play
+	return mini(
+		PUMPKIN_TRINKET_STREAK_CAP,
+		IngredientEffects.count_trailing_pumpkin_streak(
+			cauldron_contents,
+			for_current_play
+		)
+	)
+
+
+static func pumpkin_trinket_buff_streak(cauldron_contents: Array) -> int:
+	return mini(
+		PUMPKIN_TRINKET_STREAK_CAP,
+		IngredientEffects.count_trailing_pumpkin_streak(cauldron_contents, false)
 	)
 
 

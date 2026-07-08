@@ -464,6 +464,8 @@ func _sync_puzzle_input() -> void:
 
 
 func bind_preview(ingredient: IngredientData) -> void:
+	if is_queued_for_deletion():
+		return
 	if not is_node_ready():
 		call_deferred("bind_preview", ingredient)
 		return
@@ -485,7 +487,7 @@ func bind_preview(ingredient: IngredientData) -> void:
 	_visual_root.visible = true
 	_ensure_card_background_visible()
 	_name_label.text = ingredient.display_name
-	_description_label.text = ingredient.description
+	_description_label.text = IngredientEffects.card_display_description(ingredient)
 	if _hand_mode:
 		_reset_hand_stat_label_colors()
 	else:
@@ -525,9 +527,14 @@ func set_offer_hover_enabled(enabled: bool) -> void:
 	set_process(enabled)
 
 
-func bind_offer(ingredient: IngredientData, price: int, slot_index: int) -> void:
+func bind_offer(
+	ingredient: IngredientData,
+	price: int,
+	slot_index: int,
+	display_rarity: int = -1
+) -> void:
 	if not is_node_ready():
-		call_deferred("bind_offer", ingredient, price, slot_index)
+		call_deferred("bind_offer", ingredient, price, slot_index, display_rarity)
 		return
 	if _is_animating:
 		return
@@ -551,7 +558,7 @@ func bind_offer(ingredient: IngredientData, price: int, slot_index: int) -> void
 	set_process(true)
 	_ensure_card_background_visible()
 	_name_label.text = ingredient.display_name
-	_description_label.text = ingredient.description
+	_description_label.text = IngredientEffects.card_display_description(ingredient)
 	_cost_label.text = "%d" % price
 	_points_value.text = "%d" % ingredient.point_value
 	if ingredient.explosive_value > 0:
@@ -561,7 +568,10 @@ func bind_offer(ingredient: IngredientData, price: int, slot_index: int) -> void
 		_explosive_value.text = ""
 		$VisualRoot/StatsRow/ExplosiveStat.visible = false
 	_set_cost_row_visible(true)
-	_apply_rarity_tint(ingredient.rarity)
+	var rarity := ingredient.rarity
+	if display_rarity >= 0:
+		rarity = display_rarity as IngredientData.Rarity
+	_apply_rarity_tint(rarity)
 	_apply_ingredient_art(ingredient)
 
 

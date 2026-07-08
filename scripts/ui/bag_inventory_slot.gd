@@ -8,7 +8,10 @@ const ART_SIZE := Vector2(72.0, 72.0)
 
 signal slot_gui_input(event: InputEvent)
 
+const _TRINKET_ART_PATH_TEMPLATE := "res://assets/cards/trinkets/%s.png"
+
 var _pending_ingredient: IngredientData
+var _pending_trinket: TrinketData
 var _pending_count: int = 0
 var _show_count: bool = true
 var _interactive: bool = false
@@ -35,6 +38,8 @@ func _on_gui_input(event: InputEvent) -> void:
 
 
 func bind_entry(ingredient: IngredientData, count: int, show_count: bool = true) -> void:
+	_pending_trinket = null
+	_clear_trinket_meta()
 	_pending_ingredient = ingredient
 	_pending_count = count
 	_show_count = show_count
@@ -42,10 +47,27 @@ func bind_entry(ingredient: IngredientData, count: int, show_count: bool = true)
 	_refresh_display()
 
 
+func bind_trinket(trinket: TrinketData, selected: bool, show_selection: bool = true) -> void:
+	_pending_ingredient = null
+	_clear_ingredient_meta()
+	_pending_trinket = trinket
+	_pending_count = 1 if selected else 0
+	_show_count = show_selection
+	_store_trinket(trinket)
+	_refresh_display()
+
+
 func _refresh_display() -> void:
+	_resolve_nodes()
+	if _pending_trinket != null:
+		if _count_label != null:
+			_count_label.visible = _show_count and _pending_count > 0
+			_count_label.text = str(_pending_count)
+		_apply_trinket_art(_pending_trinket)
+		call_deferred("_sync_art_layout")
+		return
 	if _pending_ingredient == null:
 		return
-	_resolve_nodes()
 	if _count_label != null:
 		_count_label.visible = _show_count
 		_count_label.text = str(maxi(1, _pending_count))
@@ -81,6 +103,21 @@ func _apply_art(ingredient: IngredientData) -> void:
 		_art.visible = false
 
 
+func _apply_trinket_art(trinket: TrinketData) -> void:
+	if _art == null or trinket == null:
+		return
+	var art_path := _TRINKET_ART_PATH_TEMPLATE % trinket.get_art_filename()
+	if ResourceLoader.exists(art_path):
+		_art.texture = load(art_path)
+		_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_art.modulate = Color.WHITE
+		_art.visible = true
+	else:
+		_art.texture = null
+		_art.modulate = Color(0.35, 0.38, 0.45, 1.0)
+		_art.visible = false
+
+
 func _sync_art_layout() -> void:
 	if _art == null:
 		return
@@ -96,6 +133,12 @@ func get_ingredient() -> IngredientData:
 	return get_meta("ingredient") as IngredientData
 
 
+func get_trinket() -> TrinketData:
+	if not has_meta("trinket"):
+		return null
+	return get_meta("trinket") as TrinketData
+
+
 func get_count() -> int:
 	return _pending_count
 
@@ -108,3 +151,17 @@ func set_count_visible(show_count: bool) -> void:
 
 func _store_ingredient(ingredient: IngredientData) -> void:
 	set_meta("ingredient", ingredient)
+
+
+func _store_trinket(trinket: TrinketData) -> void:
+	set_meta("trinket", trinket)
+
+
+func _clear_ingredient_meta() -> void:
+	if has_meta("ingredient"):
+		remove_meta("ingredient")
+
+
+func _clear_trinket_meta() -> void:
+	if has_meta("trinket"):
+		remove_meta("trinket")

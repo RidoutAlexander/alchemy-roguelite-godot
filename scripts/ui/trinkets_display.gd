@@ -26,6 +26,8 @@ func _ready() -> void:
 		_tooltip.hide_tooltip()
 	if not GameManager.run_changed.is_connected(_on_run_changed):
 		GameManager.run_changed.connect(_on_run_changed)
+	if not GameManager.brew_updated.is_connected(_on_brew_updated):
+		GameManager.brew_updated.connect(_on_brew_updated)
 	_refresh()
 
 
@@ -37,6 +39,10 @@ func _process(_delta: float) -> void:
 
 
 func _on_run_changed() -> void:
+	_refresh()
+
+
+func _on_brew_updated(_ctx: BrewContext) -> void:
 	_refresh()
 
 
@@ -60,7 +66,12 @@ func _refresh() -> void:
 	var icon_size := _resolve_icon_size(trinkets.size())
 	for index in trinkets.size():
 		var icon := _get_or_create_icon(index)
-		icon.bind(trinkets[index], icon_size)
+		icon.bind(
+			trinkets[index],
+			icon_size,
+			_countdown_text_for(trinkets[index]),
+			_is_clickable_trinket(trinkets[index])
+		)
 		icon.visible = true
 
 	for index in range(trinkets.size(), _icon_pool.size()):
@@ -118,6 +129,8 @@ func _get_or_create_icon(index: int) -> TrinketIcon:
 			icon.hover_started.connect(_on_icon_hover_started)
 		if not icon.hover_ended.is_connected(_on_icon_hover_ended):
 			icon.hover_ended.connect(_on_icon_hover_ended)
+		if not icon.activated.is_connected(_on_icon_activated):
+			icon.activated.connect(_on_icon_activated)
 		_icon_pool.append(icon)
 	return _icon_pool[index]
 
@@ -125,3 +138,35 @@ func _get_or_create_icon(index: int) -> TrinketIcon:
 func _hide_all_icons() -> void:
 	for icon in _icon_pool:
 		icon.visible = false
+
+
+func _is_clickable_trinket(trinket: TrinketData) -> bool:
+	if trinket == null or trinket.id != TrinketEffects.TIME_TURNER_ID:
+		return false
+	return GameManager.can_use_time_turner()
+
+
+func _on_icon_activated(
+	trinket: TrinketData,
+	icon_center: Vector2,
+	texture: Texture2D
+) -> void:
+	if trinket == null or trinket.id != TrinketEffects.TIME_TURNER_ID:
+		return
+	GameManager.try_use_time_turner(icon_center, texture)
+
+
+func _countdown_text_for(trinket: TrinketData) -> String:
+	if trinket == null or trinket.id != TrinketEffects.POCKET_WATCH_ID:
+		return ""
+	if GameManager.run == null:
+		return ""
+	if GameManager.current_phase != GamePhase.Phase.BREWING:
+		return ""
+	var session := GameManager.run.brew_session
+	if session.context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		return ""
+	var countdown := session.get_pocket_watch_countdown()
+	if countdown <= 0:
+		return ""
+	return str(countdown)

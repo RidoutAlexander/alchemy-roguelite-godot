@@ -16,6 +16,7 @@ signal hand_mulligan_started(
 	new_ingredient: IngredientData,
 	slot_index: int
 )
+signal time_turner_redraw_started(old_hand_entries: Array, new_hand: Array)
 signal ingredient_drawn(
 	context: BrewContext,
 	ingredient: IngredientData,
@@ -43,6 +44,8 @@ var _presentation_in_progress: bool = false
 var _dev_mode_enabled: bool = false
 var _hand_end_effects_delay_id: int = 0
 var _brew_completion_queued: bool = false
+var _pending_time_turner_poof_center: Vector2 = Vector2.ZERO
+var _pending_time_turner_poof_texture: Texture2D = null
 
 
 func _ready() -> void:
@@ -58,6 +61,7 @@ func _ready() -> void:
 	run.brew_session.eyeball_puzzle_requested.connect(_on_eyeball_puzzle_requested)
 	run.brew_session.bat_wing_picker_requested.connect(_on_bat_wing_picker_requested)
 	run.brew_session.hand_mulligan_started.connect(_on_hand_mulligan_started)
+	run.brew_session.time_turner_redraw_started.connect(_on_time_turner_redraw_started)
 	run.brew_session.hand_end_effects_pending.connect(_on_hand_end_effects_pending)
 
 
@@ -105,6 +109,19 @@ func get_all_ingredients() -> Array:
 
 func get_all_trinkets() -> Array:
 	return _content.all_trinkets()
+
+
+func get_trinkets_with_art() -> Array:
+	var result: Array[TrinketData] = []
+	for trinket in get_all_trinkets():
+		if trinket is TrinketData and _trinket_has_art(trinket):
+			result.append(trinket)
+	return result
+
+
+func _trinket_has_art(trinket: TrinketData) -> bool:
+	var art_path := "res://assets/cards/trinkets/%s.png" % trinket.get_art_filename()
+	return ResourceLoader.exists(art_path)
 
 
 func grant_trinket(trinket_id: String) -> bool:
@@ -234,6 +251,31 @@ func can_mulligan() -> bool:
 	)
 
 
+func can_use_time_turner() -> bool:
+	return (
+		current_phase == GamePhase.Phase.BREWING
+		and not _brew_transition_pending
+		and not _presentation_in_progress
+		and run.brew_session.can_use_time_turner()
+	)
+
+
+func try_use_time_turner(icon_center: Vector2, texture: Texture2D) -> void:
+	if not can_use_time_turner():
+		return
+	_pending_time_turner_poof_center = icon_center
+	_pending_time_turner_poof_texture = texture
+	if not run.brew_session.try_time_turner_redraw():
+		_pending_time_turner_poof_center = Vector2.ZERO
+		_pending_time_turner_poof_texture = null
+		return
+	if not run.consume_trinket(TrinketEffects.TIME_TURNER_ID):
+		return
+	_sync_brew_owned_trinkets()
+	run_changed.emit()
+	set_presentation_in_progress(true)
+
+
 func try_mulligan(slot_index: int) -> void:
 	if not can_mulligan():
 		return
@@ -249,6 +291,24 @@ func complete_mulligan(
 	new_ingredient: IngredientData
 ) -> void:
 	run.brew_session.complete_mulligan(slot_index, old_ingredient, new_ingredient)
+
+
+func complete_time_turner_redraw() -> void:
+	run.brew_session.complete_time_turner_redraw()
+
+
+func consume_time_turner_poof() -> Dictionary:
+	return {
+		"center": _pending_time_turner_poof_center,
+		"texture": _pending_time_turner_poof_texture,
+	}
+
+
+func notify_time_turner_presentation_finished() -> void:
+	_presentation_in_progress = false
+	_pending_time_turner_poof_center = Vector2.ZERO
+	_pending_time_turner_poof_texture = null
+	call_deferred("_mark_presentation_idle")
 
 
 func notify_mulligan_presentation_finished() -> void:
@@ -284,6 +344,8 @@ func _continue_after_card_presentation() -> void:
 	if session.try_advance_chain_draw():
 		return
 	if session.try_begin_parrot_repeat_play():
+		return
+	if session.try_begin_pristine_feather_repeat_play():
 		return
 	_sync_hand_completion()
 
@@ -546,6 +608,10 @@ func _on_hand_mulligan_started(
 	slot_index: int
 ) -> void:
 	hand_mulligan_started.emit(old_ingredient, new_ingredient, slot_index)
+
+
+func _on_time_turner_redraw_started(old_hand_entries: Array, new_hand: Array) -> void:
+	time_turner_redraw_started.emit(old_hand_entries, new_hand)
 
 
 func _on_hand_end_effects_pending() -> void:

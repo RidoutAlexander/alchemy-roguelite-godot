@@ -13,5 +13,45 @@
     "id": "rat_trinket",
     "display_name": "Rat Trinket",
     "description": "Rats can score a maximum of 6 instead of 4"
+  },
+  {
+    "id": "jar_of_flies",
+    "display_name": "Jar of Flies",
+    "description": "Batwing has an option to reroll choices once"
+  },
+  {
+    "id": "pocket_watch",
+    "display_name": "Pocket Watch",
+    "description": "Every 21st ingredient added has double stats"
+  },
+  {
+    "id": "time_turner",
+    "display_name": "Time Turner",
+    "description": "Click to redraw your hand and lose this trinket"
+  },
+  {
+    "id": "jar_of_froglegs",
+    "display_name": "Jar of Froglegs",
+    "description": "Your froglegs jump back into your bag at the end of the level."
+  },
+  {
+    "id": "voodoo_doll_trinket",
+    "display_name": "Voodoo Doll",
+    "description": "Voodoo Dolls become common in the shop and cost 6"
+  },
+  {
+    "id": "pristine_feather",
+    "display_name": "Pristine Feather",
+    "description": "Your feathers are played twice"
+  },
+  {
+    "id": "beating_heart",
+    "display_name": "Beating Heart",
+    "description": "Gain a life and add a 3 Boomberry to your bag"
+  },
+  {
+    "id": "gecko_feet",
+    "display_name": "Gecko Feet",
+    "description": "Every 11 ingredients stays in your hand"
   }
 ]

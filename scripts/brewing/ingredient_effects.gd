@@ -26,6 +26,7 @@ const HOLY_GRAIL_ID := "holy_grail"
 const ICE_CUBE_ID := "ice_cube"
 const SHRUNKEN_HEAD_ID := "shrunken_head"
 const JAR_OF_DIRT_ID := "jar_of_dirt"
+const JAR_OF_DIRT_MAX_USES := 5
 const STIRRING_SPOON_ID := "stirring_spoon"
 const JUGGLING_CLUB_ID := "juggling_club"
 const FISH_BONES_ID := "fish_bones"
@@ -84,9 +85,16 @@ class EffectResult:
 	var poison_apple_delay_scheduled: bool = false
 	var bonus_explosiveness: int = 0
 	var growth_potion_doubles: int = 0
+	var cobbler_retroactive_slot: int = -1
+	var cobbler_retroactive_score: int = 0
+	var cobbler_retroactive_explosiveness: int = 0
 
 
-static func apply(ingredient: IngredientData, context: BrewContext) -> EffectResult:
+static func apply(
+	ingredient: IngredientData,
+	context: BrewContext,
+	hand_play: Dictionary = {}
+) -> EffectResult:
 	var result := EffectResult.new()
 	if ingredient == null or context == null:
 		return result
@@ -99,12 +107,31 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		if newt_tail_count > 0:
 			result.bonus_score = newt_tail_count
 
-	var cobbler_bonus := _cobbler_adjacency_bonus_between(
-		context.cauldron_contents[-1] if not context.cauldron_contents.is_empty() else null,
-		ingredient
-	)
-	result.bonus_score += int(cobbler_bonus.get("score", 0))
-	result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
+	var play_slot := int(hand_play.get("play_slot", -1))
+	if play_slot >= 0:
+		var resolved := resolve_hand_play_cobbler(
+			ingredient,
+			context.cauldron_contents,
+			play_slot,
+			int(hand_play.get("last_hand_slot", -1)),
+			hand_play.get("hand_slots", [])
+		)
+		var bonus: Dictionary = resolved.get("bonus", {})
+		var retroactive_slot := int(resolved.get("retroactive_slot", -1))
+		if retroactive_slot >= 0:
+			result.cobbler_retroactive_slot = retroactive_slot
+			result.cobbler_retroactive_score = int(bonus.get("score", 0))
+			result.cobbler_retroactive_explosiveness = int(bonus.get("explosiveness", 0))
+		else:
+			result.bonus_score += int(bonus.get("score", 0))
+			result.bonus_explosiveness += int(bonus.get("explosiveness", 0))
+	else:
+		var cobbler_bonus := _cobbler_adjacency_bonus_between(
+			context.cauldron_contents[-1] if not context.cauldron_contents.is_empty() else null,
+			ingredient
+		)
+		result.bonus_score += int(cobbler_bonus.get("score", 0))
+		result.bonus_explosiveness += int(cobbler_bonus.get("explosiveness", 0))
 	context.cauldron_contents.append(ingredient)
 
 	match ingredient.id:
@@ -137,11 +164,6 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 			result.voodoo_doll_arms_copy = true
 		THORNS_ID:
 			result.bonus_score = maxi(0, context.explosiveness)
-		GARLIC_ID:
-			if _count_ingredient_id(context.cauldron_contents, GARLIC_ID) <= 1:
-				result.explosion_limit_bonus = 1
-		HOLY_GRAIL_ID:
-			result.explosion_limit_bonus = 1
 		ICE_CUBE_ID:
 			result.ice_cube_shields = ICE_CUBE_SHIELD_COUNT
 		SHRUNKEN_HEAD_ID:
@@ -174,11 +196,73 @@ static func apply(ingredient: IngredientData, context: BrewContext) -> EffectRes
 		_:
 			pass
 
+	var limit_bonus := explosion_limit_bonus_for_played_ingredient(
+		ingredient,
+		context.cauldron_contents
+	)
+	if limit_bonus > 0:
+		result.explosion_limit_bonus = limit_bonus
+
 	return result
+
+
+static func card_display_description(ingredient: IngredientData) -> String:
+	if ingredient == null:
+		return ""
+	if ingredient.id != JAR_OF_DIRT_ID:
+		return ingredient.description
+	var uses_left := jar_of_dirt_uses_remaining(ingredient)
+	return "%s\n%d uses left" % [ingredient.description, uses_left]
+
+
+static func jar_of_dirt_uses_remaining(ingredient: IngredientData) -> int:
+	if ingredient == null or ingredient.id != JAR_OF_DIRT_ID:
+		return 0
+	if ingredient.jar_of_dirt_uses_remaining >= 0:
+		return ingredient.jar_of_dirt_uses_remaining
+	return JAR_OF_DIRT_MAX_USES
+
+
+static func explosion_limit_bonus_for_played_ingredient(
+	ingredient: IngredientData,
+	cauldron_contents_with_played: Array
+) -> int:
+	if ingredient == null:
+		return 0
+	match ingredient.id:
+		HOLY_GRAIL_ID:
+			return 1
+		GARLIC_ID:
+			if _count_ingredient_id(cauldron_contents_with_played, GARLIC_ID) <= 1:
+				return 1
+	return 0
 
 
 static func is_boom_berry_id(ingredient_id: String) -> bool:
 	return ingredient_id.begins_with("boom_berry")
+
+
+static func resolve_hand_play_cobbler(
+	ingredient: IngredientData,
+	cauldron_contents: Array,
+	play_slot: int,
+	last_hand_slot: int,
+	hand_slots: Array
+) -> Dictionary:
+	var previous = cauldron_contents[-1] if not cauldron_contents.is_empty() else null
+	var bonus := _cobbler_adjacency_bonus_between(previous, ingredient)
+	if int(bonus.get("score", 0)) == 0 and int(bonus.get("explosiveness", 0)) == 0:
+		return {"bonus": bonus, "retroactive_slot": -1}
+	var target_slot := _cobbler_bonus_target_slot(
+		ingredient,
+		previous,
+		play_slot,
+		last_hand_slot,
+		hand_slots
+	)
+	if target_slot == play_slot:
+		return {"bonus": bonus, "retroactive_slot": -1}
+	return {"bonus": bonus, "retroactive_slot": target_slot}
 
 
 static func _cobbler_adjacency_bonus_between(
@@ -396,6 +480,16 @@ static func compute_hand_display_stats(
 		if _AuraEffects.in_rhythm_doubles_ingredient(cauldron_count, aura):
 			point_value *= 2
 			explosive_value *= 2
+		if TrinketEffects.pocket_watch_doubles_ingredient(cauldron_count, owned_trinket_ids):
+			point_value *= 2
+			explosive_value *= 2
+
+		var preview_cauldron := sim_cauldron.duplicate()
+		preview_cauldron.append(ingredient)
+		explosion_limit += explosion_limit_bonus_for_played_ingredient(
+			ingredient,
+			preview_cauldron
+		)
 
 		var explosive_add := explosive_value
 		if unicorn_cures_next and explosive_add > 0:
@@ -424,6 +518,35 @@ static func compute_hand_display_stats(
 		sim_cauldron.append(ingredient)
 		last_hand_slot = play_slot
 		cauldron_count += 1
+		if TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
+			var repeat_point := ingredient.point_value
+			var repeat_explosive := ingredient.explosive_value
+			if doubles_remaining > 0:
+				repeat_point *= 2
+				repeat_explosive *= 2
+				doubles_remaining -= 1
+			if _AuraEffects.in_rhythm_doubles_ingredient(cauldron_count, aura):
+				repeat_point *= 2
+				repeat_explosive *= 2
+			if TrinketEffects.pocket_watch_doubles_ingredient(cauldron_count, owned_trinket_ids):
+				repeat_point *= 2
+				repeat_explosive *= 2
+			var repeat_explosive_add := repeat_explosive
+			if unicorn_cures_next and repeat_explosive_add > 0:
+				repeat_explosive_add = 0
+				unicorn_cures_next = false
+			if ice_cube_shields > 0:
+				if (
+					repeat_explosive_add > 0
+					and sim_explosiveness + repeat_explosive_add >= explosion_limit
+				):
+					repeat_explosive_add = 0
+				ice_cube_shields -= 1
+			display_stats[play_slot]["point_value"] += repeat_point
+			display_stats[play_slot]["explosive_value"] += repeat_explosive_add
+			sim_explosiveness += repeat_explosive_add
+			sim_cauldron.append(ingredient)
+			cauldron_count += 1
 		if ingredient.id == PARROT_ID:
 			parrot_doubles_next = true
 		if ingredient.id == UNICORN_HORN_ID:

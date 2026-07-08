@@ -53,6 +53,7 @@ var _boiling_fill_display: float = 0.0
 var _boiling_base_volume_db: float = 0.0
 var _pending_hand_draw: Array = []
 var _pending_hand_draw_index: int = 0
+var _frog_leg_return_queue: Array = []
 
 
 func _ready() -> void:
@@ -64,6 +65,7 @@ func _ready() -> void:
 
 	GameManager.hand_draw_batch_started.connect(_on_hand_draw_batch_started)
 	GameManager.hand_mulligan_started.connect(_on_hand_mulligan_started)
+	GameManager.time_turner_redraw_started.connect(_on_time_turner_redraw_started)
 	GameManager.hand_card_played.connect(_on_hand_card_played)
 	GameManager.ingredient_drawn.connect(_on_ingredient_drawn)
 	GameManager.frog_leg_escaped.connect(_on_frog_leg_escaped)
@@ -316,6 +318,10 @@ func _on_hand_mulligan_started(
 	slot_index: int
 ) -> void:
 	_play_mulligan_animation(old_ingredient, new_ingredient, slot_index)
+
+
+func _on_time_turner_redraw_started(old_hand_entries: Array, new_hand: Array) -> void:
+	_play_time_turner_redraw_animation(old_hand_entries, new_hand)
 
 
 func _on_hand_swap_requested(from_slot: int, to_slot: int) -> void:
@@ -942,7 +948,7 @@ func _play_cauldron_fly_repeat(
 func _complete_card_fly_sequence(ingredient: IngredientData, track_for_exit: bool) -> void:
 	var granted := _consume_pending_bag_grant()
 	if granted == null:
-		_finish_card_presentation(ingredient, track_for_exit)
+		_finish_with_optional_jar_break_poof(ingredient, track_for_exit)
 		return
 	_play_bag_grant_from_cauldron(granted, ingredient, track_for_exit)
 
@@ -961,7 +967,7 @@ func _play_bag_grant_from_cauldron(
 	var fly_data := _cauldron_to_bag_fly_data(granted)
 	if fly_data.is_empty():
 		GameManager.notify_bag_display_changed()
-		_finish_card_presentation(source_ingredient, track_for_exit)
+		_finish_with_optional_jar_break_poof(source_ingredient, track_for_exit)
 		return
 	_IngredientFlyUtil.play(
 		_fly_layer,
@@ -971,7 +977,38 @@ func _play_bag_grant_from_cauldron(
 		fly_data["size"],
 		func() -> void:
 			GameManager.notify_bag_display_changed()
-			_finish_card_presentation(source_ingredient, track_for_exit)
+			_finish_with_optional_jar_break_poof(source_ingredient, track_for_exit)
+	)
+
+
+func _finish_with_optional_jar_break_poof(
+	source_ingredient: IngredientData,
+	track_for_exit: bool
+) -> void:
+	if GameManager.run == null:
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	if not GameManager.run.brew_session.consume_jar_of_dirt_broke_poof():
+		_finish_card_presentation(source_ingredient, track_for_exit)
+		return
+	_play_jar_break_poof(source_ingredient, track_for_exit)
+
+
+func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> void:
+	var texture := _load_ingredient_texture(ingredient)
+	if texture == null or _cauldron_target == null:
+		_finish_card_presentation(ingredient, track_for_exit)
+		return
+	if track_for_exit:
+		_brew_exit_animations_pending += 1
+	_IngredientFlyUtil.play_poof(
+		_fly_layer,
+		texture,
+		_cauldron_target.get_global_rect().get_center(),
+		FLY_ART_SIZE,
+		func() -> void:
+			GameManager.present_card_stats()
+			_finish_card_presentation(ingredient, track_for_exit)
 	)
 
 
@@ -1037,7 +1074,66 @@ func _try_finalize_brew_transition() -> void:
 		return
 	if _brew_exit_animations_pending > 0:
 		return
+	if _try_begin_frog_leg_return_animations():
+		return
 	GameManager.finalize_brew_transition()
+
+
+func _try_begin_frog_leg_return_animations() -> bool:
+	if GameManager.run == null:
+		return false
+	var returns := GameManager.run.brew_session.get_jar_of_froglegs_return_entries()
+	if returns.is_empty():
+		return false
+	_frog_leg_return_queue = returns.duplicate()
+	_brew_exit_animations_pending += 1
+	_play_next_frog_leg_return_to_bag()
+	return true
+
+
+func _play_next_frog_leg_return_to_bag() -> void:
+	if _frog_leg_return_queue.is_empty():
+		_frog_leg_return_queue.clear()
+		_on_brew_exit_animation_finished()
+		return
+
+	var entry: Dictionary = _frog_leg_return_queue.pop_front()
+	var needs_restore := bool(entry.get("needs_restore", false))
+	var fly_data := _frog_leg_return_fly_data()
+	if fly_data.is_empty():
+		if needs_restore and GameManager.run != null:
+			GameManager.run.brew_session.restore_frog_leg_to_master_bag()
+		GameManager.notify_bag_display_changed()
+		_play_next_frog_leg_return_to_bag()
+		return
+
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		fly_data["texture"],
+		fly_data["start_center"],
+		fly_data["target_center"],
+		fly_data["size"],
+		func() -> void:
+			if needs_restore and GameManager.run != null:
+				GameManager.run.brew_session.restore_frog_leg_to_master_bag()
+			GameManager.notify_bag_display_changed()
+			_play_next_frog_leg_return_to_bag()
+	)
+
+
+func _frog_leg_return_fly_data() -> Dictionary:
+	if GameManager.run == null or _cauldron_target == null or _bag_anchor == null:
+		return {}
+	var frog_leg := GameManager.run.find_ingredient(IngredientEffects.FROG_LEG_ID)
+	var texture := _load_ingredient_texture(frog_leg)
+	if texture == null:
+		return {}
+	return {
+		"texture": texture,
+		"size": FLY_ART_SIZE,
+		"start_center": _cauldron_target.get_global_rect().get_center(),
+		"target_center": _bag_anchor.get_global_rect().get_center(),
+	}
 
 
 func _hand_draw_fly_data_for(ingredient: IngredientData, slot_index: int) -> Dictionary:
@@ -1114,6 +1210,124 @@ func _cauldron_to_bag_fly_data(ingredient: IngredientData) -> Dictionary:
 		"start_center": _cauldron_target.get_global_rect().get_center(),
 		"target_center": _bag_anchor.get_global_rect().get_center(),
 	}
+
+
+func _play_time_turner_redraw_animation(old_hand_entries: Array, new_hand: Array) -> void:
+	GameManager.set_presentation_in_progress(true)
+	if _player_hand != null:
+		_player_hand.clear_selection()
+		_player_hand.prepare_for_draw([])
+	_set_play_undo_visible(false)
+	_sync_hand_ui()
+
+	var poof := GameManager.consume_time_turner_poof()
+	_play_time_turner_poof(
+		poof.get("texture"),
+		poof.get("center", Vector2.ZERO),
+		func() -> void:
+			_play_time_turner_return_cards(old_hand_entries, 0, new_hand)
+	)
+
+
+func _play_time_turner_poof(
+	texture: Texture2D,
+	center: Vector2,
+	on_complete: Callable
+) -> void:
+	if texture == null or center == Vector2.ZERO:
+		if on_complete.is_valid():
+			on_complete.call()
+		return
+	_IngredientFlyUtil.play_poof(
+		_fly_layer,
+		texture,
+		center,
+		Vector2(48, 48),
+		on_complete
+	)
+
+
+func _play_time_turner_return_cards(
+	old_hand_entries: Array,
+	entry_index: int,
+	new_hand: Array
+) -> void:
+	if entry_index >= old_hand_entries.size():
+		_play_time_turner_draw_in(new_hand, 0)
+		return
+
+	var entry: Dictionary = old_hand_entries[entry_index]
+	var slot_index := int(entry.get("slot_index", -1))
+	var ingredient: IngredientData = entry.get("ingredient")
+	if ingredient == null or slot_index < 0:
+		_play_time_turner_return_cards(old_hand_entries, entry_index + 1, new_hand)
+		return
+
+	if _player_hand != null:
+		_player_hand.suppress_slot(slot_index)
+
+	var return_fly := _hand_to_bag_fly_data(ingredient, slot_index)
+	if return_fly.is_empty():
+		_play_time_turner_return_cards(old_hand_entries, entry_index + 1, new_hand)
+		return
+
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		return_fly["texture"],
+		return_fly["start_center"],
+		return_fly["target_center"],
+		return_fly["size"],
+		func() -> void:
+			GameManager.notify_bag_display_changed()
+			_play_time_turner_return_cards(old_hand_entries, entry_index + 1, new_hand)
+	)
+
+
+func _play_time_turner_draw_in(new_hand: Array, draw_index: int) -> void:
+	if draw_index >= new_hand.size():
+		GameManager.complete_time_turner_redraw()
+		GameManager.notify_time_turner_presentation_finished()
+		_sync_hand_ui()
+		return
+
+	var ingredient: IngredientData = new_hand[draw_index]
+	var target_slots: Array = []
+	if GameManager.run != null:
+		target_slots = GameManager.run.brew_session.get_pending_time_turner_target_slots()
+	var slot_index := draw_index
+	if draw_index < target_slots.size():
+		slot_index = int(target_slots[draw_index])
+
+	if _player_hand != null:
+		_player_hand.hide_slot_for_fly(slot_index)
+
+	var draw_fly := _hand_draw_fly_data_for(ingredient, slot_index)
+	if draw_fly.is_empty():
+		if _player_hand != null:
+			_player_hand.reveal_slot(
+				slot_index,
+				ingredient,
+				_get_hand_display_stats_for_slot(slot_index, ingredient)
+			)
+		_play_time_turner_draw_in(new_hand, draw_index + 1)
+		return
+
+	GameManager.notify_bag_display_changed()
+	_IngredientFlyUtil.play(
+		_fly_layer,
+		draw_fly["texture"],
+		draw_fly["start_center"],
+		draw_fly["target_center"],
+		draw_fly["size"],
+		func() -> void:
+			if _player_hand != null:
+				_player_hand.reveal_slot(
+					slot_index,
+					ingredient,
+					_get_hand_display_stats_for_slot(slot_index, ingredient)
+				)
+			_play_time_turner_draw_in(new_hand, draw_index + 1)
+	)
 
 
 func _play_mulligan_animation(

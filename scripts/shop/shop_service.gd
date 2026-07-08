@@ -15,14 +15,15 @@ func _init(content: DefaultContent) -> void:
 func generate_offers(
 	_level: int,
 	gold: int,
-	slot_count: int = GameConstants.SHOP_SLOT_COUNT
+	slot_count: int = GameConstants.SHOP_SLOT_COUNT,
+	owned_trinket_ids: Array = []
 ) -> Array:
 	var offers: Array = []
 	offers.resize(slot_count)
 	for slot_index in slot_count:
 		offers[slot_index] = null
 
-	var affordable := _affordable_ingredients(gold)
+	var affordable := _affordable_ingredients(gold, owned_trinket_ids)
 	if affordable.is_empty():
 		return offers
 
@@ -31,13 +32,13 @@ func generate_offers(
 		var available := _excluding_offered(affordable, offered_ids)
 		if available.is_empty():
 			break
-		var ingredient := _pick_weighted_ingredient(available)
+		var ingredient := _pick_weighted_ingredient(available, owned_trinket_ids)
 		if ingredient == null:
 			break
 		offered_ids[ingredient.id] = true
 		var offer := ShopOffer.new()
 		offer.ingredient = ingredient
-		offer.price = ingredient.shop_cost
+		offer.price = TrinketEffects.shop_price_for_ingredient(ingredient, owned_trinket_ids)
 		offers[slot_index] = offer
 	return offers
 
@@ -50,25 +51,27 @@ func _excluding_offered(candidates: Array, offered_ids: Dictionary) -> Array:
 	return available
 
 
-func _affordable_ingredients(gold: int) -> Array:
+func _affordable_ingredients(gold: int, owned_trinket_ids: Array) -> Array:
 	var affordable: Array = []
 	for ingredient in _content.all_ingredients():
 		if ingredient == null or not ingredient.shop_available:
 			continue
-		if ingredient.shop_cost > gold:
+		if TrinketEffects.shop_price_for_ingredient(ingredient, owned_trinket_ids) > gold:
 			continue
 		affordable.append(ingredient)
 	return affordable
 
 
-func _rarity_weight(ingredient: IngredientData) -> int:
-	var rarity_index := int(ingredient.rarity)
+func _rarity_weight(ingredient: IngredientData, owned_trinket_ids: Array) -> int:
+	var rarity_index := int(
+		TrinketEffects.shop_rarity_for_ingredient(ingredient, owned_trinket_ids)
+	)
 	if rarity_index < 0 or rarity_index >= GameConstants.SHOP_RARITY_WEIGHTS.size():
 		return 1
 	return int(GameConstants.SHOP_RARITY_WEIGHTS[rarity_index])
 
 
-func _pick_weighted_ingredient(candidates: Array) -> IngredientData:
+func _pick_weighted_ingredient(candidates: Array, owned_trinket_ids: Array) -> IngredientData:
 	if candidates.is_empty():
 		return null
 	if candidates.size() == 1:
@@ -77,7 +80,7 @@ func _pick_weighted_ingredient(candidates: Array) -> IngredientData:
 	var total := 0
 	var weights: Array[int] = []
 	for ingredient in candidates:
-		var weight := _rarity_weight(ingredient)
+		var weight := _rarity_weight(ingredient, owned_trinket_ids)
 		weights.append(weight)
 		total += weight
 	if total <= 0:

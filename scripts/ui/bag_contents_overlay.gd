@@ -10,11 +10,12 @@ enum DisplayMode { BAG_STACKS, CAULDRON_SEQUENCE, DEV_HAND_PICKER, DEV_TRINKET_P
 const DEV_HAND_PICK_COUNT := 5
 
 const _SLOT_SCENE := preload("res://scenes/ui/bag_inventory_slot.tscn")
-const _TRINKET_OPTION_SCENE := preload("res://scenes/ui/trinket_reward_option.tscn")
+const _TRINKET_ART_PATH_TEMPLATE := "res://assets/cards/trinkets/%s.png"
 const PREVIEW_SCALE := 0.38
 const GRID_COLUMNS := 5
-const DEV_TRINKET_GRID_COLUMNS := 3
-const DEV_TRINKET_OPTION_SIZE := Vector2(200, 300)
+const _PANEL_DEFAULT_ANCHOR_RIGHT := 0.58
+const _PANEL_DEV_TRINKET_ANCHOR_LEFT := 0.22
+const _PANEL_DEV_TRINKET_ANCHOR_RIGHT := 0.78
 
 @onready var _input_blocker: ColorRect = $InputBlocker
 @onready var _panel: PanelContainer = $Panel
@@ -39,7 +40,7 @@ var _dev_selection_order: Array[IngredientData] = []
 var _dev_slot_by_id: Dictionary = {}
 var _dev_trinket_catalog: Array[TrinketData] = []
 var _dev_trinket_selection: Dictionary = {}
-var _dev_trinket_option_by_id: Dictionary = {}
+var _dev_trinket_slot_by_id: Dictionary = {}
 var _hovered_ingredient: IngredientData
 var _hovered_slot: BagInventorySlot
 var _preview_rest_position: Vector2 = Vector2.ZERO
@@ -208,9 +209,9 @@ func show_dev_trinket_picker(trinkets: Array) -> void:
 	_dev_slot_by_id.clear()
 	_dev_trinket_catalog.clear()
 	_dev_trinket_selection.clear()
-	_dev_trinket_option_by_id.clear()
+	_dev_trinket_slot_by_id.clear()
 	for item in trinkets:
-		if item is TrinketData:
+		if item is TrinketData and _trinket_has_art(item):
 			_dev_trinket_catalog.append(item)
 	_dev_trinket_catalog.sort_custom(
 		func(a: TrinketData, b: TrinketData) -> bool:
@@ -240,7 +241,8 @@ func hide_overlay() -> void:
 	_dev_slot_by_id.clear()
 	_dev_trinket_catalog.clear()
 	_dev_trinket_selection.clear()
-	_dev_trinket_option_by_id.clear()
+	_dev_trinket_slot_by_id.clear()
+	_restore_default_panel_layout()
 	overlay_closed.emit()
 
 
@@ -251,6 +253,7 @@ func refresh_if_open() -> void:
 
 
 func _open() -> void:
+	_apply_panel_layout_for_mode()
 	_rebuild_grid()
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -276,8 +279,15 @@ func _configure_mode_input() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible or _mode != DisplayMode.DEV_HAND_PICKER:
+	if not visible:
 		return
+	if _mode == DisplayMode.DEV_HAND_PICKER:
+		_handle_dev_hand_input(event)
+	elif _mode == DisplayMode.DEV_TRINKET_PICKER:
+		_handle_dev_trinket_input(event)
+
+
+func _handle_dev_hand_input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton:
 		return
 	var mouse_event := event as InputEventMouseButton
@@ -293,6 +303,25 @@ func _input(event: InputEvent) -> void:
 		return
 
 	_on_dev_slot_gui_input(ingredient, event)
+	get_viewport().set_input_as_handled()
+
+
+func _handle_dev_trinket_input(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+
+	var mouse_pos := mouse_event.global_position
+	if _is_dev_ui_control_at(mouse_pos):
+		return
+
+	var trinket := _find_dev_trinket_at(mouse_pos)
+	if trinket == null:
+		return
+
+	_on_dev_trinket_slot_gui_input(trinket)
 	get_viewport().set_input_as_handled()
 
 
@@ -316,6 +345,18 @@ func _find_dev_ingredient_at(mouse_pos: Vector2) -> IngredientData:
 			continue
 		if slot.get_global_rect().has_point(mouse_pos):
 			return slot.get_ingredient()
+	return null
+
+
+func _find_dev_trinket_at(mouse_pos: Vector2) -> TrinketData:
+	if _grid == null:
+		return null
+	for child in _grid.get_children():
+		var slot := child as BagInventorySlot
+		if slot == null:
+			continue
+		if slot.get_global_rect().has_point(mouse_pos):
+			return slot.get_trinket()
 	return null
 
 
@@ -397,13 +438,14 @@ func _rebuild_dev_hand_picker_grid() -> void:
 
 func _rebuild_dev_trinket_picker_grid() -> void:
 	if _grid != null:
-		_grid.columns = DEV_TRINKET_GRID_COLUMNS
+		_grid.columns = GRID_COLUMNS
 	var has_entries := not _dev_trinket_catalog.is_empty()
 	_set_scroll_visible(has_entries, not has_entries)
 	for trinket in _dev_trinket_catalog:
 		if trinket == null:
 			continue
-		_add_trinket_option(trinket)
+		var selected := bool(_dev_trinket_selection.get(trinket.id, false))
+		_add_trinket_slot(trinket, selected)
 
 
 func _add_slot(
@@ -422,27 +464,21 @@ func _add_slot(
 		_dev_slot_by_id[ingredient.id] = slot
 
 
-func _add_trinket_option(trinket: TrinketData) -> void:
-	var option := _TRINKET_OPTION_SCENE.instantiate() as TrinketRewardOption
-	if option == null or _grid == null:
+func _add_trinket_slot(trinket: TrinketData, selected: bool) -> void:
+	var slot := _SLOT_SCENE.instantiate() as BagInventorySlot
+	if slot == null or _grid == null:
 		return
-	option.custom_minimum_size = DEV_TRINKET_OPTION_SIZE
-	option.size = DEV_TRINKET_OPTION_SIZE
-	option.bind(trinket)
-	var owned := _is_trinket_owned(trinket.id)
-	var selected := bool(_dev_trinket_selection.get(trinket.id, false))
-	option.set_dev_picker_state(selected, owned and not selected)
-	if not option.selected.is_connected(_on_dev_trinket_option_selected):
-		option.selected.connect(_on_dev_trinket_option_selected)
-	_grid.add_child(option)
-	_dev_trinket_option_by_id[trinket.id] = option
+	_grid.add_child(slot)
+	slot.bind_trinket(trinket, selected, selected)
+	slot.set_interactive(false)
+	_dev_trinket_slot_by_id[trinket.id] = slot
 
 
 func _clear_grid() -> void:
 	if _grid == null:
 		return
 	_dev_slot_by_id.clear()
-	_dev_trinket_option_by_id.clear()
+	_dev_trinket_slot_by_id.clear()
 	for child in _grid.get_children():
 		child.queue_free()
 
@@ -592,9 +628,15 @@ func _update_dev_trinket_selection_ui() -> void:
 		_selection_label.text = "Click to select. Click again to deselect."
 	if _done_button != null:
 		_done_button.disabled = false
+	for trinket_id in _dev_trinket_slot_by_id.keys():
+		var slot: BagInventorySlot = _dev_trinket_slot_by_id[trinket_id]
+		if slot == null:
+			continue
+		var selected := bool(_dev_trinket_selection.get(trinket_id, false))
+		slot.bind_trinket(slot.get_trinket(), selected, selected)
 
 
-func _on_dev_trinket_option_selected(trinket: TrinketData) -> void:
+func _on_dev_trinket_slot_gui_input(trinket: TrinketData) -> void:
 	if _mode != DisplayMode.DEV_TRINKET_PICKER or trinket == null:
 		return
 	var trinket_id := trinket.id
@@ -603,20 +645,36 @@ func _on_dev_trinket_option_selected(trinket: TrinketData) -> void:
 		_dev_trinket_selection.erase(trinket_id)
 	else:
 		_dev_trinket_selection[trinket_id] = true
-	var option: TrinketRewardOption = _dev_trinket_option_by_id.get(trinket_id)
-	if option != null:
-		var now_selected := not is_selected
-		option.set_dev_picker_state(
-			now_selected,
-			_is_trinket_owned(trinket_id) and not now_selected
-		)
 	_update_dev_trinket_selection_ui()
 
 
-func _is_trinket_owned(trinket_id: String) -> bool:
-	if GameManager.run == null:
+static func _trinket_has_art(trinket: TrinketData) -> bool:
+	if trinket == null:
 		return false
-	return GameManager.run.has_trinket(trinket_id)
+	var art_path := _TRINKET_ART_PATH_TEMPLATE % trinket.get_art_filename()
+	return ResourceLoader.exists(art_path)
+
+
+func _apply_panel_layout_for_mode() -> void:
+	if _panel == null:
+		return
+	match _mode:
+		DisplayMode.DEV_TRINKET_PICKER:
+			_panel.anchor_left = _PANEL_DEV_TRINKET_ANCHOR_LEFT
+			_panel.anchor_right = _PANEL_DEV_TRINKET_ANCHOR_RIGHT
+			_panel.offset_left = 0.0
+			_panel.offset_right = 0.0
+		_:
+			_restore_default_panel_layout()
+
+
+func _restore_default_panel_layout() -> void:
+	if _panel == null:
+		return
+	_panel.anchor_left = 0.0
+	_panel.anchor_right = _PANEL_DEFAULT_ANCHOR_RIGHT
+	_panel.offset_left = 12.0
+	_panel.offset_right = -12.0
 
 
 func _remove_last_dev_selection(ingredient: IngredientData) -> void:

@@ -12,6 +12,8 @@ var explosive_value: int
 var shop_cost: int
 var rarity: Rarity
 var shop_available: bool = true
+var jar_of_dirt_uses_remaining: int = -1
+var is_bag_chip: bool = false
 
 
 func _init(
@@ -38,6 +40,24 @@ func _init(
 
 func get_art_filename() -> String:
 	return art if art != "" else id
+
+
+func duplicate_for_bag() -> IngredientData:
+	var copy := IngredientData.new(
+		id,
+		display_name,
+		description,
+		point_value,
+		explosive_value,
+		shop_cost,
+		rarity,
+		shop_available,
+		art
+	)
+	copy.is_bag_chip = true
+	if id == "jar_of_dirt":
+		copy.jar_of_dirt_uses_remaining = IngredientEffects.JAR_OF_DIRT_MAX_USES
+	return copy
 
 
 func apply_on_draw(_context: BrewContext) -> void:

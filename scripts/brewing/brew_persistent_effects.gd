@@ -81,6 +81,14 @@ static func collect(session: BrewSession) -> Array[EffectEntry]:
 	):
 		_add_entry(entries, IngredientEffects.VOODOO_DOLL_ID, "", 23)
 
+	if TrinketEffects.has_pumpkin_trinket(context.owned_trinket_ids):
+		_add_counter_entry(
+			entries,
+			IngredientEffects.PUMPKIN_ID,
+			TrinketEffects.pumpkin_trinket_buff_streak(cauldron),
+			28
+		)
+
 	_add_counter_entry(
 		entries,
 		IngredientEffects.RAT_ID,

@@ -3,19 +3,31 @@ extends Control
 
 signal hover_started(trinket: TrinketData)
 signal hover_ended
+signal activated(trinket: TrinketData, icon_center: Vector2, texture: Texture2D)
 
 const _ART_PATH_TEMPLATE := "res://assets/cards/trinkets/%s.png"
 
 @onready var _icon: TextureRect = $Icon
 @onready var _fallback: Panel = $Fallback
+@onready var _countdown: Label = $Countdown
 
 var _trinket: TrinketData
+var _clickable: bool = false
 
 
-func bind(trinket: TrinketData, icon_size: Vector2) -> void:
+func bind(
+	trinket: TrinketData,
+	icon_size: Vector2,
+	countdown_text: String = "",
+	clickable: bool = false
+) -> void:
 	_trinket = trinket
+	_clickable = clickable
 	custom_minimum_size = icon_size
 	size = icon_size
+	mouse_default_cursor_shape = (
+		CURSOR_POINTING_HAND if clickable else CURSOR_ARROW
+	)
 	var texture := _load_art(trinket)
 	if _icon != null:
 		_icon.custom_minimum_size = icon_size
@@ -26,6 +38,7 @@ func bind(trinket: TrinketData, icon_size: Vector2) -> void:
 		_fallback.visible = texture == null
 		_fallback.custom_minimum_size = icon_size
 		_fallback.size = icon_size
+	_set_countdown(countdown_text, icon_size)
 
 
 func get_trinket() -> TrinketData:
@@ -47,6 +60,27 @@ func _on_mouse_entered() -> void:
 
 func _on_mouse_exited() -> void:
 	hover_ended.emit()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not _clickable or _trinket == null:
+		return
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
+			activated.emit(_trinket, get_global_rect().get_center(), _load_art(_trinket))
+			accept_event()
+
+
+func _set_countdown(countdown_text: String, icon_size: Vector2) -> void:
+	if _countdown == null:
+		return
+	_countdown.text = countdown_text
+	_countdown.visible = countdown_text != ""
+	if countdown_text == "":
+		return
+	var font_size := clampi(int(icon_size.y * 0.42), 12, 24)
+	_countdown.add_theme_font_size_override("font_size", font_size)
 
 
 func _load_art(trinket: TrinketData) -> Texture2D:

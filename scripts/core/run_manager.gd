@@ -66,6 +66,15 @@ func grant_trinket(trinket_id: String) -> bool:
 	return true
 
 
+func consume_trinket(trinket_id: String) -> bool:
+	var normalized := _normalize_trinket_id(trinket_id)
+	var index := owned_trinket_ids.find(normalized)
+	if index < 0:
+		return false
+	owned_trinket_ids.remove_at(index)
+	return true
+
+
 func _init(content: DefaultContent) -> void:
 	_content = content
 	brew_session = BrewSession.new()
@@ -128,10 +137,18 @@ func load_from_save(data: Dictionary) -> void:
 		_append_unique_pending_trinket_offer(str(trinket_id))
 	_sanitize_pending_trinket_reward_ids()
 	var chips: Array[IngredientData] = []
-	for ingredient_id in data.get("bagIngredientIds", []):
-		var ingredient := _content.find_ingredient(str(ingredient_id))
-		if ingredient != null:
-			chips.append(ingredient)
+	if data.has("bagChips"):
+		for chip_data in data.get("bagChips", []):
+			if typeof(chip_data) != TYPE_DICTIONARY:
+				continue
+			var chip := _content.create_bag_chip_from_save(chip_data)
+			if chip != null:
+				chips.append(chip)
+	else:
+		for ingredient_id in data.get("bagIngredientIds", []):
+			var ingredient := _content.find_ingredient(str(ingredient_id))
+			if ingredient != null:
+				chips.append(ingredient.duplicate_for_bag())
 	bag.set_master_bag(chips)
 	current_shop_offers.clear()
 	for offer_data in data.get("shopOffers", []):
@@ -148,7 +165,17 @@ func load_from_save(data: Dictionary) -> void:
 		var offer := ShopService.ShopOffer.new()
 		offer.ingredient = ingredient
 		offer.price = int(offer_data.get("price", ingredient.shop_cost))
+		_apply_shop_offer_modifiers(offer)
 		current_shop_offers.append(offer)
+
+
+func _apply_shop_offer_modifiers(offer) -> void:
+	if offer == null or offer.ingredient == null:
+		return
+	offer.price = TrinketEffects.shop_price_for_ingredient(
+		offer.ingredient,
+		owned_trinket_ids
+	)
 
 
 func to_save_data() -> Dictionary:
@@ -171,7 +198,7 @@ func to_save_data() -> Dictionary:
 		"bossThresholdDiscount": boss_threshold_discount,
 		"freeShopRerolls": free_shop_rerolls,
 		"pendingExtraMulligans": pending_extra_mulligans,
-		"bagIngredientIds": bag.master_ids(),
+		"bagChips": bag.get_master_chip_save_data(),
 		"lastAuraId": last_aura_id,
 		"lockedLevelAuraId": locked_level_aura_id,
 		"lockedLevelAuraLevel": locked_level_aura_level,
@@ -255,7 +282,8 @@ func prepare_shop_for_current_level() -> void:
 	current_shop_offers = _shop_service.generate_offers(
 		current_level,
 		gold,
-		GameConstants.SHOP_SLOT_COUNT
+		GameConstants.SHOP_SLOT_COUNT,
+		owned_trinket_ids
 	)
 
 
@@ -301,7 +329,8 @@ func try_reroll_shop() -> bool:
 	current_shop_offers = _shop_service.generate_offers(
 		current_level,
 		gold,
-		GameConstants.SHOP_SLOT_COUNT
+		GameConstants.SHOP_SLOT_COUNT,
+		owned_trinket_ids
 	)
 	return true
 

@@ -345,6 +345,143 @@ def migrate_ingredients_sheet(wb) -> bool:
     return True
 
 
+def _style_ingredients_sheet(sheet) -> None:
+    for cell in sheet[1]:
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center")
+    for row in sheet.iter_rows(min_row=2, max_col=len(INGREDIENT_HEADERS)):
+        for cell in row:
+            if cell.column == 4:
+                continue
+            cell.font = INPUT_FONT
+    rarity_validation = DataValidation(
+        type="list",
+        formula1='"common,uncommon,rare,epic,legendary"',
+        allow_blank=False,
+    )
+    rarity_validation.add(f"H2:H{max(sheet.max_row, 200)}")
+    sheet.add_data_validation(rarity_validation)
+    shop_validation = DataValidation(type="list", formula1='"TRUE,FALSE"', allow_blank=False)
+    shop_validation.add(f"I2:I{max(sheet.max_row, 200)}")
+    sheet.add_data_validation(shop_validation)
+    widths = [18, 18, 20, 44, 12, 14, 10, 12, 14]
+    for idx, width in enumerate(widths, start=1):
+        sheet.column_dimensions[chr(64 + idx)].width = width
+
+
+def _replace_sheet(
+    wb,
+    name: str,
+    headers: list,
+    rows: list[list],
+    style_fn,
+    index: int,
+) -> None:
+    if name in wb.sheetnames:
+        del wb[name]
+    sheet = wb.create_sheet(name, index)
+    sheet.append(headers)
+    for row in rows:
+        sheet.append(row)
+    style_fn(sheet)
+
+
+def _load_json_array(path: Path, label: str) -> list[dict]:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing {label} file: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError(f"{label} must be a JSON array.")
+    return data
+
+
+def sync_workbook_from_json() -> None:
+    """Push runtime JSON content back into ingredients.xlsx."""
+    if not XLSX_PATH.exists():
+        create_default_workbook()
+
+    ingredients = _load_json_array(INGREDIENTS_JSON, "ingredients")
+    starter_bag = _load_json_array(STARTER_BAG_JSON, "starter bag")
+    auras = _load_json_array(AURAS_JSON, "auras")
+    trinkets = _load_json_array(TRINKETS_JSON, "trinkets")
+
+    wb = load_workbook(XLSX_PATH)
+    migrate_ingredients_sheet(wb)
+    ensure_auras_sheet(wb)
+    ensure_trinkets_sheet(wb)
+
+    ingredient_rows = [
+        [
+            item["id"],
+            item.get("art", item["id"]),
+            item["display_name"],
+            item["description"],
+            item["point_value"],
+            item["explosive_value"],
+            item["shop_cost"],
+            item["rarity"],
+            bool(item.get("shop_available", True)),
+        ]
+        for item in ingredients
+    ]
+    starter_rows = [
+        [item["id"], item["count"]]
+        for item in starter_bag
+    ]
+    aura_rows = [
+        [
+            item["id"],
+            item["display_name"],
+            item["description"],
+            item["pool"],
+            item.get("pool_unlock_level", 1),
+            item["explosion_limit_modifier"],
+            item["score_multiplier_percent"],
+            item["gold_multiplier_percent"],
+        ]
+        for item in auras
+    ]
+    trinket_rows = [
+        [
+            item["id"],
+            item["display_name"],
+            item["description"],
+        ]
+        for item in trinkets
+    ]
+
+    _replace_sheet(wb, "Ingredients", INGREDIENT_HEADERS, ingredient_rows, _style_ingredients_sheet, 1)
+    _replace_sheet(wb, "StarterBag", STARTER_HEADERS, starter_rows, _style_starter_bag_sheet, 2)
+    _replace_sheet(wb, "Auras", AURA_HEADERS, aura_rows, _style_aura_sheet, 3)
+    _replace_sheet(wb, "Trinkets", TRINKET_HEADERS, trinket_rows, _style_trinket_sheet, 4)
+
+    try:
+        wb.save(XLSX_PATH)
+    except OSError as exc:
+        raise OSError(
+            f"Could not save spreadsheet ({exc}). "
+            "Close ingredients.xlsx in Excel and run sync again."
+        ) from exc
+
+    print(f"Synced {len(ingredient_rows)} ingredients -> {XLSX_PATH}")
+    print(f"Synced {len(starter_rows)} starter stacks")
+    print(f"Synced {len(aura_rows)} auras")
+    print(f"Synced {len(trinket_rows)} trinkets")
+
+
+def _style_starter_bag_sheet(sheet) -> None:
+    for cell in sheet[1]:
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center")
+    for row in sheet.iter_rows(min_row=2, max_col=2):
+        for cell in row:
+            cell.font = INPUT_FONT
+    sheet.column_dimensions["A"].width = 20
+    sheet.column_dimensions["B"].width = 10
+
+
 def create_default_workbook() -> None:
     XLSX_PATH.parent.mkdir(parents=True, exist_ok=True)
     wb = Workbook()
@@ -816,6 +953,13 @@ def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--init":
         create_default_workbook()
         export_workbook()
+        return 0
+    if len(sys.argv) > 1 and sys.argv[1] == "--sync-json":
+        try:
+            sync_workbook_from_json()
+        except Exception as exc:
+            print(f"Sync failed: {exc}", file=sys.stderr)
+            return 1
         return 0
     try:
         export_workbook()

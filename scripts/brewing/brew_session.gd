@@ -25,6 +25,10 @@ signal hand_mulligan_started(
 	new_ingredient: IngredientData,
 	slot_index: int
 )
+signal time_turner_redraw_started(
+	old_hand_entries: Array,
+	new_hand: Array
+)
 signal ingredient_drawn(
 	context: BrewContext,
 	ingredient: IngredientData,
@@ -65,6 +69,9 @@ var _eyeball_puzzle_active: bool = false
 var _bat_wing_choices: Array[IngredientData] = []
 var _bat_wing_picker_active: bool = false
 var _bat_wing_reroll_used: bool = false
+var _bat_wing_source_slot_index: int = -1
+var _last_hand_play_slot: int = -1
+var _pending_cobbler_slot_bonuses: Dictionary = {}
 var _unicorn_cures_next_explosive: bool = false
 var _ice_cube_shields_remaining: int = 0
 var _parrot_doubles_next: bool = false
@@ -72,6 +79,10 @@ var _parrot_repeat_pending: bool = false
 var _parrot_repeat_ingredient: IngredientData = null
 var _parrot_repeat_from_hand: bool = false
 var _parrot_repeat_hand_slot: int = -1
+var _pristine_feather_repeat_pending: bool = false
+var _pristine_feather_repeat_ingredient: IngredientData = null
+var _pristine_feather_repeat_from_hand: bool = false
+var _pristine_feather_repeat_hand_slot: int = -1
 var _voodoo_doll_arms_copy: bool = false
 var _practice_restart_used: bool = false
 var _frog_leg_save_pending: bool = false
@@ -94,6 +105,10 @@ var last_presented_stat_deltas: Dictionary = {
 }
 var last_play_fly_count: int = 1
 var last_play_fairy_poof: bool = false
+var _jar_of_dirt_broke_poof_pending: bool = false
+var _pending_time_turner_new_hand: Array = []
+var _pending_time_turner_target_slots: Array = []
+var _frog_legs_played_this_brew: Array[IngredientData] = []
 var last_bag_grant_ingredient: IngredientData = null
 
 
@@ -145,6 +160,7 @@ func start_brew(
 	_brew_extra_mulligans = maxi(0, extra_mulligans)
 	_purchased_mulligans_this_brew = 0
 	_mulligans_used = 0
+	_frog_legs_played_this_brew.clear()
 	_reset_draw_flow_state()
 	_refresh_mulligan_allowance()
 	bag.reset_for_brew(true)
@@ -280,7 +296,13 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 	var layout_slots: Array = []
 	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
 		layout_slots = _hand_start_slots
-	return _HandSlotEffects.compute_entries(slots, HAND_SLOT_COUNT, layout_slots)
+	return _HandSlotEffects.compute_entries(
+		slots,
+		HAND_SLOT_COUNT,
+		layout_slots,
+		context.cauldron_contents.size(),
+		context.owned_trinket_ids
+	)
 
 
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
@@ -342,6 +364,19 @@ func can_mulligan() -> bool:
 	)
 
 
+func can_use_time_turner() -> bool:
+	if _hand_phase != HandPhase.HAND:
+		return false
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
+		return false
+	if not TrinketEffects.has_time_turner(context.owned_trinket_ids):
+		return false
+	var old_hand := _collect_hand_ingredients()
+	if old_hand.is_empty():
+		return false
+	return context.bag.count_drawable_excluding_instances(old_hand) >= old_hand.size()
+
+
 func is_mulligan_used_this_level() -> bool:
 	return _mulligans_used >= _mulligan_allowance
 
@@ -396,31 +431,37 @@ func sync_owned_trinkets(owned_trinket_ids: Array[String]) -> void:
 
 func can_reroll_bat_wing_choices() -> bool:
 	if (
-		not _bat_wing_picker_active
-		or _bat_wing_reroll_used
-		or _bat_wing_choices.is_empty()
+		_bat_wing_reroll_used
+		or _bat_wing_choices.size() < IngredientEffects.BAT_WING_PICK_COUNT
 		or context.bag == null
 	):
 		return false
 	if not TrinketEffects.has_jar_of_flies(context.owned_trinket_ids):
 		return false
-	return context.bag.remaining_count() >= IngredientEffects.BAT_WING_PICK_COUNT
+	return (
+		context.bag.count_drawable_excluding_instances(_bat_wing_choices)
+		>= IngredientEffects.BAT_WING_PICK_COUNT
+	)
 
 
 func try_reroll_bat_wing_choices() -> bool:
 	if not can_reroll_bat_wing_choices():
 		return false
 
-	var previous_choices := _bat_wing_choices.duplicate()
-	var rerolled := context.bag.take_random(IngredientEffects.BAT_WING_PICK_COUNT)
+	var held_out := _bat_wing_choices.duplicate()
+	context.bag.return_to_bag(held_out)
+	var rerolled := context.bag.take_random_excluding_instances(
+		held_out,
+		IngredientEffects.BAT_WING_PICK_COUNT
+	)
 	if rerolled.size() < IngredientEffects.BAT_WING_PICK_COUNT:
 		context.bag.return_to_bag(rerolled)
+		context.bag.remove_instances(held_out)
+		_bat_wing_choices = held_out
 		return false
 
-	context.bag.return_to_bag(previous_choices)
 	_bat_wing_choices = rerolled
 	_bat_wing_reroll_used = true
-	brew_updated.emit(context)
 	return true
 
 
@@ -440,6 +481,13 @@ func get_growth_potion_doubles_remaining() -> int:
 	return _growth_potion_doubles_remaining
 
 
+func get_pocket_watch_countdown() -> int:
+	return TrinketEffects.pocket_watch_countdown(
+		context.cauldron_contents.size(),
+		context.owned_trinket_ids
+	)
+
+
 func get_chain_draws_remaining() -> int:
 	return _chain_draws_remaining
 
@@ -448,6 +496,12 @@ func consume_last_bag_grant_ingredient() -> IngredientData:
 	var granted := last_bag_grant_ingredient
 	last_bag_grant_ingredient = null
 	return granted
+
+
+func consume_jar_of_dirt_broke_poof() -> bool:
+	var pending := _jar_of_dirt_broke_poof_pending
+	_jar_of_dirt_broke_poof_pending = false
+	return pending
 
 
 func get_poison_apple_pending() -> Array:
@@ -494,6 +548,31 @@ func complete_frog_leg_save() -> void:
 	brew_updated.emit(context)
 
 
+func get_jar_of_froglegs_return_entries() -> Array:
+	if not TrinketEffects.has_jar_of_froglegs(context.owned_trinket_ids):
+		return []
+	var entries: Array = []
+	var seen: Dictionary = {}
+	for ingredient in _frog_legs_played_this_brew:
+		if ingredient == null or ingredient.id != IngredientEffects.FROG_LEG_ID:
+			continue
+		if seen.has(ingredient):
+			continue
+		seen[ingredient] = true
+		entries.append(
+			{
+				"needs_restore": not context.bag.has_master_chip(ingredient),
+			}
+		)
+	return entries
+
+
+func restore_frog_leg_to_master_bag() -> void:
+	var template := GameManager.run.find_ingredient(IngredientEffects.FROG_LEG_ID)
+	if template != null:
+		context.bag.add_to_master_bag(template)
+
+
 func begin_eyeball_puzzle() -> void:
 	if _eyeball_reserved.is_empty():
 		return
@@ -527,12 +606,18 @@ func complete_bat_wing_picker(selected: IngredientData) -> void:
 	_bat_wing_choices.clear()
 	_bat_wing_picker_active = false
 	_bat_wing_reroll_used = false
-	var parrot_doubled := _apply_ingredient(selected, true)
+	var source_slot := _bat_wing_source_slot_index
+	_bat_wing_source_slot_index = -1
+	var from_hand := source_slot >= 0
+	var parrot_doubled := _apply_ingredient(selected, true, from_hand, source_slot)
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
 			_resolve_explosion()
-	ingredient_drawn.emit(context, selected, parrot_doubled)
+	if from_hand:
+		hand_card_played.emit(context, selected, source_slot, parrot_doubled)
+	else:
+		ingredient_drawn.emit(context, selected, parrot_doubled)
 	brew_updated.emit(context)
 
 
@@ -624,6 +709,9 @@ func try_play_hand() -> bool:
 	_hand_start_slots = _hand_slots.duplicate()
 	_honey_skipped_slots = _compute_honey_skipped_slots()
 	_play_slot_cursor = 0
+	_last_hand_play_slot = -1
+	_pending_cobbler_slot_bonuses.clear()
+	_bat_wing_source_slot_index = -1
 	_play_next_hand_card()
 	return true
 
@@ -663,6 +751,55 @@ func undo_hand_swap() -> bool:
 	return true
 
 
+func try_time_turner_redraw() -> bool:
+	if not can_use_time_turner():
+		return false
+
+	var old_hand_entries := _collect_hand_entries()
+	var old_hand := _collect_hand_ingredients()
+	var draw_count := old_hand.size()
+	context.bag.return_to_bag(old_hand)
+	for slot_index in range(HAND_SLOT_COUNT):
+		_hand_slots[slot_index] = null
+
+	var drawn := context.bag.take_random_excluding_instances(old_hand, draw_count)
+	if drawn.size() < draw_count:
+		context.bag.remove_instances(drawn)
+		context.bag.remove_instances(old_hand)
+		for entry in old_hand_entries:
+			var slot := int(entry.get("slot_index", -1))
+			var ingredient: IngredientData = entry.get("ingredient")
+			if _is_valid_hand_slot(slot) and ingredient != null:
+				_hand_slots[slot] = ingredient
+		return false
+
+	_hand_undo_stack.clear()
+	_pending_time_turner_new_hand = drawn.duplicate()
+	_pending_time_turner_target_slots = _compute_hand_draw_target_slots(drawn.size())
+	time_turner_redraw_started.emit(old_hand_entries, drawn)
+	brew_updated.emit(context)
+	return true
+
+
+func get_pending_time_turner_target_slots() -> Array:
+	return _pending_time_turner_target_slots.duplicate()
+
+
+func complete_time_turner_redraw() -> void:
+	var drawn: Array = _pending_time_turner_new_hand.duplicate()
+	var target_slots := _pending_time_turner_target_slots.duplicate()
+	_pending_time_turner_new_hand.clear()
+	_pending_time_turner_target_slots.clear()
+	for index in range(drawn.size()):
+		if index >= target_slots.size():
+			break
+		var slot_index: int = target_slots[index]
+		if _is_valid_hand_slot(slot_index):
+			_hand_slots[slot_index] = drawn[index]
+	_note_lucky_coin_in_hand()
+	brew_updated.emit(context)
+
+
 func try_mulligan(slot_index: int) -> bool:
 	if not can_mulligan():
 		return false
@@ -699,6 +836,8 @@ func on_hand_play_presentation_finished() -> void:
 		return
 	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return
+	if _bat_wing_picker_active or _eyeball_puzzle_active:
+		return
 	_continue_hand_play_resolution()
 
 
@@ -706,7 +845,13 @@ func try_begin_parrot_repeat_play() -> bool:
 	return _try_begin_parrot_repeat_play()
 
 
+func try_begin_pristine_feather_repeat_play() -> bool:
+	return _try_begin_pristine_feather_repeat_play()
+
+
 func _continue_hand_play_resolution() -> void:
+	if _bat_wing_picker_active or _eyeball_puzzle_active:
+		return
 	if needs_bat_wing_picker():
 		begin_bat_wing_picker()
 		bat_wing_picker_requested.emit(get_bat_wing_choices())
@@ -718,6 +863,8 @@ func _continue_hand_play_resolution() -> void:
 	if try_advance_chain_draw():
 		return
 	if _try_begin_parrot_repeat_play():
+		return
+	if _try_begin_pristine_feather_repeat_play():
 		return
 	if _try_boss_early_clear():
 		return
@@ -886,6 +1033,15 @@ func _apply_ingredient(
 		_parrot_repeat_ingredient = ingredient
 		_parrot_repeat_from_hand = from_hand_play
 		_parrot_repeat_hand_slot = hand_slot_index
+	if (
+		TrinketEffects.feather_plays_twice(ingredient, context.owned_trinket_ids)
+		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+		and not context.is_exploded()
+	):
+		_pristine_feather_repeat_pending = true
+		_pristine_feather_repeat_ingredient = ingredient
+		_pristine_feather_repeat_from_hand = from_hand_play
+		_pristine_feather_repeat_hand_slot = hand_slot_index
 
 	if context.is_exploded() and ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
 		_trigger_phoenix_save()
@@ -928,6 +1084,42 @@ func _clear_parrot_repeat() -> void:
 	_parrot_repeat_hand_slot = -1
 
 
+func _try_begin_pristine_feather_repeat_play() -> bool:
+	if not _pristine_feather_repeat_pending:
+		return false
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS or context.is_exploded():
+		_clear_pristine_feather_repeat()
+		return false
+
+	var ingredient: IngredientData = _pristine_feather_repeat_ingredient
+	var from_hand := _pristine_feather_repeat_from_hand
+	var slot_index := _pristine_feather_repeat_hand_slot
+	_clear_pristine_feather_repeat()
+
+	last_play_fly_count = 1
+	_apply_ingredient_play(ingredient, false)
+	enqueue_presented_stat_snapshot()
+
+	if context.is_exploded():
+		_chain_draws_remaining = 0
+		if not _try_frog_leg_save():
+			_resolve_explosion()
+
+	if from_hand:
+		hand_card_played.emit(context, ingredient, slot_index, true)
+	else:
+		ingredient_drawn.emit(context, ingredient, true)
+	brew_updated.emit(context)
+	return true
+
+
+func _clear_pristine_feather_repeat() -> void:
+	_pristine_feather_repeat_pending = false
+	_pristine_feather_repeat_ingredient = null
+	_pristine_feather_repeat_from_hand = false
+	_pristine_feather_repeat_hand_slot = -1
+
+
 func _count_hand_ingredients_to_left_from_start(slot_index: int) -> int:
 	var count := 0
 	for i in range(slot_index):
@@ -952,12 +1144,36 @@ func _apply_ingredient_play(
 ) -> void:
 	if track_draw:
 		context.drawn_this_brew.append(ingredient)
+	if ingredient.id == IngredientEffects.FROG_LEG_ID:
+		_frog_legs_played_this_brew.append(ingredient)
 
 	var cauldron_count_before := context.cauldron_contents.size()
-	var effect := IngredientEffects.apply(ingredient, context)
+	var pending_cobbler := _consume_pending_cobbler_bonus(hand_slot_index, from_hand_play)
+	var hand_play := {}
+	if from_hand_play and hand_slot_index >= 0:
+		hand_play = {
+			"play_slot": hand_slot_index,
+			"last_hand_slot": _last_hand_play_slot,
+			"hand_slots": _hand_slots,
+		}
+	var effect := IngredientEffects.apply(ingredient, context, hand_play)
+	if effect.cobbler_retroactive_slot >= 0:
+		_store_pending_cobbler_bonus(
+			effect.cobbler_retroactive_slot,
+			effect.cobbler_retroactive_score,
+			effect.cobbler_retroactive_explosiveness
+		)
 
-	var point_value := ingredient.point_value + effect.bonus_score
-	var explosive_add := ingredient.explosive_value + effect.bonus_explosiveness
+	var point_value := (
+		ingredient.point_value
+		+ effect.bonus_score
+		+ int(pending_cobbler.get("score", 0))
+	)
+	var explosive_add := (
+		ingredient.explosive_value
+		+ effect.bonus_explosiveness
+		+ int(pending_cobbler.get("explosiveness", 0))
+	)
 	if effect.score_penalty > 0:
 		point_value = maxi(0, point_value - effect.score_penalty)
 	if from_hand_play and hand_slot_index >= 0:
@@ -976,6 +1192,15 @@ func _apply_ingredient_play(
 	):
 		point_value *= 2
 		explosive_add *= 2
+	if TrinketEffects.pocket_watch_doubles_ingredient(
+		cauldron_count_before,
+		context.owned_trinket_ids
+	):
+		point_value *= 2
+		explosive_add *= 2
+
+	if effect.explosion_limit_bonus > 0:
+		context.explosion_limit += effect.explosion_limit_bonus
 
 	context.score += point_value
 	var unicorn_blocks_explosive := _unicorn_cures_next_explosive
@@ -1014,8 +1239,6 @@ func _apply_ingredient_play(
 		context.free_shop_rerolls_gained += effect.free_shop_rerolls
 	if effect.extra_mulligans > 0:
 		_mulligan_allowance += effect.extra_mulligans
-	if effect.explosion_limit_bonus > 0:
-		context.explosion_limit += effect.explosion_limit_bonus
 	if effect.ice_cube_shields > 0:
 		_ice_cube_shields_remaining = effect.ice_cube_shields
 	if effect.next_hand_draw_count > 0:
@@ -1025,6 +1248,8 @@ func _apply_ingredient_play(
 		if granted != null:
 			context.bag.grant_ingredient_during_brew(granted)
 			last_bag_grant_ingredient = granted
+	if ingredient.id == IngredientEffects.JAR_OF_DIRT_ID:
+		_consume_jar_of_dirt_use(ingredient)
 	if effect.bonus_swap_hands > 0:
 		if ingredient.id == IngredientEffects.STIRRING_SPOON_ID:
 			_stirring_spoon_hands_remaining += effect.bonus_swap_hands
@@ -1044,10 +1269,43 @@ func _apply_ingredient_play(
 	if effect.bat_wing_pick_count > 0:
 		_bat_wing_choices = context.bag.take_random(effect.bat_wing_pick_count)
 		_bat_wing_reroll_used = false
+		if from_hand_play and hand_slot_index >= 0:
+			_bat_wing_source_slot_index = hand_slot_index
+		else:
+			_bat_wing_source_slot_index = -1
 	if effect.voodoo_doll_arms_copy:
 		_voodoo_doll_arms_copy = true
 	else:
 		_try_consume_voodoo_copy(ingredient)
+
+	if from_hand_play and hand_slot_index >= 0:
+		_last_hand_play_slot = hand_slot_index
+
+
+func _consume_pending_cobbler_bonus(
+	hand_slot_index: int,
+	from_hand_play: bool
+) -> Dictionary:
+	if not from_hand_play or hand_slot_index < 0:
+		return {"score": 0, "explosiveness": 0}
+	if not _pending_cobbler_slot_bonuses.has(hand_slot_index):
+		return {"score": 0, "explosiveness": 0}
+	var bonus: Dictionary = _pending_cobbler_slot_bonuses[hand_slot_index]
+	_pending_cobbler_slot_bonuses.erase(hand_slot_index)
+	return bonus
+
+
+func _store_pending_cobbler_bonus(
+	slot_index: int,
+	bonus_score: int,
+	bonus_explosiveness: int
+) -> void:
+	if slot_index < 0 or (bonus_score == 0 and bonus_explosiveness == 0):
+		return
+	var existing: Dictionary = _pending_cobbler_slot_bonuses.get(slot_index, {})
+	existing["score"] = int(existing.get("score", 0)) + bonus_score
+	existing["explosiveness"] = int(existing.get("explosiveness", 0)) + bonus_explosiveness
+	_pending_cobbler_slot_bonuses[slot_index] = existing
 
 
 func _note_booberry_played_this_hand(ingredient: IngredientData) -> void:
@@ -1121,6 +1379,18 @@ func _compute_and_consume_hand_swap_bonus() -> int:
 		_lucky_coin_swap_hands_remaining -= 1
 
 	return bonus
+
+
+func _consume_jar_of_dirt_use(jar_chip: IngredientData) -> void:
+	if jar_chip == null:
+		return
+	if jar_chip.jar_of_dirt_uses_remaining < 0:
+		jar_chip.jar_of_dirt_uses_remaining = IngredientEffects.JAR_OF_DIRT_MAX_USES
+	jar_chip.jar_of_dirt_uses_remaining -= 1
+	if jar_chip.jar_of_dirt_uses_remaining > 0:
+		return
+	context.bag.remove_one_chip_from_master(jar_chip)
+	_jar_of_dirt_broke_poof_pending = true
 
 
 func _try_vanish_ingredient_from_fairy(
@@ -1377,6 +1647,30 @@ func get_pending_hand_draw_target_slots() -> Array:
 	return _pending_hand_draw_target_slots.duplicate()
 
 
+func _collect_hand_entries() -> Array:
+	var entries: Array = []
+	for slot_index in range(HAND_SLOT_COUNT):
+		var ingredient: IngredientData = _hand_slots[slot_index]
+		if ingredient == null:
+			continue
+		entries.append(
+			{
+				"slot_index": slot_index,
+				"ingredient": ingredient,
+			}
+		)
+	return entries
+
+
+func _collect_hand_ingredients() -> Array[IngredientData]:
+	var ingredients: Array[IngredientData] = []
+	for slot_index in range(HAND_SLOT_COUNT):
+		var ingredient: IngredientData = _hand_slots[slot_index]
+		if ingredient != null:
+			ingredients.append(ingredient)
+	return ingredients
+
+
 func _count_empty_hand_slots() -> int:
 	var count := 0
 	for slot in _hand_slots:
@@ -1474,13 +1768,21 @@ func _reset_draw_flow_state() -> void:
 	_bat_wing_choices.clear()
 	_bat_wing_picker_active = false
 	_bat_wing_reroll_used = false
+	_bat_wing_source_slot_index = -1
+	_last_hand_play_slot = -1
+	_pending_cobbler_slot_bonuses.clear()
 	_unicorn_cures_next_explosive = false
 	_ice_cube_shields_remaining = 0
 	_parrot_doubles_next = false
 	_clear_parrot_repeat()
+	_clear_pristine_feather_repeat()
 	_voodoo_doll_arms_copy = false
 	_frog_leg_save_pending = false
 	_fairy_vanish_next_ingredient = false
+	_jar_of_dirt_broke_poof_pending = false
+	_pending_time_turner_new_hand.clear()
+	_pending_time_turner_target_slots.clear()
+	_frog_legs_played_this_brew.clear()
 	_booberry_count_this_hand = 0
 	_poison_apple_pending.clear()
 	_growth_potion_doubles_remaining = 0

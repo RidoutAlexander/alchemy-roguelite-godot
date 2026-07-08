@@ -119,6 +119,7 @@ func show_picker(ingredients: Array) -> void:
 	_configure_slots_for_picker(ingredients.size())
 	_populate_slots(ingredients, false)
 	_reset_picker_card_states()
+	_ensure_picker_cards_interactive()
 	if _done_button != null:
 		_done_button.visible = true
 		_done_button.disabled = true
@@ -180,6 +181,8 @@ func _populate_slots(ingredients: Array, enable_drag: bool) -> void:
 		var card := _CARD_SCENE.instantiate() as IngredientCard
 		if card == null:
 			continue
+		# Attach first so _ready() runs before binding; binding before place leaves
+		# deferred bind_preview to fire after _set_empty_state() clears picker mode.
 		_order_slots[i].place_card(card)
 		if enable_drag:
 			card.bind_puzzle_card(ingredient)
@@ -259,12 +262,39 @@ func _refresh_reroll_button() -> void:
 func _on_reroll_pressed() -> void:
 	if _mode != Mode.PICKER:
 		return
+	_cancel_drag()
 	if not GameManager.try_reroll_bat_wing_choices():
 		if _reroll_button != null:
 			_reroll_button.shake()
 		return
-	var refreshed_choices := GameManager.run.brew_session.get_bat_wing_choices()
-	show_picker(refreshed_choices)
+	GameManager.notify_bag_display_changed()
+	_refresh_picker_choices(GameManager.run.brew_session.get_bat_wing_choices())
+
+
+func _refresh_picker_choices(ingredients: Array) -> void:
+	if _mode != Mode.PICKER:
+		return
+	_selected_picker_card = null
+	_configure_slots_for_picker(ingredients.size())
+	_populate_slots(ingredients, false)
+	_reset_picker_card_states()
+	_ensure_picker_cards_interactive()
+	if _done_button != null:
+		_done_button.disabled = true
+	_refresh_reroll_button()
+
+
+func _ensure_picker_cards_interactive() -> void:
+	if _mode != Mode.PICKER:
+		return
+	for slot in _order_slots:
+		if not slot.visible:
+			continue
+		var card := slot.get_card()
+		if card == null:
+			continue
+		if card.has_method("sync_picker_input"):
+			card.sync_picker_input()
 
 
 func _on_puzzle_drag_began(card: IngredientCard) -> void:
@@ -401,9 +431,7 @@ func _best_slot_for_card(card: IngredientCard) -> EyeballPuzzleSlot:
 
 func _clear_cards() -> void:
 	for slot in _order_slots:
-		var card := slot.get_card()
-		if card != null:
-			card.queue_free()
+		slot.clear_hosted_card()
 
 
 func _on_done_pressed() -> void:

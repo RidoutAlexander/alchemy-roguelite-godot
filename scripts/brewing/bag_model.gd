@@ -29,14 +29,15 @@ func can_add_to_master_bag(ingredient: IngredientData) -> bool:
 func add_to_master_bag(ingredient: IngredientData) -> bool:
 	if not can_add_to_master_bag(ingredient):
 		return false
-	_master_chips.append(ingredient)
+	_master_chips.append(_chip_for_bag(ingredient))
 	return true
 
 
 func grant_ingredient_during_brew(ingredient: IngredientData) -> bool:
+	var before_count := _master_chips.size()
 	if not add_to_master_bag(ingredient):
 		return false
-	_working_chips.append(ingredient)
+	_working_chips.append(_master_chips[before_count])
 	return true
 
 
@@ -59,6 +60,15 @@ func master_count() -> int:
 	return _master_chips.size()
 
 
+func has_master_chip(chip: IngredientData) -> bool:
+	if chip == null:
+		return false
+	for entry in _master_chips:
+		if entry == chip:
+			return true
+	return false
+
+
 func master_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for chip in _master_chips:
@@ -67,23 +77,36 @@ func master_ids() -> Array[String]:
 
 
 func get_master_inventory() -> Array[Dictionary]:
-	# UI-only aggregation: group every copy by ingredient id. Draw order / shuffle
-	# uses _working_chips and is unrelated to how the bag overlay displays stacks.
+	# UI-only aggregation: group copies by ingredient id, except jars of dirt which
+	# can have different remaining uses and are stacked separately.
 	var counts: Dictionary = {}
 	var order: Array[String] = []
 	for chip in _master_chips:
 		if chip == null:
 			continue
-		if not counts.has(chip.id):
-			counts[chip.id] = {"ingredient": chip, "count": 0}
-			order.append(chip.id)
-		var entry: Dictionary = counts[chip.id]
+		var stack_key := _inventory_stack_key(chip)
+		if not counts.has(stack_key):
+			counts[stack_key] = {"ingredient": chip, "count": 0}
+			order.append(stack_key)
+		var entry: Dictionary = counts[stack_key]
 		entry["count"] = int(entry["count"]) + 1
 
 	var entries: Array[Dictionary] = []
-	for id in order:
-		entries.append(counts[id])
+	for stack_key in order:
+		entries.append(counts[stack_key])
 	return entries
+
+
+func get_master_chip_save_data() -> Array:
+	var chips: Array = []
+	for chip in _master_chips:
+		if chip == null:
+			continue
+		var entry := {"id": chip.id}
+		if chip.jar_of_dirt_uses_remaining >= 0:
+			entry["jarUses"] = chip.jar_of_dirt_uses_remaining
+		chips.append(entry)
+	return chips
 
 
 func try_draw() -> IngredientData:
@@ -219,6 +242,12 @@ func return_to_bag(ingredients: Array) -> void:
 			_working_chips.append(ingredient)
 
 
+func remove_instances(ingredients: Array) -> void:
+	for ingredient in ingredients:
+		if ingredient is IngredientData:
+			_remove_working_chip(ingredient)
+
+
 func replace_one_voodoo_doll_in_master_with(ingredient: IngredientData) -> void:
 	if ingredient == null:
 		return
@@ -275,3 +304,20 @@ func _shuffle(chips: Array) -> void:
 		var tmp = chips[i]
 		chips[i] = chips[j]
 		chips[j] = tmp
+
+
+func _chip_for_bag(ingredient: IngredientData) -> IngredientData:
+	if ingredient == null:
+		return null
+	if ingredient.is_bag_chip:
+		return ingredient
+	return ingredient.duplicate_for_bag()
+
+
+func _inventory_stack_key(chip: IngredientData) -> String:
+	if chip.id == IngredientEffects.JAR_OF_DIRT_ID:
+		return "%s:%d" % [
+			chip.id,
+			IngredientEffects.jar_of_dirt_uses_remaining(chip),
+		]
+	return chip.id

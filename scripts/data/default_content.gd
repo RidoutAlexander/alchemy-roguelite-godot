@@ -24,6 +24,17 @@ func find_ingredient(ingredient_id: String) -> IngredientData:
 	return ingredients.get(ingredient_id)
 
 
+func create_bag_chip_from_save(chip_data: Dictionary) -> IngredientData:
+	var ingredient_id := str(chip_data.get("id", ""))
+	var template := find_ingredient(ingredient_id)
+	if template == null:
+		return null
+	var chip := template.duplicate_for_bag()
+	if chip_data.has("jarUses"):
+		chip.jar_of_dirt_uses_remaining = maxi(0, int(chip_data.get("jarUses", 0)))
+	return chip
+
+
 func all_ingredients() -> Array:
 	return ingredients.values()
 
@@ -54,6 +65,6 @@ func flatten_starter_bag() -> Array[IngredientData]:
 		var ingredient := find_ingredient(stack["id"])
 		if ingredient == null:
 			continue
-		for i in stack["count"]:
-			chips.append(ingredient)
+		for _i in stack["count"]:
+			chips.append(ingredient.duplicate_for_bag())
 	return chips

@@ -441,7 +441,7 @@ func _open_dev_trinket_picker() -> void:
 		return
 	if GameManager.run == null:
 		return
-	_dev_trinket_picker.show_dev_trinket_picker(GameManager.get_all_trinkets())
+	_dev_trinket_picker.show_dev_trinket_picker(GameManager.get_trinkets_with_art())
 
 
 func _on_dev_trinket_picker_completed(trinket_ids: Array) -> void:

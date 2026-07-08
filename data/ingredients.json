@@ -344,7 +344,7 @@
 	"id": "jar_of_dirt",
 	"art": "jar_of_dirt",
 	"display_name": "Jar of Dirt",
-	"description": "Add a pumpkin to your bag",
+	"description": "Add a pumpkin to your bag. Breaks after 5 pumpkins.",
 	"point_value": 2,
 	"explosive_value": 0,
 	"shop_cost": 12,
