@@ -14,12 +14,11 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 @onready var _brew_score_flask: Control = $PhaseSwipeHost/BrewPanel/ScoreFlask
 @onready var _brew_gold_reward_display: Control = $PhaseSwipeHost/BrewPanel/GoldRewardDisplay
 @onready var _brew_stat_popups: BrewStatPopups = $HudOverlayLayer/BrewStatPopups
-@onready var _level_aura_banner: Control = $PhaseSwipeHost/BrewPanel/LevelAuraBanner
+@onready var _level_aura_banner: LevelAuraBanner = $PhaseSwipeHost/BrewPanel/LevelAuraBanner
 @onready var _level_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/LevelLabel
 @onready var _aura_name_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraNameLabel
 @onready var _aura_description_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraDescriptionLabel
-@onready var _aura_countdown_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraCountdownLabel
-@onready var _aura_countdown_caption: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraCountdownCaption
+
 @onready var _practice_restart_button: ShopRerollButton = (
 	$PhaseSwipeHost/BrewPanel/LevelAuraBanner/PracticeRestartButton
 )
@@ -293,7 +292,8 @@ func _refresh_brew() -> void:
 			session.get_explosion_limit_for_hud()
 		)
 	_refresh_practice_restart_button()
-	_refresh_aura_interval_countdown()
+	if _level_aura_banner != null:
+		_level_aura_banner.refresh_interval_countdown()
 	_refresh_rhythm_aura_shake(ctx)
 
 
@@ -323,24 +323,6 @@ func _align_bag_remaining_count_label() -> void:
 		bag_rect.position.x + (bag_rect.size.x - label_size.x) * 0.5,
 		bag_rect.end.y + BAG_REMAINING_COUNT_INSET.y
 	)
-
-
-func _refresh_aura_interval_countdown() -> void:
-	var show_countdown := false
-	var countdown := 0
-	if GameManager.run != null and GameManager.run.brew_session != null:
-		var session := GameManager.run.brew_session
-		countdown = session.get_aura_interval_countdown()
-		show_countdown = (
-			session.context.outcome == BrewOutcome.Outcome.IN_PROGRESS
-			and countdown > 0
-		)
-	if _aura_countdown_label != null:
-		_aura_countdown_label.visible = show_countdown
-		if show_countdown:
-			_aura_countdown_label.text = str(countdown)
-	if _aura_countdown_caption != null:
-		_aura_countdown_caption.visible = show_countdown
 
 
 func _should_shake_rhythm_aura(ctx: BrewContext) -> bool:
