@@ -65,6 +65,7 @@ var _pending_hand_draw_target_slots: Array = []
 var _hand_draw_display_reserve: int = 0
 var _honey_skipped_slots: Dictionary = {}
 var _gecko_stayed_slots: Dictionary = {}
+var _hand_preview_gecko_slots: Dictionary = {}
 var _hand_locked_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
@@ -348,16 +349,38 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		_compute_hand_preview_steps(slots_override),
 		context.owned_trinket_ids,
 		unicorn_cured_slots,
-		_parrot_doubles_next
+		_parrot_doubles_next,
+		_resolve_gecko_stayed_slots_for_display()
 	)
 
 
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
-	if not slots_override.is_empty():
-		return slots_override
 	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
 		return _hand_start_slots.duplicate()
+	if not slots_override.is_empty():
+		return slots_override
 	return _hand_slots.duplicate()
+
+
+func _resolve_gecko_stayed_slots_for_display() -> Dictionary:
+	if _hand_phase == HandPhase.PLAYING:
+		return _gecko_stayed_slots
+	if _hand_phase == HandPhase.HAND:
+		return _hand_preview_gecko_slots
+	return {}
+
+
+func _refresh_hand_preview_locks() -> void:
+	_hand_preview_gecko_slots.clear()
+	if _hand_phase != HandPhase.HAND:
+		return
+	var play_locks := _HandSlotEffects.compute_hand_play_locks(
+		_hand_slots,
+		HAND_SLOT_COUNT,
+		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
+		context.owned_trinket_ids
+	)
+	_hand_preview_gecko_slots = play_locks.get("gecko_stayed", {})
 
 
 func _compute_hand_display_stats(slots_override: Array = []) -> Array:
@@ -850,6 +873,7 @@ func on_hand_draw_batch_finished() -> void:
 	_hand_phase = HandPhase.HAND
 	_hand_swaps_used = 0
 	_note_lucky_coin_in_hand()
+	_refresh_hand_preview_locks()
 	brew_updated.emit(context)
 
 
@@ -894,6 +918,7 @@ func swap_hand_slots(from_slot: int, to_slot: int) -> bool:
 	_hand_slots[from_slot] = _hand_slots[to_slot]
 	_hand_slots[to_slot] = tmp
 	_hand_swaps_used += 1
+	_refresh_hand_preview_locks()
 	brew_updated.emit(context)
 	return true
 
@@ -910,6 +935,7 @@ func undo_hand_swap() -> bool:
 	_hand_slots[from_slot] = _hand_slots[to_slot]
 	_hand_slots[to_slot] = tmp
 	_hand_swaps_used = maxi(0, _hand_swaps_used - 1)
+	_refresh_hand_preview_locks()
 	brew_updated.emit(context)
 	return true
 
@@ -960,6 +986,7 @@ func complete_time_turner_redraw() -> void:
 		if _is_valid_hand_slot(slot_index):
 			_hand_slots[slot_index] = drawn[index]
 	_note_lucky_coin_in_hand()
+	_refresh_hand_preview_locks()
 	brew_updated.emit(context)
 
 
@@ -993,6 +1020,7 @@ func complete_mulligan(
 	_hand_slots[slot_index] = new_ingredient
 	_mulligans_used += 1
 	_note_lucky_coin_in_hand()
+	_refresh_hand_preview_locks()
 	brew_updated.emit(context)
 
 
@@ -1141,6 +1169,7 @@ func _finish_hand_play() -> void:
 	_resolve_lucky_coin_hand_effect()
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
+	_hand_preview_gecko_slots.clear()
 	_hand_locked_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
@@ -2099,6 +2128,7 @@ func _reset_draw_flow_state() -> void:
 	_pending_hand_draw_target_slots.clear()
 	_honey_skipped_slots.clear()
 	_gecko_stayed_slots.clear()
+	_hand_preview_gecko_slots.clear()
 	_hand_locked_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0

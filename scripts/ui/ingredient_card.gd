@@ -378,13 +378,13 @@ func _apply_gecko_hand_layout() -> void:
 	_gecko_hand_overlay.texture = GECKO_HAND_OVERLAY_TEXTURE
 	_gecko_hand_overlay.z_index = GECKO_HAND_Z_INDEX
 	_gecko_hand_overlay.scale = Vector2.ONE / HAND_CARD_SCALE
-	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0
-	var overlay_width := HAND_CARD_BASE_SIZE.x * 0.9
+	var overlay_height := HAND_CARD_BASE_SIZE.y / 3.0 * 0.5
+	var overlay_width := HAND_CARD_BASE_SIZE.x * 0.9 * 0.5
 	_gecko_hand_overlay.custom_minimum_size = Vector2(overlay_width, overlay_height)
 	_gecko_hand_overlay.size = Vector2(overlay_width, overlay_height)
 	_gecko_hand_overlay.position = Vector2(
-		(HAND_CARD_BASE_SIZE.x - overlay_width) * 0.5,
-		HAND_CARD_BASE_SIZE.y - overlay_height
+		(HAND_CARD_BASE_SIZE.x - overlay_width) * 0.5 + 20.0,
+		HAND_CARD_BASE_SIZE.y - overlay_height - 120.0
 	)
 	_gecko_hand_overlay.pivot_offset = Vector2(overlay_width * 0.52, overlay_height * 0.18)
 	_gecko_hand_overlay.rotation_degrees = GECKO_HAND_ROTATION_DEG

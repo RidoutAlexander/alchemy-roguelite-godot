@@ -11,14 +11,18 @@ static func compute_entries(
 	play_steps: Array = [],
 	owned_trinket_ids: Array = [],
 	unicorn_cured_slots: Array = [],
-	parrot_repeats_next: bool = false
+	parrot_repeats_next: bool = false,
+	gecko_stayed_override: Dictionary = {}
 ) -> Array:
 	var reference := layout_slots if not layout_slots.is_empty() else hand_slots
 	var per_slot: Array = []
 	for _i in hand_slot_count:
 		per_slot.append([])
 	_append_honey_entries(per_slot, reference, hand_slot_count)
-	_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
+	if gecko_stayed_override.is_empty():
+		_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
+	else:
+		_append_gecko_assistant_entries_from_stayed_slots(per_slot, gecko_stayed_override)
 	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
 	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
 	_append_parrot_repeat_entries(per_slot, play_steps, parrot_repeats_next)
@@ -136,6 +140,22 @@ static func _append_pocket_watch_entries_from_steps(
 					"overlay_text": "",
 				}
 			)
+
+
+static func _append_gecko_assistant_entries_from_stayed_slots(
+	per_slot: Array,
+	gecko_stayed: Dictionary
+) -> void:
+	for slot_key in gecko_stayed.keys():
+		var slot_index := int(slot_key)
+		if slot_index < 0 or slot_index >= per_slot.size():
+			continue
+		per_slot[slot_index].append(
+			{
+				"trinket_id": TrinketEffects.GECKO_ASSISTANT_ID,
+				"overlay_text": "",
+			}
+		)
 
 
 static func _append_gecko_assistant_entries_from_steps(
