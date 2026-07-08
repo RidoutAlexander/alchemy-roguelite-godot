@@ -1,6 +1,8 @@
 class_name LevelAuraBanner
 extends Control
 
+const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
+
 @onready var _countdown_label: Label = $AuraCountdownLabel
 @onready var _countdown_caption: Label = $AuraCountdownCaption
 
