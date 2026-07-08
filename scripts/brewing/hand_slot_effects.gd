@@ -19,10 +19,7 @@ static func compute_entries(
 	for _i in hand_slot_count:
 		per_slot.append([])
 	_append_honey_entries(per_slot, reference, hand_slot_count)
-	if gecko_stayed_override.is_empty():
-		_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
-	else:
-		_append_gecko_assistant_entries_from_stayed_slots(per_slot, gecko_stayed_override)
+	_append_gecko_assistant_entries_from_stayed_slots(per_slot, gecko_stayed_override)
 	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
 	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
 	_append_parrot_repeat_entries(per_slot, play_steps, parrot_repeats_next)

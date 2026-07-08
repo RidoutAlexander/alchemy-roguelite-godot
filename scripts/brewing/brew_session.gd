@@ -342,7 +342,7 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		_build_hand_display_modifiers(),
 		severed_layout_slots
 	)
-	return _HandSlotEffects.compute_entries(
+	var effect_entries := _HandSlotEffects.compute_entries(
 		slots,
 		HAND_SLOT_COUNT,
 		layout_slots,
@@ -352,6 +352,8 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		_parrot_doubles_next,
 		_resolve_gecko_stayed_slots_for_display()
 	)
+	_sanitize_gecko_effect_entries(effect_entries)
+	return effect_entries
 
 
 func _resolve_display_hand_slots(slots_override: Array = []) -> Array:
@@ -381,6 +383,26 @@ func _refresh_hand_preview_locks() -> void:
 		context.owned_trinket_ids
 	)
 	_hand_preview_gecko_slots = play_locks.get("gecko_stayed", {})
+
+
+func _sanitize_gecko_effect_entries(per_slot: Array) -> void:
+	var allowed_slots := _resolve_gecko_stayed_slots_for_display()
+	for slot_index in range(per_slot.size()):
+		var entries: Array = per_slot[slot_index]
+		if entries.is_empty():
+			continue
+		var filtered: Array = []
+		for entry in entries:
+			if not entry is Dictionary:
+				filtered.append(entry)
+				continue
+			if (
+				str(entry.get("trinket_id", "")) == TrinketEffects.GECKO_ASSISTANT_ID
+				and not allowed_slots.has(slot_index)
+			):
+				continue
+			filtered.append(entry)
+		per_slot[slot_index] = filtered
 
 
 func _compute_hand_display_stats(slots_override: Array = []) -> Array:
