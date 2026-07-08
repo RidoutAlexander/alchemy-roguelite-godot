@@ -208,7 +208,9 @@ func _play_hand_draw_fly(ingredient: IngredientData, slot_index: int) -> void:
 		fly_data["target_center"],
 		fly_data["size"],
 		func() -> void:
-			_on_hand_draw_landed(ingredient, slot_index)
+			_on_hand_draw_landed(ingredient, slot_index),
+		Callable(),
+		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
 	)
 
 
@@ -1018,7 +1020,8 @@ func _play_cauldron_fly_repeat(
 			_play_cauldron_plop()
 			_present_card_stats_after_play(ingredient, track_for_exit)
 			if track_for_exit and remaining_flies == 1:
-				_try_play_pending_brew_exit_effects_after_plop()
+				_try_play_pending_brew_exit_effects_after_plop(),
+		_IngredientFlyUtil.BREW_INGREDIENT_FLY_DURATION
 	)
 
 

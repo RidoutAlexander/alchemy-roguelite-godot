@@ -2,6 +2,8 @@ class_name IngredientFlyUtil
 extends RefCounted
 
 const DURATION := 0.8
+const BREW_INGREDIENT_FLY_SPEED_MULTIPLIER := 1.5
+const BREW_INGREDIENT_FLY_DURATION := DURATION / BREW_INGREDIENT_FLY_SPEED_MULTIPLIER
 const ARRIVAL_FRACTION := 1.0
 const HOP_HEIGHT := 140.0
 const FLY_Z_INDEX := 100
@@ -44,7 +46,8 @@ static func play(
 	target_center: Vector2,
 	display_size: Vector2,
 	on_complete: Callable = Callable(),
-	on_arrival: Callable = Callable()
+	on_arrival: Callable = Callable(),
+	duration: float = DURATION
 ) -> void:
 	if texture == null or layer == null:
 		if on_complete.is_valid():
@@ -74,12 +77,12 @@ static func play(
 			_update_flyer(flyer, layer_start, layer_target, start_scale, t),
 		0.0,
 		1.0,
-		DURATION
+		duration
 	).set_trans(Tween.TRANS_LINEAR)
 
 	if on_arrival.is_valid():
 		var arrival := flyer.create_tween()
-		arrival.tween_callback(on_arrival).set_delay(DURATION * ARRIVAL_FRACTION)
+		arrival.tween_callback(on_arrival).set_delay(duration * ARRIVAL_FRACTION)
 
 	tween.finished.connect(
 		func() -> void:
