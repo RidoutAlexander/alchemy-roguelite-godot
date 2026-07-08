@@ -652,12 +652,13 @@ static func compute_hand_display_stats(
 		)
 
 		var explosive_add := explosive_value
-		if unicorn_cures_next and explosive_add > 0:
-			explosive_add = 0
+		if unicorn_cures_next:
+			if explosive_add > 0:
+				explosive_add = 0
+				if unicorn_cured_slots is Array:
+					unicorn_cured_slots.append(play_slot)
+				unicorn_cured_slot_lookup[play_slot] = true
 			unicorn_cures_next = false
-			if unicorn_cured_slots is Array:
-				unicorn_cured_slots.append(play_slot)
-			unicorn_cured_slot_lookup[play_slot] = true
 		if ice_cube_shields > 0:
 			if (
 				explosive_add > 0
@@ -702,12 +703,13 @@ static func compute_hand_display_stats(
 				repeat_point *= 2
 				repeat_explosive *= 2
 			var repeat_explosive_add := repeat_explosive
-			if unicorn_cures_next and repeat_explosive_add > 0:
-				repeat_explosive_add = 0
+			if unicorn_cures_next:
+				if repeat_explosive_add > 0:
+					repeat_explosive_add = 0
+					if unicorn_cured_slots is Array:
+						unicorn_cured_slots.append(play_slot)
+					unicorn_cured_slot_lookup[play_slot] = true
 				unicorn_cures_next = false
-				if unicorn_cured_slots is Array:
-					unicorn_cured_slots.append(play_slot)
-				unicorn_cured_slot_lookup[play_slot] = true
 			if ice_cube_shields > 0:
 				if (
 					repeat_explosive_add > 0
