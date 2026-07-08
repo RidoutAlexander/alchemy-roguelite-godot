@@ -77,6 +77,7 @@ var _bat_wing_source_slot_index: int = -1
 var _last_hand_play_slot: int = -1
 var _last_hand_play_ingredient: IngredientData = null
 var _pending_cobbler_slot_bonuses: Dictionary = {}
+var _preseeded_cobbler_bonus_slots: Dictionary = {}
 var _unicorn_cures_next_explosive: bool = false
 var _ice_cube_shields_remaining: int = 0
 var _parrot_doubles_next: bool = false
@@ -869,6 +870,8 @@ func try_play_hand() -> bool:
 	_last_hand_play_slot = -1
 	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()
+	_preseeded_cobbler_bonus_slots.clear()
+	_seed_pending_cobbler_bonuses_from_hand()
 	_discard_pending_cobbler_bonuses_for_locked_slots()
 	_bat_wing_source_slot_index = -1
 	_play_next_hand_card()
@@ -1492,6 +1495,8 @@ func _apply_cobbler_retroactive_routing(
 		and hand_slot_index >= 0
 		and effect.cobbler_retroactive_slot < hand_slot_index
 	):
+		if _preseeded_cobbler_bonus_slots.has(effect.cobbler_retroactive_slot):
+			return
 		_apply_cobbler_pairing_bonus(effect, ingredient)
 		return
 	_store_pending_cobbler_bonus(
@@ -1982,9 +1987,56 @@ func _compute_honey_skipped_slots() -> Dictionary:
 	)
 
 
+func _seed_pending_cobbler_bonuses_from_hand() -> void:
+	var steps := _HandPlayPreview.compute_steps(
+		_hand_start_slots,
+		HAND_SLOT_COUNT,
+		context.cauldron_contents,
+		context.ingredients_added_to_cauldron,
+		context.owned_trinket_ids,
+		context.current_aura,
+		_honey_skipped_slots,
+		_gecko_stayed_slots
+	)
+	var sequence: Array = context.cauldron_contents.duplicate()
+	var last_hand_slot := -1
+	var last_hand_ingredient: IngredientData = null
+	for step in steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		var play_slot := int(step.get("slot_index", -1))
+		if play_slot < 0 or play_slot >= _hand_start_slots.size():
+			continue
+		var ingredient: IngredientData = step.get("ingredient")
+		if ingredient == null:
+			continue
+		var resolved := IngredientEffects.resolve_hand_play_cobbler(
+			ingredient,
+			sequence,
+			play_slot,
+			last_hand_slot,
+			_hand_start_slots,
+			last_hand_ingredient,
+			_hand_locked_slots
+		)
+		var retroactive_slot := int(resolved.get("retroactive_slot", -1))
+		if retroactive_slot >= 0 and retroactive_slot < play_slot:
+			var bonus: Dictionary = resolved.get("bonus", {})
+			_store_pending_cobbler_bonus(
+				retroactive_slot,
+				int(bonus.get("score", 0)),
+				int(bonus.get("explosiveness", 0))
+			)
+			_preseeded_cobbler_bonus_slots[retroactive_slot] = true
+		sequence.append(ingredient)
+		last_hand_slot = play_slot
+		last_hand_ingredient = ingredient
+
+
 func _discard_pending_cobbler_bonuses_for_locked_slots() -> void:
 	for slot_index in _hand_locked_slots.keys():
 		_pending_cobbler_slot_bonuses.erase(slot_index)
+		_preseeded_cobbler_bonus_slots.erase(slot_index)
 
 
 func _reset_hand_slots() -> void:
@@ -2058,6 +2110,7 @@ func _reset_draw_flow_state() -> void:
 	_last_hand_play_slot = -1
 	_last_hand_play_ingredient = null
 	_pending_cobbler_slot_bonuses.clear()
+	_preseeded_cobbler_bonus_slots.clear()
 	_unicorn_cures_next_explosive = false
 	_ice_cube_shields_remaining = 0
 	_parrot_doubles_next = false

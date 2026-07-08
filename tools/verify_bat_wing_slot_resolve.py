@@ -107,12 +107,46 @@ def simulate_hand_play(
     hand_slots: list[str | None],
     bat_wing_slot: int | None = None,
     bat_wing_pick_id: str | None = None,
+    *,
+    preseed_retroactive_cobbler: bool = False,
 ) -> dict[str, int]:
     cauldron: list[str] = []
     last_hand_slot = -1
     last_hand_ingredient_id: str | None = None
     pending: dict[int, dict[str, int]] = {}
+    preseeded: set[int] = set()
     totals = {"score": 0, "explosiveness": 0}
+
+    if preseed_retroactive_cobbler:
+        preview_cauldron: list[str] = []
+        last_preview_slot = -1
+        last_preview_ingredient: str | None = None
+        for play_slot in range(len(hand_slots)):
+            if hand_slots[play_slot] is None:
+                continue
+            ingredient_id = hand_slots[play_slot]
+            resolved_preview = resolve_hand_play_cobbler(
+                ingredient_id,
+                preview_cauldron,
+                play_slot,
+                last_preview_slot,
+                hand_slots,
+                last_preview_ingredient,
+            )
+            retroactive_slot = resolved_preview["retroactive_slot"]
+            if retroactive_slot >= 0 and retroactive_slot < play_slot:
+                bonus = resolved_preview["bonus"]
+                existing = pending.get(
+                    retroactive_slot,
+                    {"score": 0, "explosiveness": 0},
+                )
+                existing["score"] += bonus["score"]
+                existing["explosiveness"] += bonus["explosiveness"]
+                pending[retroactive_slot] = existing
+                preseeded.add(retroactive_slot)
+            preview_cauldron.append(ingredient_id)
+            last_preview_slot = play_slot
+            last_preview_ingredient = ingredient_id
 
     for play_slot in range(len(hand_slots)):
         if bat_wing_slot is not None and play_slot == bat_wing_slot:
@@ -140,8 +174,9 @@ def simulate_hand_play(
         retroactive_slot = resolved["retroactive_slot"]
         if retroactive_slot >= 0:
             if retroactive_slot < play_slot_for_pick:
-                totals["score"] += bonus["score"]
-                totals["explosiveness"] += bonus["explosiveness"]
+                if retroactive_slot not in preseeded:
+                    totals["score"] += bonus["score"]
+                    totals["explosiveness"] += bonus["explosiveness"]
                 bonus = {"score": 0, "explosiveness": 0}
             else:
                 existing = pending.get(retroactive_slot, {"score": 0, "explosiveness": 0})
@@ -163,6 +198,91 @@ def simulate_hand_play(
         last_hand_ingredient_id = ingredient_id
 
     return totals
+
+
+def simulate_hand_play_with_play_breakdown(
+    hand_slots: list[str | None],
+    *,
+    preseed_retroactive_cobbler: bool = False,
+) -> dict:
+    cauldron: list[str] = []
+    last_hand_slot = -1
+    last_hand_ingredient_id: str | None = None
+    pending: dict[int, dict[str, int]] = {}
+    preseeded: set[int] = set()
+    berry_play = {"score": 0, "explosiveness": 0}
+
+    if preseed_retroactive_cobbler:
+        preview_cauldron: list[str] = []
+        last_preview_slot = -1
+        last_preview_ingredient: str | None = None
+        for play_slot in range(len(hand_slots)):
+            if hand_slots[play_slot] is None:
+                continue
+            ingredient_id = hand_slots[play_slot]
+            resolved_preview = resolve_hand_play_cobbler(
+                ingredient_id,
+                preview_cauldron,
+                play_slot,
+                last_preview_slot,
+                hand_slots,
+                last_preview_ingredient,
+            )
+            retroactive_slot = resolved_preview["retroactive_slot"]
+            if retroactive_slot >= 0 and retroactive_slot < play_slot:
+                bonus = resolved_preview["bonus"]
+                existing = pending.get(
+                    retroactive_slot,
+                    {"score": 0, "explosiveness": 0},
+                )
+                existing["score"] += bonus["score"]
+                existing["explosiveness"] += bonus["explosiveness"]
+                pending[retroactive_slot] = existing
+                preseeded.add(retroactive_slot)
+            preview_cauldron.append(ingredient_id)
+            last_preview_slot = play_slot
+            last_preview_ingredient = ingredient_id
+
+    for play_slot in range(len(hand_slots)):
+        if hand_slots[play_slot] is None:
+            continue
+        ingredient_id = hand_slots[play_slot]
+        pending_bonus = pending.pop(play_slot, {"score": 0, "explosiveness": 0})
+        resolved = resolve_hand_play_cobbler(
+            ingredient_id,
+            cauldron,
+            play_slot,
+            last_hand_slot,
+            hand_slots,
+            last_hand_ingredient_id,
+        )
+        bonus = resolved["bonus"]
+        retroactive_slot = resolved["retroactive_slot"]
+        if retroactive_slot >= 0 and retroactive_slot < play_slot:
+            if retroactive_slot not in preseeded:
+                bonus = {"score": 0, "explosiveness": 0}
+            else:
+                bonus = {"score": 0, "explosiveness": 0}
+        elif retroactive_slot >= 0:
+            existing = pending.get(retroactive_slot, {"score": 0, "explosiveness": 0})
+            existing["score"] += bonus["score"]
+            existing["explosiveness"] += bonus["explosiveness"]
+            pending[retroactive_slot] = existing
+            bonus = {"score": 0, "explosiveness": 0}
+        elif not resolved.get("apply_to_current", False):
+            bonus = {"score": 0, "explosiveness": 0}
+
+        play_totals = {
+            "score": bonus["score"] + pending_bonus["score"],
+            "explosiveness": bonus["explosiveness"] + pending_bonus["explosiveness"],
+        }
+        if ingredient_id == BOOM_BERRY_ID:
+            berry_play = play_totals
+        cauldron.append(ingredient_id)
+        last_hand_slot = play_slot
+        last_hand_ingredient_id = ingredient_id
+
+    return {"berry_play": berry_play}
 
 
 def main() -> int:
@@ -188,6 +308,20 @@ def main() -> int:
         f"expected boom berry to receive cobbler bonus, got score={totals['score']}"
     )
     assert totals["explosiveness"] == COBBLER_EXPLOSIVE
+
+    # Pre-seeded retroactive cobbler bonuses apply when the boom berry plays.
+    preseeded_totals = simulate_hand_play(
+        hand,
+        preseed_retroactive_cobbler=True,
+    )
+    assert preseeded_totals == totals
+    berry_play_totals = simulate_hand_play_with_play_breakdown(
+        hand,
+        preseed_retroactive_cobbler=True,
+    )
+    assert berry_play_totals["berry_play"]["explosiveness"] == COBBLER_EXPLOSIVE, (
+        berry_play_totals
+    )
 
     resolved = resolve_hand_play_cobbler(
         COBBLER_ID,
