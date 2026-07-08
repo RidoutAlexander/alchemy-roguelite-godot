@@ -67,6 +67,8 @@ var _honey_skipped_slots: Dictionary = {}
 var _gecko_stayed_slots: Dictionary = {}
 var _hand_preview_gecko_slots: Dictionary = {}
 var _hand_preview_honey_slots: Dictionary = {}
+var _hand_preview_unicorn_slots: Array = []
+var _unicorn_cured_slots: Array = []
 var _hand_locked_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
@@ -342,19 +344,9 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		return []
 	var slots := _resolve_display_hand_slots(slots_override)
 	var layout_slots: Array = []
-	var severed_layout_slots: Array = []
 	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
 		layout_slots = _hand_start_slots
-		severed_layout_slots = _hand_start_slots
-	var unicorn_cured_slots := IngredientEffects.compute_unicorn_cured_hand_slots(
-		slots,
-		context.cauldron_contents,
-		context.current_aura,
-		HAND_SLOT_COUNT,
-		_growth_potion_doubles_remaining,
-		_build_hand_display_modifiers(),
-		severed_layout_slots
-	)
+	var unicorn_cured_slots := _resolve_unicorn_cured_slots_for_display()
 	var effect_entries := _HandSlotEffects.compute_entries(
 		slots,
 		HAND_SLOT_COUNT,
@@ -394,9 +386,30 @@ func _resolve_honey_skipped_slots_for_display() -> Dictionary:
 	return {}
 
 
+func _resolve_unicorn_cured_slots_for_display() -> Array:
+	if _hand_phase == HandPhase.PLAYING:
+		return _unicorn_cured_slots.duplicate()
+	if _hand_phase == HandPhase.HAND:
+		return _hand_preview_unicorn_slots.duplicate()
+	return []
+
+
+func _compute_unicorn_cured_slots_for_hand(slots: Array, severed_layout_slots: Array = []) -> Array:
+	return IngredientEffects.compute_unicorn_cured_hand_slots(
+		slots,
+		context.cauldron_contents,
+		context.current_aura,
+		HAND_SLOT_COUNT,
+		_growth_potion_doubles_remaining,
+		_build_hand_display_modifiers(),
+		severed_layout_slots
+	)
+
+
 func _refresh_hand_preview_locks() -> void:
 	_hand_preview_gecko_slots.clear()
 	_hand_preview_honey_slots.clear()
+	_hand_preview_unicorn_slots.clear()
 	if _hand_phase != HandPhase.HAND:
 		return
 	var play_locks := _HandSlotEffects.compute_hand_play_locks(
@@ -407,11 +420,15 @@ func _refresh_hand_preview_locks() -> void:
 	)
 	_hand_preview_honey_slots = play_locks.get("honey_skipped", {})
 	_hand_preview_gecko_slots = play_locks.get("gecko_stayed", {})
+	_hand_preview_unicorn_slots = _compute_unicorn_cured_slots_for_hand(_hand_slots)
 
 
 func _sanitize_hand_overlay_effect_entries(per_slot: Array) -> void:
 	var allowed_gecko_slots := _resolve_gecko_stayed_slots_for_display()
 	var allowed_honey_slots := _resolve_honey_skipped_slots_for_display()
+	var allowed_unicorn_slots := {}
+	for slot_index in _resolve_unicorn_cured_slots_for_display():
+		allowed_unicorn_slots[int(slot_index)] = true
 	for slot_index in range(per_slot.size()):
 		var entries: Array = per_slot[slot_index]
 		if entries.is_empty():
@@ -429,6 +446,11 @@ func _sanitize_hand_overlay_effect_entries(per_slot: Array) -> void:
 			if (
 				str(entry.get("ingredient_id", "")) == IngredientEffects.HONEY_ID
 				and not allowed_honey_slots.has(slot_index)
+			):
+				continue
+			if (
+				str(entry.get("ingredient_id", "")) == IngredientEffects.UNICORN_HORN_ID
+				and not allowed_unicorn_slots.has(slot_index)
 			):
 				continue
 			filtered.append(entry)
@@ -942,6 +964,7 @@ func try_play_hand() -> bool:
 	)
 	_honey_skipped_slots = play_locks.get("honey_skipped", {})
 	_gecko_stayed_slots = play_locks.get("gecko_stayed", {})
+	_unicorn_cured_slots = _compute_unicorn_cured_slots_for_hand(_hand_start_slots, _hand_start_slots)
 	_hand_locked_slots = play_locks.get("locked", {})
 	_play_slot_cursor = 0
 	_last_hand_play_slot = -1
@@ -1223,6 +1246,8 @@ func _finish_hand_play() -> void:
 	_gecko_stayed_slots.clear()
 	_hand_preview_gecko_slots.clear()
 	_hand_preview_honey_slots.clear()
+	_hand_preview_unicorn_slots.clear()
+	_unicorn_cured_slots.clear()
 	_hand_locked_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
@@ -2183,6 +2208,8 @@ func _reset_draw_flow_state() -> void:
 	_gecko_stayed_slots.clear()
 	_hand_preview_gecko_slots.clear()
 	_hand_preview_honey_slots.clear()
+	_hand_preview_unicorn_slots.clear()
+	_unicorn_cured_slots.clear()
 	_hand_locked_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0

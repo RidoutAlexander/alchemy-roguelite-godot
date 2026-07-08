@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_slot_effect_icons.tscn" id="15_effect_icons"]
 [ext_resource type="Texture2D" uid="uid://d4nivh36yfbia" path="res://assets/cards/trinkets/gecko_hand_overlay.png" id="16_gecko_hand"]
 [ext_resource type="Texture2D" uid="uid://02fmieotp53e" path="res://assets/cards/ingredients/honey_splatter_overlay.png" id="17_honey_splatter"]
+[ext_resource type="Script" path="res://scripts/ui/hand_unicorn_sparkles.gd" id="18_unicorn_sparkles"]
 
 [node name="IngredientCard" type="Button" unique_id=1373869819]
 custom_minimum_size = Vector2(300, 420)
@@ -334,6 +335,11 @@ mouse_filter = 2
 texture = ExtResource("17_honey_splatter")
 expand_mode = 1
 stretch_mode = 5
+
+[node name="UnicornSparkleFX" type="Node2D" parent="."]
+visible = false
+z_index = 2
+script = ExtResource("18_unicorn_sparkles")
 
 [node name="HandSlotEffectIcons" parent="." instance=ExtResource("15_effect_icons")]
 visible = false

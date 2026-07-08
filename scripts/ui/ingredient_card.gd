@@ -66,6 +66,7 @@ const _MODIFIED_STAT_OUTLINE_SIZE := 4
 @onready var _hand_effect_icons: HandSlotEffectIcons = $HandSlotEffectIcons
 @onready var _gecko_hand_overlay: TextureRect = $GeckoHandOverlay
 @onready var _honey_splatter_overlay: TextureRect = $HoneySplatterOverlay
+@onready var _unicorn_sparkle_fx: HandUnicornSparkles = $UnicornSparkleFX
 
 var _name_plate_bg: TextureRect
 var _description_plate_bg: TextureRect
@@ -287,6 +288,7 @@ func _apply_hand_layout() -> void:
 	_apply_hand_effect_layout()
 	_apply_gecko_hand_layout()
 	_apply_honey_splatter_layout()
+	_apply_unicorn_sparkle_layout()
 
 
 func _snap_hand_highlight(active: bool) -> void:
@@ -307,6 +309,7 @@ func _bind_hand_effect_entries(entries: Array) -> void:
 	var icon_entries: Array = []
 	var has_gecko := false
 	var has_honey := false
+	var has_unicorn_sparkle := false
 	for entry in entries:
 		if not entry is Dictionary:
 			continue
@@ -316,9 +319,13 @@ func _bind_hand_effect_entries(entries: Array) -> void:
 		if str(entry.get("ingredient_id", "")) == _IngredientEffects.HONEY_ID:
 			has_honey = true
 			continue
+		if str(entry.get("ingredient_id", "")) == _IngredientEffects.UNICORN_HORN_ID:
+			has_unicorn_sparkle = true
+			continue
 		icon_entries.append(entry)
 	_set_gecko_hand_overlay_visible(has_gecko)
 	_set_honey_splatter_overlay_visible(has_honey)
+	_set_unicorn_sparkle_visible(has_unicorn_sparkle)
 	if _hand_effect_icons == null:
 		return
 	if icon_entries.is_empty():
@@ -331,6 +338,7 @@ func _bind_hand_effect_entries(entries: Array) -> void:
 func _clear_hand_effect_entries() -> void:
 	_set_gecko_hand_overlay_visible(false)
 	_set_honey_splatter_overlay_visible(false)
+	_set_unicorn_sparkle_visible(false)
 	if _hand_effect_icons != null:
 		_hand_effect_icons.clear_icons()
 
@@ -426,6 +434,21 @@ func _apply_honey_splatter_layout() -> void:
 	)
 	_honey_splatter_overlay.pivot_offset = Vector2(overlay_width * 0.5, overlay_height * 0.5)
 	_honey_splatter_overlay.rotation_degrees = 0.0
+
+
+func _set_unicorn_sparkle_visible(visible_fx: bool) -> void:
+	if _unicorn_sparkle_fx == null:
+		return
+	_unicorn_sparkle_fx.visible = visible_fx and _hand_mode
+	_apply_unicorn_sparkle_layout()
+	_unicorn_sparkle_fx.set_active(visible_fx and _hand_mode)
+
+
+func _apply_unicorn_sparkle_layout() -> void:
+	if _unicorn_sparkle_fx == null:
+		return
+	_unicorn_sparkle_fx.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
+	_unicorn_sparkle_fx.configure_for_card(HAND_CARD_BASE_SIZE, HAND_CARD_SCALE)
 
 
 func _sync_hand_visual_z_order(elevated: bool) -> void:
