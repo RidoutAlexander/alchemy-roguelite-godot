@@ -185,12 +185,6 @@ static func apply(
 			result.vanish_next_ingredient = true
 		POISON_APPLE_ID:
 			result.poison_apple_delay_scheduled = true
-		PUMPKIN_ID:
-			if TrinketEffects.has_pumpkin_trinket(context.owned_trinket_ids):
-				result.bonus_score += TrinketEffects.pumpkin_trinket_bonus_score(
-					context.cauldron_contents,
-					true
-				)
 		GROWTH_POTION_ID:
 			result.growth_potion_doubles = GROWTH_POTION_DOUBLE_COUNT
 		SAGE_ID:
@@ -199,6 +193,13 @@ static func apply(
 			result.extra_mulligans = 1
 		_:
 			pass
+
+	result.bonus_score += _pumpkin_trinket_bonus_if_equipped(
+		ingredient,
+		context.cauldron_contents,
+		context.owned_trinket_ids,
+		true
+	)
 
 	var limit_bonus := explosion_limit_bonus_for_played_ingredient(
 		ingredient,
@@ -219,6 +220,15 @@ static func is_feather_ingredient_id(ingredient_id: String) -> bool:
 
 static func is_feather_ingredient(ingredient: IngredientData) -> bool:
 	return ingredient != null and is_feather_ingredient_id(ingredient.id)
+
+
+static func is_pumpkin_like_id(ingredient_id: String) -> bool:
+	var normalized := str(ingredient_id).to_lower()
+	return normalized == PUMPKIN_ID or normalized == JACK_O_LANTERN_ID
+
+
+static func is_pumpkin_ingredient(ingredient: IngredientData) -> bool:
+	return ingredient != null and is_pumpkin_like_id(ingredient.id)
 
 
 static func card_display_description(ingredient: IngredientData) -> String:
@@ -688,7 +698,7 @@ static func count_trailing_pumpkin_streak(
 		last_index -= 1
 	for i in range(last_index, -1, -1):
 		var entry = cauldron_contents[i]
-		if entry != null and entry.id == PUMPKIN_ID:
+		if entry != null and is_pumpkin_like_id(entry.id):
 			streak += 1
 		else:
 			break
@@ -733,14 +743,15 @@ static func _preview_card_effect_bonuses(
 			bonus_score = maxi(0, explosiveness)
 		FISH_BONES_ID:
 			score_penalty = 1
-		PUMPKIN_ID:
-			if TrinketEffects.has_pumpkin_trinket(owned_trinket_ids):
-				bonus_score += TrinketEffects.pumpkin_trinket_bonus_score(
-					cauldron_contents,
-					false
-				)
 		_:
 			pass
+
+	bonus_score += _pumpkin_trinket_bonus_if_equipped(
+		ingredient,
+		cauldron_contents,
+		owned_trinket_ids,
+		false
+	)
 
 	return {
 		"bonus_score": bonus_score,
@@ -828,6 +839,22 @@ static func _count_pumpkin_like(contents: Array) -> int:
 	for entry in contents:
 		if entry == null:
 			continue
-		if entry.id == PUMPKIN_ID or entry.id == JACK_O_LANTERN_ID:
+		if is_pumpkin_like_id(entry.id):
 			count += 1
 	return count
+
+
+static func _pumpkin_trinket_bonus_if_equipped(
+	ingredient: IngredientData,
+	cauldron_contents: Array,
+	owned_trinket_ids: Array,
+	exclude_last_entry: bool
+) -> int:
+	if not is_pumpkin_ingredient(ingredient):
+		return 0
+	if not TrinketEffects.has_pumpkin_trinket(owned_trinket_ids):
+		return 0
+	return TrinketEffects.pumpkin_trinket_bonus_score(
+		cauldron_contents,
+		exclude_last_entry
+	)
