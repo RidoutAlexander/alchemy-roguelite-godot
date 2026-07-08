@@ -1184,8 +1184,10 @@ func _play_phoenix_save_presentation(
 			var pending_finish := _pending_finish_after_phoenix
 			_pending_finish_after_phoenix = Callable()
 			pending_finish.call()
-		if on_presented.is_valid():
+		elif on_presented.is_valid():
 			on_presented.call()
+		else:
+			GameManager.notify_card_presentation_finished()
 
 	_PhoenixSaveEffect.play(
 		_explosion_layer,
@@ -1218,8 +1220,20 @@ func _pulse_cauldron_for_phoenix_save() -> void:
 		)
 
 
-func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
+func _should_defer_finish_for_phoenix() -> bool:
 	if _phoenix_save_presentation_active:
+		return true
+	if GameManager.run == null:
+		return false
+	var session := GameManager.run.brew_session
+	return (
+		session.has_pending_phoenix_save_presentation()
+		or session.is_phoenix_save_visual_active()
+	)
+
+
+func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
+	if _should_defer_finish_for_phoenix():
 		_pending_finish_after_phoenix = func() -> void:
 			_finish_card_presentation(ingredient, track_for_exit)
 		return

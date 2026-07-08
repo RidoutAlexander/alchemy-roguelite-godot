@@ -559,6 +559,10 @@ func consume_phoenix_save_presentation() -> Dictionary:
 	}
 
 
+func has_pending_phoenix_save_presentation() -> bool:
+	return _pending_phoenix_save_presentation
+
+
 func set_presented_explosiveness(value: int) -> void:
 	presented_explosiveness = maxi(0, value)
 
