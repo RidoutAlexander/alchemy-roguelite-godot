@@ -13,8 +13,10 @@ const PRISTINE_FEATHER_ID := "pristine_feather"
 const BEATING_HEART_ID := "beating_heart"
 const BEATING_HEART_BOOM_BERRY_ID := "boom_berry_3"
 const GECKO_ASSISTANT_ID := "gecko_assistant"
+const HEADLESS_CHICKEN_ID := "headless_chicken"
 
 const POCKET_WATCH_INTERVAL := 21
+const HEADLESS_CHICKEN_BLOCKED_HANDS := 2
 const GECKO_ASSISTANT_INTERVAL := 11
 const VOODOO_DOLL_TRINKET_SHOP_COST := 6
 
@@ -71,6 +73,29 @@ static func has_beating_heart(trinket_ids: Array) -> bool:
 
 static func has_gecko_assistant(trinket_ids: Array) -> bool:
 	return has_trinket(trinket_ids, GECKO_ASSISTANT_ID)
+
+
+static func has_headless_chicken(trinket_ids: Array) -> bool:
+	return has_trinket(trinket_ids, HEADLESS_CHICKEN_ID)
+
+
+static func headless_chicken_blocks_chicken_draws(
+	hands_drawn_this_brew: int,
+	trinket_ids: Array
+) -> bool:
+	return (
+		has_headless_chicken(trinket_ids)
+		and hands_drawn_this_brew < HEADLESS_CHICKEN_BLOCKED_HANDS
+	)
+
+
+static func headless_chicken_turns_remaining(
+	hands_drawn_this_brew: int,
+	trinket_ids: Array
+) -> int:
+	if not has_headless_chicken(trinket_ids):
+		return 0
+	return maxi(0, HEADLESS_CHICKEN_BLOCKED_HANDS - hands_drawn_this_brew)
 
 
 static func apply_acquire_effects(trinket_id: String, run: RunManager) -> void:

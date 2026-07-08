@@ -171,6 +171,8 @@ func _countdown_text_for(trinket: TrinketData) -> String:
 		countdown = session.get_pocket_watch_countdown()
 	elif trinket.id == TrinketEffects.GECKO_ASSISTANT_ID:
 		countdown = session.get_gecko_assistant_countdown()
+	elif trinket.id == TrinketEffects.HEADLESS_CHICKEN_ID:
+		countdown = session.get_headless_chicken_turns_remaining()
 	else:
 		return ""
 	if countdown <= 0:

@@ -8,7 +8,7 @@ static func compute_entries(
 	hand_slots: Array,
 	hand_slot_count: int,
 	layout_slots: Array = [],
-	cauldron_count_before_hand: int = 0,
+	play_steps: Array = [],
 	owned_trinket_ids: Array = []
 ) -> Array:
 	var reference := layout_slots if not layout_slots.is_empty() else hand_slots
@@ -16,20 +16,8 @@ static func compute_entries(
 	for _i in hand_slot_count:
 		per_slot.append([])
 	_append_honey_entries(per_slot, reference, hand_slot_count)
-	_append_pocket_watch_entries(
-		per_slot,
-		hand_slots,
-		hand_slot_count,
-		cauldron_count_before_hand,
-		owned_trinket_ids
-	)
-	_append_gecko_assistant_entries(
-		per_slot,
-		hand_slots,
-		hand_slot_count,
-		cauldron_count_before_hand,
-		owned_trinket_ids
-	)
+	_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
+	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
 	_append_pristine_feather_entries(per_slot, hand_slots, owned_trinket_ids)
 	return per_slot
 
@@ -108,50 +96,28 @@ static func _append_honey_entries(
 		)
 
 
-static func _append_pocket_watch_entries(
+static func _append_pocket_watch_entries_from_steps(
 	per_slot: Array,
-	hand_slots: Array,
-	hand_slot_count: int,
-	cauldron_count_before_hand: int,
-	owned_trinket_ids: Array
+	play_steps: Array
 ) -> void:
-	if not TrinketEffects.has_pocket_watch(owned_trinket_ids):
-		return
-
-	var play_order: Array[int] = []
-	for slot_index in range(hand_slots.size()):
-		if hand_slots[slot_index] != null:
-			play_order.append(slot_index)
-
-	var cauldron_count := cauldron_count_before_hand
-	for play_slot in play_order:
-		if TrinketEffects.pocket_watch_doubles_ingredient(cauldron_count, owned_trinket_ids):
-			if play_slot >= 0 and play_slot < per_slot.size():
-				per_slot[play_slot].append(
-					{
-						"trinket_id": TrinketEffects.POCKET_WATCH_ID,
-						"overlay_text": "",
-					}
-				)
-		cauldron_count += 1
+	for slot_index in HandPlayPreview.pocket_watch_slots(play_steps):
+		if slot_index >= 0 and slot_index < per_slot.size():
+			per_slot[slot_index].append(
+				{
+					"trinket_id": TrinketEffects.POCKET_WATCH_ID,
+					"overlay_text": "",
+				}
+			)
 
 
-static func _append_gecko_assistant_entries(
+static func _append_gecko_assistant_entries_from_steps(
 	per_slot: Array,
-	hand_slots: Array,
-	hand_slot_count: int,
-	cauldron_count_before_hand: int,
-	owned_trinket_ids: Array
+	play_steps: Array
 ) -> void:
-	var honey_skipped := compute_honey_skipped_slots(hand_slots, hand_slot_count)
-	var gecko_stayed := compute_gecko_stay_slots(
-		hand_slots,
-		hand_slot_count,
-		honey_skipped,
-		cauldron_count_before_hand,
-		owned_trinket_ids
-	)
-	for slot_index in gecko_stayed.keys():
+	for step in play_steps:
+		if not bool(step.get("gecko_stays", false)):
+			continue
+		var slot_index := int(step.get("slot_index", -1))
 		if slot_index >= 0 and slot_index < per_slot.size():
 			per_slot[slot_index].append(
 				{

@@ -110,11 +110,29 @@ func get_master_chip_save_data() -> Array:
 
 
 func try_draw() -> IngredientData:
+	return try_draw_excluding_ids([])
+
+
+func try_draw_excluding_ids(excluded_ids: Array[String]) -> IngredientData:
+	var excluded: Dictionary = _excluded_id_lookup(excluded_ids)
+	if not _forced_draw_queue.is_empty():
+		for index in _forced_draw_queue.size():
+			var queued: IngredientData = _forced_draw_queue[index]
+			if queued != null and not excluded.has(queued.id):
+				return _forced_draw_queue.pop_at(index)
+		if excluded.is_empty():
+			return _forced_draw_queue.pop_front()
+
+	for index in _working_chips.size():
+		var chip: IngredientData = _working_chips[index]
+		if chip != null and not excluded.has(chip.id):
+			return _working_chips.pop_at(index)
+
+	if not _working_chips.is_empty():
+		return _working_chips.pop_front()
 	if not _forced_draw_queue.is_empty():
 		return _forced_draw_queue.pop_front()
-	if _working_chips.is_empty():
-		return null
-	return _working_chips.pop_front()
+	return null
 
 
 func peek_next(count: int) -> Array[IngredientData]:
@@ -183,16 +201,18 @@ func count_drawable_excluding_instances(excluded_instances: Array) -> int:
 
 func take_random_excluding_instances(
 	excluded_instances: Array,
-	count: int
+	count: int,
+	excluded_ids: Array[String] = []
 ) -> Array[IngredientData]:
 	var excluded: Dictionary = {}
 	for item in excluded_instances:
 		if item is IngredientData:
 			excluded[item] = true
+	var excluded_id_lookup := _excluded_id_lookup(excluded_ids)
 
 	var pool: Array[IngredientData] = []
 	for chip in _working_chips:
-		if chip != null and not excluded.has(chip):
+		if chip != null and not excluded.has(chip) and not excluded_id_lookup.has(chip.id):
 			pool.append(chip)
 
 	if pool.is_empty():
@@ -210,9 +230,14 @@ func take_random_excluding_instances(
 
 
 func take_random_excluding_id(excluded_id: String, count: int = 1) -> Array[IngredientData]:
+	return take_random_excluding_ids([excluded_id], count)
+
+
+func take_random_excluding_ids(excluded_ids: Array[String], count: int = 1) -> Array[IngredientData]:
+	var excluded: Dictionary = _excluded_id_lookup(excluded_ids)
 	var pool: Array[IngredientData] = []
 	for chip in _working_chips:
-		if chip != null and chip.id != excluded_id:
+		if chip != null and not excluded.has(chip.id):
 			pool.append(chip)
 
 	if pool.is_empty():
@@ -315,6 +340,15 @@ func _chip_for_bag(ingredient: IngredientData) -> IngredientData:
 	if ingredient.is_bag_chip:
 		return ingredient
 	return ingredient.duplicate_for_bag()
+
+
+func _excluded_id_lookup(excluded_ids: Array[String]) -> Dictionary:
+	var excluded: Dictionary = {}
+	for ingredient_id in excluded_ids:
+		var normalized := str(ingredient_id).strip_edges()
+		if normalized != "":
+			excluded[normalized] = true
+	return excluded
 
 
 func _inventory_stack_key(chip: IngredientData) -> String:

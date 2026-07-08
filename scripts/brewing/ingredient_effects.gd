@@ -2,6 +2,7 @@ class_name IngredientEffects
 extends RefCounted
 
 const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
+const _HandPlayPreview := preload("res://scripts/brewing/hand_play_preview.gd")
 
 const LIGHTNING_ID := "lightning_in_a_bottle"
 const EYEBALL_ID := "eyeball"
@@ -463,13 +464,17 @@ static func compute_hand_display_stats(
 	var severed_reference := (
 		severed_layout_slots if not severed_layout_slots.is_empty() else hand_slots
 	)
-	var play_order: Array[int] = []
-	for slot_index in range(hand_slots.size()):
-		if hand_slots[slot_index] != null:
-			play_order.append(slot_index)
+	var owned_trinket_ids: Array = modifiers.get("owned_trinket_ids", [])
+	var play_steps := _HandPlayPreview.compute_steps(
+		hand_slots,
+		hand_slot_count,
+		cauldron_contents,
+		int(modifiers.get("ingredients_added_to_cauldron", 0)),
+		owned_trinket_ids,
+		aura
+	)
 
 	var sim_cauldron: Array = cauldron_contents.duplicate()
-	var cauldron_count := sim_cauldron.size()
 	var doubles_remaining := growth_potion_doubles_remaining
 	var parrot_doubles_next := bool(modifiers.get("parrot_doubles_next", false))
 	var unicorn_cures_next := bool(modifiers.get("unicorn_cures_next", false))
@@ -482,8 +487,16 @@ static func compute_hand_display_stats(
 	for _slot_index in hand_slot_count:
 		pre_double_stats.append(null)
 
-	for play_slot in play_order:
-		var ingredient: IngredientData = hand_slots[play_slot]
+	for step in play_steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		var play_slot := int(step.get("slot_index", -1))
+		if play_slot < 0 or play_slot >= hand_slots.size():
+			continue
+		var ingredient: IngredientData = step.get("ingredient")
+		if ingredient == null:
+			continue
+		var cauldron_count := int(step.get("cauldron_count_before", sim_cauldron.size()))
 		var point_value := ingredient.point_value
 		var explosive_value := ingredient.explosive_value
 
@@ -514,7 +527,6 @@ static func compute_hand_display_stats(
 					display_stats
 				)
 
-		var owned_trinket_ids: Array = modifiers.get("owned_trinket_ids", [])
 		var effect_bonuses := _preview_card_effect_bonuses(
 			ingredient,
 			sim_cauldron,
@@ -538,10 +550,10 @@ static func compute_hand_display_stats(
 			point_value *= 2
 			explosive_value *= 2
 			parrot_doubles_next = false
-		if _AuraEffects.in_rhythm_doubles_ingredient(cauldron_count, aura):
+		if bool(step.get("in_rhythm_doubles", false)):
 			point_value *= 2
 			explosive_value *= 2
-		if TrinketEffects.pocket_watch_doubles_ingredient(cauldron_count, owned_trinket_ids):
+		if bool(step.get("pocket_watch_doubles", false)):
 			point_value *= 2
 			explosive_value *= 2
 
@@ -577,9 +589,11 @@ static func compute_hand_display_stats(
 
 		sim_explosiveness += explosive_add
 		sim_cauldron.append(ingredient)
+		if bool(step.get("bubbling_returns", false)):
+			sim_cauldron.pop_back()
 		last_hand_slot = play_slot
 		last_hand_ingredient = ingredient
-		cauldron_count += 1
+		cauldron_count = sim_cauldron.size()
 		if TrinketEffects.feather_plays_twice(ingredient, owned_trinket_ids):
 			var repeat_point := ingredient.point_value
 			var repeat_explosive := ingredient.explosive_value
@@ -587,10 +601,14 @@ static func compute_hand_display_stats(
 				repeat_point *= 2
 				repeat_explosive *= 2
 				doubles_remaining -= 1
-			if _AuraEffects.in_rhythm_doubles_ingredient(cauldron_count, aura):
+			var repeat_cauldron_count := sim_cauldron.size()
+			if _AuraEffects.in_rhythm_doubles_ingredient(repeat_cauldron_count, aura):
 				repeat_point *= 2
 				repeat_explosive *= 2
-			if TrinketEffects.pocket_watch_doubles_ingredient(cauldron_count, owned_trinket_ids):
+			if TrinketEffects.pocket_watch_doubles_ingredient(
+				repeat_cauldron_count,
+				owned_trinket_ids
+			):
 				repeat_point *= 2
 				repeat_explosive *= 2
 			var repeat_explosive_add := repeat_explosive
@@ -608,7 +626,7 @@ static func compute_hand_display_stats(
 			display_stats[play_slot]["explosive_value"] += repeat_explosive_add
 			sim_explosiveness += repeat_explosive_add
 			sim_cauldron.append(ingredient)
-			cauldron_count += 1
+			cauldron_count = sim_cauldron.size()
 		if ingredient.id == PARROT_ID:
 			parrot_doubles_next = true
 		if ingredient.id == UNICORN_HORN_ID:

@@ -2,7 +2,7 @@
   {
     "id": "pumpkin_trinket",
     "display_name": "Pumpkin Necklace",
-    "description": "Pumpkins gain +1 score for each pumpkin played before it in a row (maximum of +3)"
+    "description": "Pumpkins gain +1 score for each pumpkin played before it in a row"
   },
   {
     "id": "red_mushroom_trinket",
@@ -52,6 +52,11 @@
   {
     "id": "gecko_assistant",
     "display_name": "Gecko Assistant",
-    "description": "Every 11th ingredient stays in your hand"
+    "description": "Every 9th ingredient stays in your hand"
+  },
+  {
+    "id": "headless_chicken",
+    "display_name": "Headless Chicken",
+    "description": "You cannot draw chickens for the first 2 turns"
   }
 ]

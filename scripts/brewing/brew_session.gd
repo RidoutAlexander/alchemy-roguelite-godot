@@ -3,6 +3,7 @@ extends RefCounted
 
 const _AuraEffects := preload("res://scripts/brewing/aura_effects.gd")
 const _HandSlotEffects := preload("res://scripts/brewing/hand_slot_effects.gd")
+const _HandPlayPreview := preload("res://scripts/brewing/hand_play_preview.gd")
 
 const HAND_SLOT_COUNT := 5
 const HAND_DRAW_COUNT := 5
@@ -57,6 +58,7 @@ var _brew_extra_mulligans: int = 0
 var _purchased_mulligans_this_brew: int = 0
 var _mulligan_allowance: int = 1
 var _mulligans_used: int = 0
+var _hands_drawn_this_brew: int = 0
 var _play_slot_cursor: int = 0
 var _pending_hand_draw: Array = []
 var _pending_hand_draw_target_slots: Array = []
@@ -285,23 +287,13 @@ func grant_purchased_mulligan() -> void:
 func get_in_rhythm_double_hand_slots(slots_override: Array = []) -> Array[int]:
 	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
 		return []
-	return _AuraEffects.in_rhythm_double_hand_slots(
-		_resolve_display_hand_slots(slots_override),
-		context.cauldron_contents.size(),
-		context.current_aura,
-		HAND_SLOT_COUNT
-	)
+	return _HandPlayPreview.in_rhythm_double_slots(_compute_hand_preview_steps(slots_override))
 
 
 func get_bubbling_brew_hand_slots(slots_override: Array = []) -> Array[int]:
 	if _hand_phase not in [HandPhase.HAND, HandPhase.PLAYING, HandPhase.DRAWING]:
 		return []
-	return _AuraEffects.bubbling_brew_hand_slots(
-		_resolve_display_hand_slots(slots_override),
-		context.ingredients_added_to_cauldron,
-		context.current_aura,
-		HAND_SLOT_COUNT
-	)
+	return _HandPlayPreview.bubbling_brew_slots(_compute_hand_preview_steps(slots_override))
 
 
 func get_aura_preview_shake_hand_slots(slots_override: Array = []) -> Array[int]:
@@ -335,7 +327,7 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		slots,
 		HAND_SLOT_COUNT,
 		layout_slots,
-		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
+		_compute_hand_preview_steps(slots_override),
 		context.owned_trinket_ids
 	)
 
@@ -369,8 +361,21 @@ func _build_hand_display_modifiers() -> Dictionary:
 		"ice_cube_shields": _ice_cube_shields_remaining,
 		"explosiveness": context.explosiveness,
 		"explosion_limit": context.explosion_limit,
+		"ingredients_added_to_cauldron": context.ingredients_added_to_cauldron,
 		"owned_trinket_ids": context.owned_trinket_ids.duplicate(),
 	}
+
+
+func _compute_hand_preview_steps(slots_override: Array = []) -> Array:
+	var slots := _resolve_display_hand_slots(slots_override)
+	return _HandPlayPreview.compute_steps(
+		slots,
+		HAND_SLOT_COUNT,
+		context.cauldron_contents,
+		context.ingredients_added_to_cauldron,
+		context.owned_trinket_ids,
+		context.current_aura
+	)
 
 
 func get_bag_display_count() -> int:
@@ -487,7 +492,8 @@ func try_reroll_bat_wing_choices() -> bool:
 	context.bag.return_to_bag(held_out)
 	var rerolled := context.bag.take_random_excluding_instances(
 		held_out,
-		IngredientEffects.BAT_WING_PICK_COUNT
+		IngredientEffects.BAT_WING_PICK_COUNT,
+		_blocked_bag_draw_ingredient_ids()
 	)
 	if rerolled.size() < IngredientEffects.BAT_WING_PICK_COUNT:
 		context.bag.return_to_bag(rerolled)
@@ -526,6 +532,13 @@ func get_pocket_watch_countdown() -> int:
 func get_gecko_assistant_countdown() -> int:
 	return TrinketEffects.gecko_assistant_countdown(
 		IngredientEffects.count_hand_stay_interval_plays(context.cauldron_contents),
+		context.owned_trinket_ids
+	)
+
+
+func get_headless_chicken_turns_remaining() -> int:
+	return TrinketEffects.headless_chicken_turns_remaining(
+		_hands_drawn_this_brew,
 		context.owned_trinket_ids
 	)
 
@@ -712,9 +725,10 @@ func try_draw_to_hand() -> bool:
 	if draw_count <= 0:
 		return false
 
+	var blocked_ids := _blocked_bag_draw_ingredient_ids()
 	var drawn: Array[IngredientData] = []
 	for _i in draw_count:
-		var ingredient := context.bag.try_draw()
+		var ingredient := context.bag.try_draw_excluding_ids(blocked_ids)
 		if ingredient == null:
 			break
 		drawn.append(ingredient)
@@ -744,6 +758,7 @@ func try_draw_custom_hand_to_hand(ingredients: Array) -> bool:
 
 
 func _begin_hand_draw(drawn: Array[IngredientData], bag_display_reserve: int) -> bool:
+	_hands_drawn_this_brew += 1
 	var explosiveness_before := context.explosiveness
 	_tick_poison_apple_on_new_hand()
 	if context.explosiveness != explosiveness_before:
@@ -847,7 +862,7 @@ func try_time_turner_redraw() -> bool:
 	for slot_index in range(HAND_SLOT_COUNT):
 		_hand_slots[slot_index] = null
 
-	var drawn := context.bag.take_random_excluding_instances(old_hand, draw_count)
+	var drawn := _take_random_hand_redraw(old_hand, draw_count)
 	if drawn.size() < draw_count:
 		context.bag.remove_instances(drawn)
 		context.bag.remove_instances(old_hand)
@@ -894,7 +909,10 @@ func try_mulligan(slot_index: int) -> bool:
 	if old_ingredient == null:
 		return false
 
-	var replacements := context.bag.take_random_excluding_id(old_ingredient.id, 1)
+	var replacements := context.bag.take_random_excluding_ids(
+		_blocked_bag_draw_ingredient_ids() + [old_ingredient.id],
+		1
+	)
 	if replacements.is_empty():
 		return false
 	var new_ingredient: IngredientData = replacements[0]
@@ -1357,7 +1375,10 @@ func _apply_ingredient_play(
 	if effect.growth_potion_doubles > 0:
 		_growth_potion_doubles_remaining += effect.growth_potion_doubles
 	if effect.bat_wing_pick_count > 0:
-		_bat_wing_choices = context.bag.take_random(effect.bat_wing_pick_count)
+		_bat_wing_choices = context.bag.take_random_excluding_ids(
+			_blocked_bag_draw_ingredient_ids(),
+			effect.bat_wing_pick_count
+		)
 		_bat_wing_reroll_used = false
 		if from_hand_play and hand_slot_index >= 0:
 			_bat_wing_source_slot_index = hand_slot_index
@@ -1835,6 +1856,26 @@ func _count_empty_hand_slots() -> int:
 	return count
 
 
+func _blocked_bag_draw_ingredient_ids() -> Array[String]:
+	if not TrinketEffects.headless_chicken_blocks_chicken_draws(
+		_hands_drawn_this_brew,
+		context.owned_trinket_ids
+	):
+		return []
+	return [IngredientEffects.CHICKEN_ID]
+
+
+func _take_random_hand_redraw(
+	excluded_instances: Array,
+	count: int
+) -> Array[IngredientData]:
+	return context.bag.take_random_excluding_instances(
+		excluded_instances,
+		count,
+		_blocked_bag_draw_ingredient_ids()
+	)
+
+
 func _compute_hand_draw_target_slots(draw_count: int) -> Array:
 	var targets: Array = []
 	for slot_index in range(HAND_SLOT_COUNT - 1, -1, -1):
@@ -1905,6 +1946,7 @@ func _reset_draw_flow_state() -> void:
 	_juggling_club_hands_remaining = 0
 	_lucky_coin_swap_hands_remaining = 0
 	_next_hand_draw_count = HAND_DRAW_COUNT
+	_hands_drawn_this_brew = 0
 	_lucky_coin_in_current_hand = false
 	_play_slot_cursor = 0
 	_pending_hand_draw.clear()

@@ -562,6 +562,16 @@ func _sync_hand_ui() -> void:
 		var show_hand := false
 		if hand_phase == BrewSession.HandPhase.BAG:
 			show_hand = _hand_has_any_card(session.get_hand_slots())
+		elif hand_phase == BrewSession.HandPhase.DRAWING:
+			# Keep the row visible while fly-in animations reveal cards one by one.
+			show_hand = true
+		elif (
+			GameManager.is_presentation_in_progress()
+			and hand_phase == BrewSession.HandPhase.HAND
+			and not _hand_has_any_card(session.get_hand_slots())
+		):
+			# Time Turner redraw clears session slots before incremental fly-ins.
+			show_hand = true
 		else:
 			show_hand = (
 				_hand_has_any_card(session.get_hand_slots())
@@ -569,17 +579,18 @@ func _sync_hand_ui() -> void:
 			)
 		_player_hand.visible = show_hand
 		if hand_phase == BrewSession.HandPhase.DRAWING:
-			var drawing_slots := _player_hand.get_current_hand_slots()
-			var drawing_stats := session.get_hand_display_stats(drawing_slots)
-			var drawing_effects := session.get_hand_slot_effect_entries(drawing_slots)
-			_player_hand.refresh_hand(
-				drawing_slots,
-				false,
-				false,
-				session.get_aura_preview_shake_hand_slots(drawing_slots),
-				drawing_stats,
-				drawing_effects
-			)
+			if _pending_hand_draw.is_empty():
+				var drawing_slots := _player_hand.get_current_hand_slots()
+				var drawing_stats := session.get_hand_display_stats(drawing_slots)
+				var drawing_effects := session.get_hand_slot_effect_entries(drawing_slots)
+				_player_hand.refresh_hand(
+					drawing_slots,
+					false,
+					false,
+					session.get_aura_preview_shake_hand_slots(drawing_slots),
+					drawing_stats,
+					drawing_effects
+				)
 			_set_play_undo_visible(false)
 			if show_mulligan:
 				call_deferred("_align_mulligan_control")
@@ -1417,6 +1428,7 @@ func _cauldron_to_bag_fly_data(ingredient: IngredientData) -> Dictionary:
 func _play_time_turner_redraw_animation(old_hand_entries: Array, new_hand: Array) -> void:
 	GameManager.set_presentation_in_progress(true)
 	if _player_hand != null:
+		_player_hand.visible = true
 		_player_hand.clear_selection()
 		_player_hand.prepare_for_draw([])
 	_set_play_undo_visible(false)
