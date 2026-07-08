@@ -320,6 +320,20 @@ func get_bubbling_brew_hand_slots(slots_override: Array = []) -> Array[int]:
 	return _HandPlayPreview.bubbling_brew_slots(_compute_hand_preview_steps(slots_override))
 
 
+func get_aura_interval_countdown(slots_override: Array = []) -> int:
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS or context.current_aura == null:
+		return 0
+	if not _AuraEffects.uses_interval_countdown(context.current_aura):
+		return 0
+	var steps := _compute_hand_preview_steps(slots_override)
+	return _HandPlayPreview.countdown_for_aura(
+		steps,
+		context.cauldron_contents.size(),
+		context.ingredients_added_to_cauldron,
+		context.current_aura
+	)
+
+
 func get_aura_preview_shake_hand_slots(slots_override: Array = []) -> Array[int]:
 	var shake_slots: Array[int] = []
 	shake_slots.append_array(get_in_rhythm_double_hand_slots(slots_override))
@@ -490,7 +504,11 @@ func _build_hand_display_modifiers() -> Dictionary:
 
 
 func _compute_hand_preview_steps(slots_override: Array = []) -> Array:
-	var slots := _resolve_display_hand_slots(slots_override)
+	var slots: Array
+	if not slots_override.is_empty():
+		slots = slots_override
+	else:
+		slots = _hand_slots.duplicate()
 	return _HandPlayPreview.compute_steps(
 		slots,
 		HAND_SLOT_COUNT,

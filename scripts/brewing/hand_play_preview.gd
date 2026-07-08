@@ -287,3 +287,64 @@ static func pocket_watch_slots(steps: Array) -> Array[int]:
 		if bool(step.get("pocket_watch_doubles", false)):
 			slots.append(slot_index)
 	return slots
+
+
+static func countdown_for_aura(
+	steps: Array,
+	cauldron_count: int,
+	ingredients_added: int,
+	aura: AuraData
+) -> int:
+	if aura == null:
+		return 0
+	match aura.id:
+		GameConstants.IN_RHYTHM_AURA_ID:
+			return countdown_to_in_rhythm(steps, cauldron_count, aura)
+		GameConstants.BUBBLING_BREW_AURA_ID:
+			return countdown_to_bubbling_brew(steps, ingredients_added, aura)
+	return 0
+
+
+static func countdown_to_in_rhythm(
+	steps: Array,
+	cauldron_count: int,
+	aura: AuraData
+) -> int:
+	if aura == null or aura.id != GameConstants.IN_RHYTHM_AURA_ID:
+		return 0
+	var plays_until := 0
+	var projected_cauldron := cauldron_count
+	for step in steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		plays_until += 1
+		if bool(step.get("in_rhythm_doubles", false)):
+			return plays_until
+		projected_cauldron += 1
+	return _AuraEffects.in_rhythm_countdown(projected_cauldron, aura)
+
+
+static func countdown_to_bubbling_brew(
+	steps: Array,
+	ingredients_added: int,
+	aura: AuraData
+) -> int:
+	if aura == null or aura.id != GameConstants.BUBBLING_BREW_AURA_ID:
+		return 0
+	var adds_until := 0
+	var projected_added := ingredients_added
+	for step in steps:
+		if not bool(step.get("plays_to_cauldron", false)):
+			continue
+		var ingredient: IngredientData = step.get("ingredient")
+		var counts_for_added := (
+			ingredient != null
+			and not IngredientEffects.skips_hand_stay_interval_counter(ingredient)
+		)
+		if not counts_for_added:
+			continue
+		adds_until += 1
+		if bool(step.get("bubbling_returns", false)):
+			return adds_until
+		projected_added += 1
+	return _AuraEffects.bubbling_brew_countdown(projected_added, aura)

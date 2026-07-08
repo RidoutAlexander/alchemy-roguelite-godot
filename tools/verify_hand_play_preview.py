@@ -272,6 +272,49 @@ def bubbling_slots(steps: list[dict]) -> list[int]:
     ]
 
 
+def in_rhythm_countdown(cauldron_count: int) -> int:
+    remainder = cauldron_count % IN_RHYTHM_INTERVAL
+    if remainder == 0:
+        return IN_RHYTHM_INTERVAL
+    return IN_RHYTHM_INTERVAL - remainder
+
+
+def bubbling_countdown(ingredients_added: int) -> int:
+    remainder = ingredients_added % BUBBLING_INTERVAL
+    if remainder == 0:
+        return BUBBLING_INTERVAL
+    return BUBBLING_INTERVAL - remainder
+
+
+def countdown_to_in_rhythm(steps: list[dict], cauldron_count: int) -> int:
+    plays_until = 0
+    projected = cauldron_count
+    for step in steps:
+        if not step.get("plays_to_cauldron"):
+            continue
+        plays_until += 1
+        if step.get("in_rhythm_doubles"):
+            return plays_until
+        projected += 1
+    return in_rhythm_countdown(projected)
+
+
+def countdown_to_bubbling(steps: list[dict], ingredients_added: int) -> int:
+    adds_until = 0
+    projected = ingredients_added
+    for step in steps:
+        if not step.get("plays_to_cauldron"):
+            continue
+        ingredient_id = step.get("ingredient_id")
+        if ingredient_id is None or skips_counter(ingredient_id):
+            continue
+        adds_until += 1
+        if step.get("bubbling_returns"):
+            return adds_until
+        projected += 1
+    return bubbling_countdown(projected)
+
+
 def main() -> int:
     # Honey keeps the left card in hand: only honey and cards to its right resolve.
     steps = compute_steps(["a", HONEY_ID, "c", None, None], 0, 0)
@@ -315,6 +358,16 @@ def main() -> int:
         bat_wing_pick_overrides={0: "safe_pick"},
     )
     assert bubbling_slots(steps) == [1], bubbling_slots(steps)
+
+    # Interval countdowns follow previewed play order.
+    steps = compute_steps(["a", "b", "c", None, None], 2, 0)
+    assert countdown_to_in_rhythm(steps, 2) == 1, countdown_to_in_rhythm(steps, 2)
+
+    steps = compute_steps([PARROT_ID, "b", None, None, None], 1, 0)
+    assert countdown_to_in_rhythm(steps, 1) == 2, countdown_to_in_rhythm(steps, 1)
+
+    steps = compute_steps([BAT_WING_ID, "b", None, None, None], 0, 9)
+    assert countdown_to_bubbling(steps, 9) == 2, countdown_to_bubbling(steps, 9)
 
     print("PASS: hand play preview verification checks passed")
     return 0

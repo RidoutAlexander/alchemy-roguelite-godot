@@ -52,11 +52,41 @@ text = "Aura Name"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="AuraCountdownLabel" type="Label" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 248.0
+offset_top = 18.0
+offset_right = 298.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.08, 0.05, 0.02, 1)
+theme_override_colors/font_outline_color = Color(0.95, 0.88, 0.7, 0.75)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("1_font")
+theme_override_font_sizes/font_size = 44
+text = "3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AuraCountdownCaption" type="Label" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 244.0
+offset_top = 68.0
+offset_right = 302.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(0.12, 0.08, 0.04, 1)
+theme_override_fonts/font = ExtResource("1_font")
+theme_override_font_sizes/font_size = 14
+text = "plays"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="AuraDescriptionLabel" type="Label" parent="."]
 layout_mode = 0
 offset_left = 18.0
 offset_top = 58.0
-offset_right = 288.0
+offset_right = 236.0
 offset_bottom = 98.0
 theme_override_colors/font_color = Color(0.12, 0.08, 0.04, 1)
 theme_override_fonts/font = ExtResource("1_font")

@@ -23,6 +23,39 @@ static func in_rhythm_doubles_ingredient(cauldron_count_before_add: int, aura: A
 	return count_after % 3 == 0
 
 
+static func in_rhythm_countdown(cauldron_count: int, aura: AuraData) -> int:
+	if aura == null or aura.id != GameConstants.IN_RHYTHM_AURA_ID:
+		return 0
+	var remainder := cauldron_count % 3
+	if remainder == 0:
+		return 3
+	return 3 - remainder
+
+
+static func uses_interval_countdown(aura: AuraData) -> bool:
+	if aura == null:
+		return false
+	return (
+		aura.id == GameConstants.IN_RHYTHM_AURA_ID
+		or aura.id == GameConstants.BUBBLING_BREW_AURA_ID
+	)
+
+
+static func interval_countdown_from_state(
+	aura: AuraData,
+	cauldron_count: int,
+	ingredients_added: int
+) -> int:
+	if aura == null:
+		return 0
+	match aura.id:
+		GameConstants.IN_RHYTHM_AURA_ID:
+			return in_rhythm_countdown(cauldron_count, aura)
+		GameConstants.BUBBLING_BREW_AURA_ID:
+			return bubbling_brew_countdown(ingredients_added, aura)
+	return 0
+
+
 static func in_rhythm_double_hand_slots(
 	hand_slots: Array,
 	cauldron_count_before_hand: int,

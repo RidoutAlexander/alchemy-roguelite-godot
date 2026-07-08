@@ -18,6 +18,8 @@ const _PhaseSwipeTransition := preload("res://scripts/ui/phase_swipe_transition.
 @onready var _level_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/LevelLabel
 @onready var _aura_name_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraNameLabel
 @onready var _aura_description_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraDescriptionLabel
+@onready var _aura_countdown_label: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraCountdownLabel
+@onready var _aura_countdown_caption: Label = $PhaseSwipeHost/BrewPanel/LevelAuraBanner/AuraCountdownCaption
 @onready var _practice_restart_button: ShopRerollButton = (
 	$PhaseSwipeHost/BrewPanel/LevelAuraBanner/PracticeRestartButton
 )
@@ -291,6 +293,7 @@ func _refresh_brew() -> void:
 			session.get_explosion_limit_for_hud()
 		)
 	_refresh_practice_restart_button()
+	_refresh_aura_interval_countdown()
 	_refresh_rhythm_aura_shake(ctx)
 
 
@@ -322,22 +325,32 @@ func _align_bag_remaining_count_label() -> void:
 	)
 
 
+func _refresh_aura_interval_countdown() -> void:
+	var show_countdown := false
+	var countdown := 0
+	if GameManager.run != null and GameManager.run.brew_session != null:
+		var session := GameManager.run.brew_session
+		countdown = session.get_aura_interval_countdown()
+		show_countdown = (
+			session.context.outcome == BrewOutcome.Outcome.IN_PROGRESS
+			and countdown > 0
+		)
+	if _aura_countdown_label != null:
+		_aura_countdown_label.visible = show_countdown
+		if show_countdown:
+			_aura_countdown_label.text = str(countdown)
+	if _aura_countdown_caption != null:
+		_aura_countdown_caption.visible = show_countdown
+
+
 func _should_shake_rhythm_aura(ctx: BrewContext) -> bool:
 	if ctx.current_aura == null:
 		return false
 	if ctx.outcome != BrewOutcome.Outcome.IN_PROGRESS:
 		return false
-	match ctx.current_aura.id:
-		GameConstants.IN_RHYTHM_AURA_ID:
-			return ctx.cauldron_contents.size() % 3 == 2
-		GameConstants.BUBBLING_BREW_AURA_ID:
-			return (
-				ctx.ingredients_added_to_cauldron
-				% GameConstants.BUBBLING_BREW_INTERVAL
-				== GameConstants.BUBBLING_BREW_INTERVAL - 1
-			)
-		_:
-			return false
+	if GameManager.run == null or GameManager.run.brew_session == null:
+		return false
+	return GameManager.run.brew_session.get_aura_interval_countdown() == 1
 
 
 func _refresh_rhythm_aura_shake(ctx: BrewContext) -> void:
