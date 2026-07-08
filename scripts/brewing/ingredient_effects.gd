@@ -743,6 +743,132 @@ static func compute_hand_display_stats(
 	return display_stats
 
 
+static func compute_immediate_cauldron_play_preview(
+	ingredient: IngredientData,
+	cauldron_contents: Array,
+	aura: AuraData,
+	play_slot: int,
+	hand_slots: Array,
+	last_hand_slot: int,
+	last_hand_ingredient: Variant,
+	modifiers: Dictionary,
+	step_flags: Dictionary
+) -> Dictionary:
+	if ingredient == null:
+		return {
+			"point_value": 0,
+			"explosive_value": 0,
+			"effect_entries": [],
+			"shake": false,
+		}
+
+	var owned_trinket_ids: Array = modifiers.get("owned_trinket_ids", [])
+	var doubles_remaining := int(modifiers.get("growth_potion_doubles_remaining", 0))
+	var unicorn_cures_next := bool(modifiers.get("unicorn_cures_next", false))
+	var ice_cube_shields := int(modifiers.get("ice_cube_shields", 0))
+	var sim_explosiveness := int(modifiers.get("explosiveness", 0))
+	var explosion_limit := int(
+		modifiers.get("explosion_limit", GameConstants.DEFAULT_EXPLOSION_LIMIT)
+	)
+	var severed_reference: Array = modifiers.get("severed_layout_slots", hand_slots)
+
+	var point_value := ingredient.point_value
+	var explosive_value := ingredient.explosive_value
+
+	if ingredient.id == SEVERED_RIGHT_HAND_ID:
+		point_value += _count_hand_ingredients_to_left(severed_reference, play_slot)
+	if ingredient.id == SEVERED_LEFT_HAND_ID:
+		point_value += _count_hand_ingredients_to_right(severed_reference, play_slot)
+
+	var previous = cauldron_contents[-1] if not cauldron_contents.is_empty() else null
+	var resolved := resolve_hand_play_cobbler(
+		ingredient,
+		cauldron_contents,
+		play_slot,
+		last_hand_slot,
+		hand_slots,
+		last_hand_ingredient
+	)
+	var cobbler_bonus: Dictionary = resolved.get("bonus", {})
+	if bool(resolved.get("apply_to_current", false)):
+		point_value += int(cobbler_bonus.get("score", 0))
+		explosive_value += int(cobbler_bonus.get("explosiveness", 0))
+
+	var effect_bonuses := _preview_card_effect_bonuses(
+		ingredient,
+		cauldron_contents,
+		sim_explosiveness,
+		owned_trinket_ids
+	)
+	point_value += int(effect_bonuses.get("bonus_score", 0))
+	explosive_value += int(effect_bonuses.get("bonus_explosiveness", 0))
+	point_value -= int(effect_bonuses.get("score_penalty", 0))
+
+	if doubles_remaining > 0:
+		point_value *= 2
+		explosive_value *= 2
+	if bool(step_flags.get("in_rhythm_doubles", false)):
+		point_value *= 2
+		explosive_value *= 2
+	if bool(step_flags.get("pocket_watch_doubles", false)):
+		point_value *= 2
+		explosive_value *= 2
+
+	var preview_cauldron := cauldron_contents.duplicate()
+	preview_cauldron.append(ingredient)
+	explosion_limit += explosion_limit_bonus_for_played_ingredient(
+		ingredient,
+		preview_cauldron
+	)
+
+	var explosive_add := explosive_value
+	var unicorn_cured := false
+	if unicorn_cures_next and explosive_add > 0:
+		explosive_add = 0
+		unicorn_cured = true
+	if ice_cube_shields > 0:
+		if (
+			explosive_add > 0
+			and sim_explosiveness + explosive_add >= explosion_limit
+		):
+			explosive_add = 0
+	elif (
+		ingredient.id == CHICKEN_ID
+		and explosive_add > 0
+		and sim_explosiveness + explosive_add >= explosion_limit
+	):
+		explosive_add = 0
+
+	var effect_entries: Array = []
+	if bool(step_flags.get("pocket_watch_doubles", false)):
+		effect_entries.append(
+			{
+				"trinket_id": TrinketEffects.POCKET_WATCH_ID,
+				"overlay_text": "",
+			}
+		)
+	if unicorn_cured:
+		effect_entries.append(
+			{
+				"ingredient_id": UNICORN_HORN_ID,
+				"overlay_text": "",
+			}
+		)
+
+	var shake := (
+		bool(step_flags.get("in_rhythm_doubles", false))
+		or bool(step_flags.get("bubbling_returns", false))
+		or bool(step_flags.get("pocket_watch_doubles", false))
+	)
+
+	return {
+		"point_value": point_value,
+		"explosive_value": explosive_add,
+		"effect_entries": effect_entries,
+		"shake": shake,
+	}
+
+
 static func skips_hand_stay_interval_counter(ingredient: IngredientData) -> bool:
 	return ingredient != null and ingredient.id == BAT_WING_ID
 

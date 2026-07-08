@@ -533,6 +533,54 @@ func clear_bat_wing_pick_preview() -> void:
 	brew_updated.emit(context)
 
 
+func get_bat_wing_choice_preview(ingredient: IngredientData) -> Dictionary:
+	if ingredient == null or not _bat_wing_picker_active or _bat_wing_source_slot_index < 0:
+		return {
+			"point_value": 0,
+			"explosive_value": 0,
+			"effect_entries": [],
+			"shake": false,
+		}
+
+	var cauldron_count_before := context.cauldron_contents.size()
+	var ingredients_added_before := context.ingredients_added_to_cauldron
+	var step_flags := {
+		"in_rhythm_doubles": _AuraEffects.in_rhythm_doubles_ingredient(
+			cauldron_count_before,
+			context.current_aura
+		),
+		"pocket_watch_doubles": TrinketEffects.pocket_watch_doubles_ingredient(
+			cauldron_count_before,
+			context.owned_trinket_ids
+		),
+		"bubbling_returns": _AuraEffects.bubbling_brew_returns_ingredient(
+			ingredients_added_before,
+			context.current_aura
+		),
+	}
+
+	var hand_slots := _resolve_display_hand_slots()
+	var layout_slots: Array = hand_slots
+	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
+		layout_slots = _hand_start_slots
+
+	var modifiers := _build_hand_display_modifiers()
+	modifiers["growth_potion_doubles_remaining"] = _growth_potion_doubles_remaining
+	modifiers["severed_layout_slots"] = layout_slots
+
+	return IngredientEffects.compute_immediate_cauldron_play_preview(
+		ingredient,
+		context.cauldron_contents,
+		context.current_aura,
+		_bat_wing_source_slot_index,
+		hand_slots,
+		_last_hand_play_slot,
+		_last_hand_play_ingredient,
+		modifiers,
+		step_flags
+	)
+
+
 func _resolve_bat_wing_pick_previews() -> Dictionary:
 	if _bat_wing_pick_preview == null or _bat_wing_source_slot_index < 0:
 		return {}

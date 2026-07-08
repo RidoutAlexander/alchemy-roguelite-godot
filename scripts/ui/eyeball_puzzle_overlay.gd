@@ -8,8 +8,14 @@ const _CARD_SCENE := preload("res://scenes/ui/ingredient_card.tscn")
 
 enum Mode { PUZZLE, PREVIEW, PICKER }
 
-@onready var _title_label: Label = $Layout/PanelOffset/Panel/Content/Title
+@onready var _dimmer: ColorRect = $Dimmer
+@onready var _layout: CenterContainer = $Layout
+@onready var _title_label: Label = $Layout/PanelOffset/Panel/Content/TitleRow/Title
 @onready var _hint_label: Label = $Layout/PanelOffset/Panel/Content/HintLabel
+@onready var _title_row: HBoxContainer = $Layout/PanelOffset/Panel/Content/TitleRow
+@onready var _picker_toggle_button: WoodenButton = (
+	$Layout/PanelOffset/Panel/Content/TitleRow/PickerToggleButton
+)
 @onready var _order_slots_row: HBoxContainer = $Layout/PanelOffset/Panel/Content/OrderSlotsRow
 @onready var _done_button: WoodenButton = $Layout/PanelOffset/Panel/Content/DoneButton
 @onready var _reroll_row: HBoxContainer = $Layout/PanelOffset/Panel/Content/RerollRow
@@ -23,6 +29,9 @@ var _drag_source_slot: EyeballPuzzleSlot = null
 var _drag_source_slot_index: int = -1
 var _drag_grab_offset: Vector2 = Vector2.ZERO
 var _selected_picker_card: IngredientCard = null
+var _picker_panel_hidden: bool = false
+var _picker_toggle_saved_parent: Node = null
+var _picker_toggle_saved_index: int = -1
 
 
 func _ready() -> void:
@@ -37,6 +46,13 @@ func _ready() -> void:
 		if not _reroll_button.pressed.is_connected(_on_reroll_pressed):
 			_reroll_button.pressed.connect(_on_reroll_pressed)
 		_reroll_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	if _picker_toggle_button != null:
+		_picker_toggle_button.custom_minimum_size = Vector2(140.0, 56.0)
+		_picker_toggle_button.size = _picker_toggle_button.custom_minimum_size
+		if not _picker_toggle_button.pressed.is_connected(_on_picker_toggle_pressed):
+			_picker_toggle_button.pressed.connect(_on_picker_toggle_pressed)
+	if not GameManager.brew_updated.is_connected(_on_brew_updated):
+		GameManager.brew_updated.connect(_on_brew_updated)
 	_gather_slots()
 	set_process(false)
 	set_process_input(false)
@@ -53,6 +69,7 @@ func _gather_slots() -> void:
 
 func show_preview(ingredients: Array) -> void:
 	_mode = Mode.PREVIEW
+	_reset_picker_chrome()
 	_selected_picker_card = null
 	if _done_button != null:
 		_done_button.visible = true
@@ -82,6 +99,7 @@ func show_preview(ingredients: Array) -> void:
 
 func show_puzzle(ingredients: Array) -> void:
 	_mode = Mode.PUZZLE
+	_reset_picker_chrome()
 	_selected_picker_card = null
 	if _done_button != null:
 		_done_button.visible = true
@@ -106,11 +124,12 @@ func show_puzzle(ingredients: Array) -> void:
 				"Drag cards between slots to set draw order"
 			)
 	_configure_slots_for_puzzle(draw_count)
-	_populate_slots(ingredients, draw_count > 1)
+	_populate_slots(ingredients, false)
 
 
 func show_picker(ingredients: Array) -> void:
 	_mode = Mode.PICKER
+	_picker_panel_hidden = false
 	_selected_picker_card = null
 	_set_overlay_copy(
 		"Choose an ingredient",
@@ -120,16 +139,20 @@ func show_picker(ingredients: Array) -> void:
 	_populate_slots(ingredients, false)
 	_reset_picker_card_states()
 	_ensure_picker_cards_interactive()
+	_refresh_picker_choice_previews()
 	if _done_button != null:
 		_done_button.visible = true
 		_done_button.disabled = true
 	_refresh_reroll_button()
+	_configure_picker_toggle_button()
+	GameManager.clear_bat_wing_pick_preview()
 
 
 func hide_puzzle() -> void:
 	_cancel_drag()
 	_selected_picker_card = null
 	_mode = Mode.PUZZLE
+	_reset_picker_chrome()
 	if _done_button != null:
 		_done_button.visible = true
 	if _reroll_row != null:
@@ -137,6 +160,98 @@ func hide_puzzle() -> void:
 	visible = false
 	_clear_cards()
 	_reset_slot_visibility()
+	GameManager.clear_bat_wing_pick_preview()
+
+
+func _reset_picker_chrome() -> void:
+	_picker_panel_hidden = false
+	if _picker_toggle_button != null:
+		_picker_toggle_button.visible = false
+		_restore_picker_toggle_parent()
+	if _layout != null:
+		_layout.visible = true
+	if _dimmer != null:
+		_dimmer.visible = true
+
+
+func _configure_picker_toggle_button() -> void:
+	if _picker_toggle_button == null:
+		return
+	_restore_picker_toggle_parent()
+	_picker_toggle_button.visible = true
+	_picker_toggle_button.label_text = "Hide"
+	_picker_toggle_button.disabled = false
+
+
+func _on_picker_toggle_pressed() -> void:
+	if _mode != Mode.PICKER or _picker_toggle_button == null:
+		return
+	if _picker_panel_hidden:
+		_show_picker_panel()
+	else:
+		_hide_picker_panel()
+
+
+func _hide_picker_panel() -> void:
+	if _picker_panel_hidden:
+		return
+	_picker_panel_hidden = true
+	_store_picker_toggle_position()
+	_reparent_picker_toggle_to_overlay()
+	if _layout != null:
+		_layout.visible = false
+	if _dimmer != null:
+		_dimmer.visible = false
+	_picker_toggle_button.label_text = "Show"
+	_refresh_reroll_button()
+
+
+func _show_picker_panel() -> void:
+	if not _picker_panel_hidden:
+		return
+	_picker_panel_hidden = false
+	if _layout != null:
+		_layout.visible = true
+	if _dimmer != null:
+		_dimmer.visible = true
+	_restore_picker_toggle_parent()
+	_picker_toggle_button.label_text = "Hide"
+	_refresh_reroll_button()
+
+
+func _store_picker_toggle_position() -> void:
+	if _picker_toggle_button == null:
+		return
+	_picker_toggle_saved_parent = _picker_toggle_button.get_parent()
+	_picker_toggle_saved_index = _picker_toggle_button.get_index()
+
+
+func _reparent_picker_toggle_to_overlay() -> void:
+	if _picker_toggle_button == null:
+		return
+	var global_pos := _picker_toggle_button.global_position
+	if _picker_toggle_button.get_parent() != self:
+		_picker_toggle_button.get_parent().remove_child(_picker_toggle_button)
+		add_child(_picker_toggle_button)
+	_picker_toggle_button.global_position = global_pos
+	_picker_toggle_button.z_index = 20
+
+
+func _restore_picker_toggle_parent() -> void:
+	if _picker_toggle_button == null or _picker_toggle_saved_parent == null:
+		return
+	if not is_instance_valid(_picker_toggle_saved_parent):
+		_picker_toggle_saved_parent = _title_row
+	var global_pos := _picker_toggle_button.global_position
+	if _picker_toggle_button.get_parent() != _picker_toggle_saved_parent:
+		_picker_toggle_button.get_parent().remove_child(_picker_toggle_button)
+	_picker_toggle_saved_parent.add_child(_picker_toggle_button)
+	_picker_toggle_saved_parent.move_child(
+		_picker_toggle_button,
+		clampi(_picker_toggle_saved_index, 0, _picker_toggle_saved_parent.get_child_count())
+	)
+	_picker_toggle_button.global_position = global_pos
+	_picker_toggle_button.z_index = 0
 
 
 func _set_overlay_copy(title: String, hint: String) -> void:
@@ -181,15 +296,13 @@ func _populate_slots(ingredients: Array, enable_drag: bool) -> void:
 		var card := _CARD_SCENE.instantiate() as IngredientCard
 		if card == null:
 			continue
-		# Attach first so _ready() runs before binding; binding before place leaves
-		# deferred bind_preview to fire after _set_empty_state() clears picker mode.
 		_order_slots[i].place_card(card)
 		if enable_drag:
 			card.bind_puzzle_card(ingredient)
 			_wire_puzzle_card(card)
 		else:
 			card.bind_picker_card(ingredient)
-			_wire_picker_card(card)
+			_wire_picker_card(card, ingredient)
 
 
 func _wire_puzzle_card(card: IngredientCard) -> void:
@@ -197,9 +310,52 @@ func _wire_puzzle_card(card: IngredientCard) -> void:
 		card.puzzle_drag_began.connect(_on_puzzle_drag_began)
 
 
-func _wire_picker_card(card: IngredientCard) -> void:
+func _wire_picker_card(card: IngredientCard, ingredient: IngredientData) -> void:
 	if not card.picker_card_pressed.is_connected(_on_picker_card_pressed):
 		card.picker_card_pressed.connect(_on_picker_card_pressed)
+	if not card.mouse_entered.is_connected(_on_picker_card_hovered):
+		card.mouse_entered.connect(_on_picker_card_hovered.bind(ingredient))
+	if not card.mouse_exited.is_connected(_on_picker_card_unhovered):
+		card.mouse_exited.connect(_on_picker_card_unhovered)
+
+
+func _on_picker_card_hovered(ingredient: IngredientData) -> void:
+	if _mode != Mode.PICKER or ingredient == null:
+		return
+	GameManager.set_bat_wing_pick_preview(ingredient)
+
+
+func _on_picker_card_unhovered() -> void:
+	if _mode != Mode.PICKER:
+		return
+	if _selected_picker_card != null:
+		var selected := _selected_picker_card.get_ingredient()
+		if selected != null:
+			GameManager.set_bat_wing_pick_preview(selected)
+		return
+	GameManager.clear_bat_wing_pick_preview()
+
+
+func _refresh_picker_choice_previews() -> void:
+	if _mode != Mode.PICKER or GameManager.run == null:
+		return
+	var session := GameManager.run.brew_session
+	for slot in _order_slots:
+		if not slot.visible:
+			continue
+		var card := slot.get_card()
+		if card == null:
+			continue
+		var ingredient := card.get_ingredient()
+		if ingredient == null:
+			continue
+		card.apply_picker_preview(session.get_bat_wing_choice_preview(ingredient))
+
+
+func _on_brew_updated(_ctx: BrewContext) -> void:
+	if _mode != Mode.PICKER or not visible:
+		return
+	_refresh_picker_choice_previews()
 
 
 func _reset_picker_card_states() -> void:
@@ -230,6 +386,9 @@ func _set_picker_selection(card: IngredientCard) -> void:
 		_selected_picker_card.set_picker_selected(false)
 	_selected_picker_card = card
 	card.set_picker_selected(true)
+	var ingredient := card.get_ingredient()
+	if ingredient != null:
+		GameManager.set_bat_wing_pick_preview(ingredient)
 	_update_done_button_state()
 
 
@@ -253,7 +412,7 @@ func _refresh_reroll_button() -> void:
 	if _reroll_row == null:
 		return
 	var show_reroll := _mode == Mode.PICKER and GameManager.can_reroll_bat_wing_choices()
-	_reroll_row.visible = show_reroll
+	_reroll_row.visible = show_reroll and not _picker_panel_hidden
 	if _reroll_button != null:
 		_reroll_button.visible = show_reroll
 		_reroll_button.disabled = not show_reroll
@@ -275,10 +434,12 @@ func _refresh_picker_choices(ingredients: Array) -> void:
 	if _mode != Mode.PICKER:
 		return
 	_selected_picker_card = null
+	GameManager.clear_bat_wing_pick_preview()
 	_configure_slots_for_picker(ingredients.size())
 	_populate_slots(ingredients, false)
 	_reset_picker_card_states()
 	_ensure_picker_cards_interactive()
+	_refresh_picker_choice_previews()
 	if _done_button != null:
 		_done_button.disabled = true
 	_refresh_reroll_button()

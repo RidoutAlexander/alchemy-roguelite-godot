@@ -29,6 +29,9 @@ const HONEY_SPLATTER_OVERLAY_TEXTURE := preload(
 
 const HOVER_SCALE := 1.08
 const PICKER_SELECT_SCALE := 1.04
+const PICKER_SHAKE_OFFSET := Vector2(5.0, 2.0)
+const PICKER_SHAKE_STEP := 0.07
+const PICKER_EFFECT_ICON_Y := 18.0
 const HAND_HOVER_SCALE := 1.12
 const HAND_SELECTED_SCALE := 1.22
 const HAND_HOVER_RISE := 28.0
@@ -91,6 +94,7 @@ var _hand_selected: bool = false
 var _choice_mode: bool = false
 var _picker_mode: bool = false
 var _picker_selected: bool = false
+var _picker_shake_tween: Tween = null
 var _puzzle_press_position: Vector2 = Vector2.INF
 var _hand_press_position: Vector2 = Vector2.INF
 var _is_animating: bool = false
@@ -439,9 +443,10 @@ func _apply_honey_splatter_layout() -> void:
 func _set_unicorn_sparkle_visible(visible_fx: bool) -> void:
 	if _unicorn_sparkle_fx == null:
 		return
-	_unicorn_sparkle_fx.visible = visible_fx and _hand_mode
+	var show_fx := visible_fx and (_hand_mode or _picker_mode)
+	_unicorn_sparkle_fx.visible = show_fx
 	_apply_unicorn_sparkle_layout()
-	_unicorn_sparkle_fx.set_active(visible_fx and _hand_mode)
+	_unicorn_sparkle_fx.set_active(show_fx)
 
 
 func _apply_unicorn_sparkle_layout() -> void:
@@ -449,7 +454,8 @@ func _apply_unicorn_sparkle_layout() -> void:
 		return
 	_unicorn_sparkle_fx.z_index = HAND_EFFECT_OVERLAY_Z_INDEX
 	_unicorn_sparkle_fx.position = Vector2.ZERO
-	_unicorn_sparkle_fx.configure_for_card(HAND_CARD_BASE_SIZE, HAND_CARD_SCALE)
+	var card_scale := HAND_CARD_SCALE if _hand_mode else EyeballPuzzleLayout.CARD_SCALE
+	_unicorn_sparkle_fx.configure_for_card(HAND_CARD_BASE_SIZE, card_scale)
 
 
 func _sync_hand_visual_z_order(elevated: bool) -> void:
@@ -532,6 +538,113 @@ func set_picker_selected(selected: bool) -> void:
 		_reset_visual_scale()
 
 
+func apply_picker_preview(preview: Dictionary) -> void:
+	if not _picker_mode:
+		return
+	if not is_node_ready():
+		call_deferred("apply_picker_preview", preview)
+		return
+	var point_value := int(preview.get("point_value", _base_point_value))
+	var explosive_value := int(preview.get("explosive_value", _base_explosive_value))
+	update_picker_stat_display(point_value, explosive_value)
+	_bind_picker_effect_entries(preview.get("effect_entries", []))
+	set_picker_preview_shake(bool(preview.get("shake", false)))
+
+
+func update_picker_stat_display(point_value: int, explosive_value: int) -> void:
+	if not is_node_ready() or not _picker_mode:
+		return
+	_points_value.text = "%d" % point_value
+	_apply_hand_stat_color(_points_value, point_value, _base_point_value, true)
+	if explosive_value > 0 or _base_explosive_value > 0:
+		_explosive_value.text = "%d" % explosive_value
+		_apply_hand_stat_color(_explosive_value, explosive_value, _base_explosive_value, false)
+		$VisualRoot/StatsRow/ExplosiveStat.visible = true
+	else:
+		_explosive_value.text = ""
+		$VisualRoot/StatsRow/ExplosiveStat.visible = false
+
+
+func set_picker_preview_shake(enabled: bool) -> void:
+	if not _picker_mode or _visual_root == null:
+		return
+	if enabled:
+		_start_picker_preview_shake()
+	else:
+		_stop_picker_preview_shake()
+
+
+func _bind_picker_effect_entries(entries: Array) -> void:
+	var icon_entries: Array = []
+	var has_unicorn_sparkle := false
+	for entry in entries:
+		if not entry is Dictionary:
+			continue
+		if str(entry.get("ingredient_id", "")) == _IngredientEffects.UNICORN_HORN_ID:
+			has_unicorn_sparkle = true
+			continue
+		icon_entries.append(entry)
+	_set_unicorn_sparkle_visible(has_unicorn_sparkle)
+	if _hand_effect_icons == null:
+		return
+	if icon_entries.is_empty():
+		_hand_effect_icons.clear_icons()
+	else:
+		_hand_effect_icons.bind_entries(icon_entries, _lookup_effect_ingredient)
+	_apply_picker_effect_icon_layout()
+
+
+func _apply_picker_effect_icon_layout() -> void:
+	if _hand_effect_icons == null:
+		return
+	_hand_effect_icons.z_index = 1
+	var strip_size := _hand_effect_icons.custom_minimum_size
+	if _hand_effect_icons.size != Vector2.ZERO:
+		strip_size = _hand_effect_icons.size
+	_hand_effect_icons.position = Vector2(
+		(HAND_CARD_BASE_SIZE.x - strip_size.x) * 0.5,
+		PICKER_EFFECT_ICON_Y
+	)
+
+
+func _start_picker_preview_shake() -> void:
+	if _picker_shake_tween != null and _picker_shake_tween.is_valid():
+		return
+	_stop_picker_preview_shake()
+	if _visual_root == null:
+		return
+	var rest := _visual_root.position
+	var shake_tween := create_tween().set_loops()
+	shake_tween.tween_property(
+		_visual_root,
+		"position",
+		rest + Vector2(PICKER_SHAKE_OFFSET.x, 0.0),
+		PICKER_SHAKE_STEP
+	)
+	shake_tween.tween_property(
+		_visual_root,
+		"position",
+		rest + Vector2(-PICKER_SHAKE_OFFSET.x, PICKER_SHAKE_OFFSET.y),
+		PICKER_SHAKE_STEP
+	)
+	shake_tween.tween_property(
+		_visual_root,
+		"position",
+		rest + Vector2(0.0, -PICKER_SHAKE_OFFSET.y),
+		PICKER_SHAKE_STEP
+	)
+	shake_tween.tween_property(_visual_root, "position", rest, PICKER_SHAKE_STEP)
+	_picker_shake_tween = shake_tween
+
+
+func _stop_picker_preview_shake() -> void:
+	if _picker_shake_tween != null and _picker_shake_tween.is_valid():
+		_picker_shake_tween.kill()
+	_picker_shake_tween = null
+	if _visual_root != null:
+		_visual_root.position = Vector2.ZERO
+
+
 func set_picker_drag_enabled(_enabled: bool) -> void:
 	_puzzle_drag_enabled = false
 	sync_picker_input()
@@ -596,10 +709,13 @@ func bind_preview(ingredient: IngredientData) -> void:
 	_ingredient = ingredient
 	_price = 0
 	_has_offer = true
+	_base_point_value = ingredient.point_value
+	_base_explosive_value = ingredient.explosive_value
 	_hover_enabled = false
 	_is_hovered = false
 	set_process(false)
 	_reset_visual_scale()
+	_stop_picker_preview_shake()
 	visible = true
 	_visual_root.visible = true
 	_ensure_card_background_visible()
@@ -607,6 +723,10 @@ func bind_preview(ingredient: IngredientData) -> void:
 	_description_label.text = IngredientEffects.card_display_description(ingredient)
 	if _hand_mode:
 		_reset_hand_stat_label_colors()
+	elif _picker_mode:
+		_reset_hand_stat_label_colors()
+		update_picker_stat_display(_base_point_value, _base_explosive_value)
+		_clear_hand_effect_entries()
 	else:
 		_points_value.text = "%d" % ingredient.point_value
 		if ingredient.explosive_value > 0:

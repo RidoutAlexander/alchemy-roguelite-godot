@@ -60,13 +60,26 @@ layout_mode = 2
 theme_override_constants/separation = 14
 alignment = 1
 
-[node name="Title" type="Label" parent="Layout/PanelOffset/Panel/Content"]
+[node name="TitleRow" type="HBoxContainer" parent="Layout/PanelOffset/Panel/Content"]
 layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Title" type="Label" parent="Layout/PanelOffset/Panel/Content/TitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.95, 0.9, 0.75, 1)
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 26
 text = "Arrange the next 3 draws"
 horizontal_alignment = 1
+
+[node name="PickerToggleButton" parent="Layout/PanelOffset/Panel/Content/TitleRow" instance=ExtResource("4_button")]
+visible = false
+custom_minimum_size = Vector2(140, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+label_text = "Hide"
 
 [node name="HintLabel" type="Label" parent="Layout/PanelOffset/Panel/Content"]
 layout_mode = 2
