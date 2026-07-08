@@ -1145,28 +1145,13 @@ func _apply_ingredient(
 	last_play_fly_count = 1
 	_apply_ingredient_play(ingredient, track_draw, from_hand_play, hand_slot_index)
 	enqueue_presented_stat_snapshot()
-
-	if (
-		parrot_doubled_this_ingredient
-		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
-		and not context.is_exploded()
-	):
-		_parrot_repeat_pending = true
-		_parrot_repeat_ingredient = ingredient
-		_parrot_repeat_from_hand = from_hand_play
-		_parrot_repeat_hand_slot = hand_slot_index
-	if (
-		TrinketEffects.feather_plays_twice(ingredient, context.owned_trinket_ids)
-		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
-		and not context.is_exploded()
-	):
-		_pristine_feather_repeat_pending = true
-		_pristine_feather_repeat_ingredient = ingredient
-		_pristine_feather_repeat_from_hand = from_hand_play
-		_pristine_feather_repeat_hand_slot = hand_slot_index
-
-	if context.is_exploded() and ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID:
-		_trigger_phoenix_save()
+	_resolve_single_ingredient_play_aftermath(
+		ingredient,
+		from_hand_play,
+		hand_slot_index,
+		parrot_doubled_this_ingredient,
+		true
+	)
 	return parrot_doubled_this_ingredient
 
 
@@ -1185,11 +1170,8 @@ func _try_begin_parrot_repeat_play() -> bool:
 	last_play_fly_count = 1
 	_apply_ingredient_play(ingredient, false)
 	enqueue_presented_stat_snapshot()
-
-	if context.is_exploded():
-		_chain_draws_remaining = 0
-		if not _try_frog_leg_save():
-			_resolve_explosion()
+	_resolve_single_ingredient_play_aftermath(ingredient, from_hand, slot_index, true, false)
+	_resolve_explosion_after_play()
 
 	if from_hand:
 		hand_card_played.emit(context, ingredient, slot_index, true)
@@ -1221,11 +1203,8 @@ func _try_begin_pristine_feather_repeat_play() -> bool:
 	last_play_fly_count = 1
 	_apply_ingredient_play(ingredient, false)
 	enqueue_presented_stat_snapshot()
-
-	if context.is_exploded():
-		_chain_draws_remaining = 0
-		if not _try_frog_leg_save():
-			_resolve_explosion()
+	_resolve_single_ingredient_play_aftermath(ingredient, from_hand, slot_index, false, false)
+	_resolve_explosion_after_play()
 
 	if from_hand:
 		hand_card_played.emit(context, ingredient, slot_index, true)
@@ -1240,6 +1219,44 @@ func _clear_pristine_feather_repeat() -> void:
 	_pristine_feather_repeat_ingredient = null
 	_pristine_feather_repeat_from_hand = false
 	_pristine_feather_repeat_hand_slot = -1
+
+
+func _resolve_single_ingredient_play_aftermath(
+	ingredient: IngredientData,
+	from_hand_play: bool,
+	hand_slot_index: int,
+	parrot_doubled_this_ingredient: bool,
+	schedule_repeats: bool
+) -> void:
+	if (
+		context.is_exploded()
+		and ingredient.id == IngredientEffects.PHOENIX_FEATHER_ID
+	):
+		_trigger_phoenix_save()
+
+	if not schedule_repeats:
+		return
+	if context.outcome != BrewOutcome.Outcome.IN_PROGRESS or context.is_exploded():
+		return
+
+	if parrot_doubled_this_ingredient:
+		_parrot_repeat_pending = true
+		_parrot_repeat_ingredient = ingredient
+		_parrot_repeat_from_hand = from_hand_play
+		_parrot_repeat_hand_slot = hand_slot_index
+	if TrinketEffects.feather_plays_twice(ingredient, context.owned_trinket_ids):
+		_pristine_feather_repeat_pending = true
+		_pristine_feather_repeat_ingredient = ingredient
+		_pristine_feather_repeat_from_hand = from_hand_play
+		_pristine_feather_repeat_hand_slot = hand_slot_index
+
+
+func _resolve_explosion_after_play() -> void:
+	if not context.is_exploded():
+		return
+	_chain_draws_remaining = 0
+	if not _try_frog_leg_save():
+		_resolve_explosion()
 
 
 func _count_hand_ingredients_to_left_from_start(slot_index: int) -> int:
