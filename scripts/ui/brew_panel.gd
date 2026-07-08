@@ -664,9 +664,16 @@ func _align_hand_action_buttons() -> void:
 	if not show_undo and not show_mulligan:
 		return
 
-	var origin := _get_hand_action_column_origin()
-	var base_y := origin.y
-	var action_left := origin.x
+	var base_y: float
+	var action_left: float
+	if _play_hand_button != null and _play_hand_button.visible:
+		var play_rect := _play_hand_button.get_global_rect()
+		base_y = play_rect.position.y
+		action_left = play_rect.end.x + HAND_ACTION_LEFT_GAP + HAND_ACTION_EXTRA_OFFSET
+	else:
+		var origin := _get_hand_action_column_origin()
+		base_y = origin.y
+		action_left = origin.x
 
 	if _hand_mulligan_button != null and _hand_mulligan_button.visible:
 		_align_mulligan_column(action_left, base_y)
@@ -760,10 +767,6 @@ func _refresh_undo_label(session: BrewSession) -> void:
 	var swaps_remaining := session.get_hand_swaps_remaining()
 	if _hand_undo_label != null:
 		_hand_undo_label.text = _format_undo_label(swaps_remaining)
-		_hand_undo_label.custom_minimum_size.x = maxf(
-			_hand_undo_label.get_minimum_size().x,
-			HAND_ACTION_LABEL_SIZE.x
-		)
 	if _hand_undo_button != null:
 		_hand_undo_button.disabled = false
 
@@ -771,10 +774,7 @@ func _refresh_undo_label(session: BrewSession) -> void:
 func _refresh_mulligan_label(session: BrewSession) -> void:
 	var remaining := session.get_mulligans_remaining()
 	if _hand_mulligan_label != null:
-		_hand_mulligan_label.text = _format_mulligan_label(
-			remaining,
-			_mulligan_needs_card_selection(session)
-		)
+		_hand_mulligan_label.text = _format_mulligan_label(remaining)
 	if _hand_mulligan_button != null:
 		_hand_mulligan_button.disabled = false
 		_hand_mulligan_button.modulate = (
@@ -789,21 +789,9 @@ func _refresh_mulligan_label(session: BrewSession) -> void:
 		_buy_brew_mulligan_cost.set_cost(GameConstants.BREW_MULLIGAN_COST)
 
 
-func _format_mulligan_label(mulligans_remaining: int, needs_selection: bool = false) -> String:
+func _format_mulligan_label(mulligans_remaining: int) -> String:
 	var noun := "mulligan" if mulligans_remaining == 1 else "mulligans"
-	if needs_selection:
-		return "Mulligan (%d %s left) - pick a card" % [mulligans_remaining, noun]
 	return "Mulligan (%d %s left)" % [mulligans_remaining, noun]
-
-
-func _mulligan_needs_card_selection(session: BrewSession) -> bool:
-	if session.get_mulligans_remaining() <= 0:
-		return false
-	if session.get_hand_phase() != BrewSession.HandPhase.HAND:
-		return false
-	if _player_hand == null:
-		return false
-	return _player_hand.get_selected_slot() < 0
 
 
 func _format_undo_label(swaps_remaining: int) -> String:
