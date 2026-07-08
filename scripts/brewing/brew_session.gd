@@ -62,6 +62,7 @@ var _pending_hand_draw: Array = []
 var _pending_hand_draw_target_slots: Array = []
 var _hand_draw_display_reserve: int = 0
 var _honey_skipped_slots: Dictionary = {}
+var _gecko_stayed_slots: Dictionary = {}
 
 var _chain_draws_remaining: int = 0
 var _eyeball_reserved: Array[IngredientData] = []
@@ -106,7 +107,6 @@ var last_presented_stat_deltas: Dictionary = {
 }
 var last_play_fly_count: int = 1
 var last_play_fairy_poof: bool = false
-var _pending_gecko_stay_slot: int = -1
 var _pending_bubbling_brew_return: IngredientData = null
 var _jar_of_dirt_broke_poof_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
@@ -529,19 +529,7 @@ func consume_bubbling_brew_return_presentation() -> IngredientData:
 	return ingredient
 
 
-func consume_gecko_stay_presentation() -> Dictionary:
-	var slot_index := _pending_gecko_stay_slot
-	_pending_gecko_stay_slot = -1
-	if slot_index < 0 or not _is_valid_hand_slot(slot_index):
-		return {"stayed": false, "slot_index": -1}
-	var ingredient: IngredientData = _hand_slots[slot_index]
-	if ingredient == null:
-		return {"stayed": false, "slot_index": -1}
-	return {
-		"stayed": true,
-		"slot_index": slot_index,
-		"ingredient": ingredient,
-	}
+
 
 
 func get_chain_draws_remaining() -> int:
@@ -764,6 +752,13 @@ func try_play_hand() -> bool:
 	_hand_phase = HandPhase.PLAYING
 	_hand_start_slots = _hand_slots.duplicate()
 	_honey_skipped_slots = _compute_honey_skipped_slots()
+	_gecko_stayed_slots = _HandSlotEffects.compute_gecko_stay_slots(
+		_hand_start_slots,
+		HAND_SLOT_COUNT,
+		_honey_skipped_slots,
+		context.cauldron_contents.size(),
+		context.owned_trinket_ids
+	)
 	_play_slot_cursor = 0
 	_last_hand_play_slot = -1
 	_last_hand_play_ingredient = null
@@ -976,6 +971,9 @@ func _play_next_hand_card() -> void:
 		if _hand_slots[_play_slot_cursor] == null:
 			_play_slot_cursor += 1
 			continue
+		if _gecko_stayed_slots.has(_play_slot_cursor):
+			_play_slot_cursor += 1
+			continue
 		break
 
 	if _play_slot_cursor >= HAND_SLOT_COUNT:
@@ -984,22 +982,10 @@ func _play_next_hand_card() -> void:
 
 	var ingredient: IngredientData = _hand_slots[_play_slot_cursor]
 	var slot_index := _play_slot_cursor
-	var stays_in_hand := TrinketEffects.gecko_assistant_stays_in_hand(
-		context.cauldron_contents.size(),
-		context.owned_trinket_ids
-	)
 	_hand_slots[_play_slot_cursor] = null
 	_play_slot_cursor += 1
 
 	var parrot_doubled := _apply_ingredient(ingredient, true, true, slot_index)
-	if (
-		stays_in_hand
-		and context.outcome == BrewOutcome.Outcome.IN_PROGRESS
-		and not last_play_fairy_poof
-		and _pending_bubbling_brew_return != ingredient
-	):
-		_hand_slots[slot_index] = ingredient
-		_pending_gecko_stay_slot = slot_index
 	if context.is_exploded():
 		_chain_draws_remaining = 0
 		if not _try_frog_leg_save():
@@ -1044,6 +1030,7 @@ func _finish_hand_play() -> void:
 		enqueue_presented_stat_snapshot()
 	_resolve_lucky_coin_hand_effect()
 	_honey_skipped_slots.clear()
+	_gecko_stayed_slots.clear()
 	_hand_start_slots.clear()
 	_hand_undo_stack.clear()
 	_hand_phase = HandPhase.BAG
@@ -1814,17 +1801,10 @@ func _compute_hand_draw_target_slots(draw_count: int) -> Array:
 
 
 func _compute_honey_skipped_slots() -> Dictionary:
-	var skipped := {}
-	for slot_index in range(1, HAND_SLOT_COUNT):
-		if slot_index >= _hand_start_slots.size():
-			continue
-		var ingredient: IngredientData = _hand_start_slots[slot_index]
-		if ingredient == null or ingredient.id != IngredientEffects.HONEY_ID:
-			continue
-		var left_ingredient: IngredientData = _hand_start_slots[slot_index - 1]
-		if left_ingredient != null:
-			skipped[slot_index - 1] = true
-	return skipped
+	return _HandSlotEffects.compute_honey_skipped_slots(
+		_hand_start_slots,
+		HAND_SLOT_COUNT
+	)
 
 
 func _reset_hand_slots() -> void:
@@ -1884,6 +1864,7 @@ func _reset_draw_flow_state() -> void:
 	_pending_hand_draw.clear()
 	_pending_hand_draw_target_slots.clear()
 	_honey_skipped_slots.clear()
+	_gecko_stayed_slots.clear()
 	_reset_hand_draw_display_reserve()
 	_chain_draws_remaining = 0
 	_eyeball_reserved.clear()
@@ -1905,7 +1886,6 @@ func _reset_draw_flow_state() -> void:
 	_fairy_vanish_next_ingredient = false
 	_jar_of_dirt_broke_poof_pending = false
 	_pending_bubbling_brew_return = null
-	_pending_gecko_stay_slot = -1
 	_pending_time_turner_new_hand.clear()
 	_pending_time_turner_target_slots.clear()
 	_frog_legs_played_this_brew.clear()

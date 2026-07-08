@@ -34,6 +34,53 @@ static func compute_entries(
 	return per_slot
 
 
+static func compute_honey_skipped_slots(
+	slots: Array,
+	hand_slot_count: int
+) -> Dictionary:
+	var skipped := {}
+	for slot_index in range(1, hand_slot_count):
+		if slot_index >= slots.size():
+			continue
+		var ingredient: IngredientData = slots[slot_index]
+		if ingredient == null or ingredient.id != HONEY_ID:
+			continue
+		var left_ingredient: IngredientData = slots[slot_index - 1]
+		if left_ingredient != null:
+			skipped[slot_index - 1] = true
+	return skipped
+
+
+static func compute_gecko_stay_slots(
+	hand_slots: Array,
+	hand_slot_count: int,
+	honey_skipped_slots: Dictionary,
+	cauldron_count_before_hand: int,
+	owned_trinket_ids: Array
+) -> Dictionary:
+	var stayed := {}
+	if not TrinketEffects.has_gecko_assistant(owned_trinket_ids):
+		return stayed
+
+	var cauldron_count := cauldron_count_before_hand
+	var gecko_stays_consumed := 0
+	for slot_index in range(hand_slot_count):
+		if honey_skipped_slots.has(slot_index):
+			continue
+		if slot_index >= hand_slots.size() or hand_slots[slot_index] == null:
+			continue
+		if TrinketEffects.gecko_assistant_stays_in_hand(
+			cauldron_count,
+			owned_trinket_ids,
+			gecko_stays_consumed
+		):
+			stayed[slot_index] = true
+			gecko_stays_consumed += 1
+		else:
+			cauldron_count += 1
+	return stayed
+
+
 static func _append_honey_entries(
 	per_slot: Array,
 	slots: Array,
@@ -93,25 +140,22 @@ static func _append_gecko_assistant_entries(
 	cauldron_count_before_hand: int,
 	owned_trinket_ids: Array
 ) -> void:
-	if not TrinketEffects.has_gecko_assistant(owned_trinket_ids):
-		return
-
-	var play_order: Array[int] = []
-	for slot_index in range(hand_slots.size()):
-		if hand_slots[slot_index] != null:
-			play_order.append(slot_index)
-
-	var cauldron_count := cauldron_count_before_hand
-	for play_slot in play_order:
-		if TrinketEffects.gecko_assistant_stays_in_hand(cauldron_count, owned_trinket_ids):
-			if play_slot >= 0 and play_slot < per_slot.size():
-				per_slot[play_slot].append(
-					{
-						"trinket_id": TrinketEffects.GECKO_ASSISTANT_ID,
-						"overlay_text": "",
-					}
-				)
-		cauldron_count += 1
+	var honey_skipped := compute_honey_skipped_slots(hand_slots, hand_slot_count)
+	var gecko_stayed := compute_gecko_stay_slots(
+		hand_slots,
+		hand_slot_count,
+		honey_skipped,
+		cauldron_count_before_hand,
+		owned_trinket_ids
+	)
+	for slot_index in gecko_stayed.keys():
+		if slot_index >= 0 and slot_index < per_slot.size():
+			per_slot[slot_index].append(
+				{
+					"trinket_id": TrinketEffects.GECKO_ASSISTANT_ID,
+					"overlay_text": "",
+				}
+			)
 
 
 static func _append_pristine_feather_entries(

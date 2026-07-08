@@ -521,14 +521,6 @@ func _sync_brew_ambience() -> void:
 		_boiling_water_player.play()
 
 
-func _reveal_gecko_stay_slot_if_needed() -> void:
-	if GameManager.run == null:
-		return
-	var gecko_stay := GameManager.run.brew_session.consume_gecko_stay_presentation()
-	if bool(gecko_stay.get("stayed", false)):
-		_sync_hand_ui()
-
-
 func _get_hand_display_stats_for_slot(slot_index: int, ingredient: IngredientData) -> Variant:
 	if GameManager.run == null or ingredient == null:
 		return null
@@ -1074,7 +1066,6 @@ func _play_jar_break_poof(ingredient: IngredientData, track_for_exit: bool) -> v
 
 
 func _finish_card_presentation(ingredient: IngredientData, track_for_exit: bool) -> void:
-	_reveal_gecko_stay_slot_if_needed()
 	if _pending_frog_escape != null:
 		var escaping_frog := _pending_frog_escape
 		_pending_frog_escape = null

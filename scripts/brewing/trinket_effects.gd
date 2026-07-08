@@ -137,11 +137,13 @@ static func pocket_watch_countdown(cauldron_count: int, trinket_ids: Array) -> i
 
 static func gecko_assistant_stays_in_hand(
 	cauldron_count_before_add: int,
-	trinket_ids: Array
+	trinket_ids: Array,
+	stays_consumed_this_hand: int = 0
 ) -> bool:
 	if not has_gecko_assistant(trinket_ids):
 		return false
-	var count_after := cauldron_count_before_add + 1
+	var effective_count := cauldron_count_before_add + stays_consumed_this_hand
+	var count_after := effective_count + 1
 	return count_after % GECKO_ASSISTANT_INTERVAL == 0
 
 
