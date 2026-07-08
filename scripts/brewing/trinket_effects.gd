@@ -63,8 +63,7 @@ static func has_pristine_feather(trinket_ids: Array) -> bool:
 
 static func feather_plays_twice(ingredient: IngredientData, trinket_ids: Array) -> bool:
 	return (
-		ingredient != null
-		and ingredient.id == IngredientEffects.FEATHER_ID
+		IngredientEffects.is_feather_ingredient(ingredient)
 		and has_pristine_feather(trinket_ids)
 	)
 

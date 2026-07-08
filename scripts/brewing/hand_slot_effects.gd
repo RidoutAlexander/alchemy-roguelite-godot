@@ -90,7 +90,7 @@ static func _append_pristine_feather_entries(
 		if slot_index >= per_slot.size():
 			continue
 		var ingredient: IngredientData = hand_slots[slot_index]
-		if ingredient == null or ingredient.id != IngredientEffects.FEATHER_ID:
+		if not IngredientEffects.is_feather_ingredient(ingredient):
 			continue
 		per_slot[slot_index].append(
 			{

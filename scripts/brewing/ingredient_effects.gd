@@ -206,6 +206,17 @@ static func apply(
 	return result
 
 
+static func is_feather_ingredient_id(ingredient_id: String) -> bool:
+	var normalized := str(ingredient_id).to_lower()
+	if normalized == FEATHER_ID:
+		return true
+	return normalized.begins_with("feather_") or "_feather" in normalized
+
+
+static func is_feather_ingredient(ingredient: IngredientData) -> bool:
+	return ingredient != null and is_feather_ingredient_id(ingredient.id)
+
+
 static func card_display_description(ingredient: IngredientData) -> String:
 	if ingredient == null:
 		return ""
