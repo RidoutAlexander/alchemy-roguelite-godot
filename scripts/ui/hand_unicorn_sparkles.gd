@@ -38,9 +38,7 @@ func _ready() -> void:
 	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
 	fade.add_point(0.12, Color(1.0, 1.0, 1.0, 1.0))
 	fade.add_point(0.72, Color(1.0, 1.0, 1.0, 0.55))
-	var fade_texture := GradientTexture1D.new()
-	fade_texture.gradient = fade
-	_particles.color_ramp = fade_texture
+	_particles.color_ramp = fade
 
 	var sparkle_material := CanvasItemMaterial.new()
 	sparkle_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
