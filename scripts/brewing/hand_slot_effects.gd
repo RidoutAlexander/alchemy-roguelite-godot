@@ -9,7 +9,8 @@ static func compute_entries(
 	hand_slot_count: int,
 	layout_slots: Array = [],
 	play_steps: Array = [],
-	owned_trinket_ids: Array = []
+	owned_trinket_ids: Array = [],
+	unicorn_cured_slots: Array = []
 ) -> Array:
 	var reference := layout_slots if not layout_slots.is_empty() else hand_slots
 	var per_slot: Array = []
@@ -18,6 +19,7 @@ static func compute_entries(
 	_append_honey_entries(per_slot, reference, hand_slot_count)
 	_append_gecko_assistant_entries_from_steps(per_slot, play_steps)
 	_append_pocket_watch_entries_from_steps(per_slot, play_steps)
+	_append_unicorn_horn_entries(per_slot, unicorn_cured_slots)
 	_append_pristine_feather_entries(per_slot, hand_slots, owned_trinket_ids)
 	return per_slot
 
@@ -125,6 +127,22 @@ static func _append_gecko_assistant_entries_from_steps(
 					"overlay_text": "",
 				}
 			)
+
+
+static func _append_unicorn_horn_entries(
+	per_slot: Array,
+	unicorn_cured_slots: Array
+) -> void:
+	for slot_index in unicorn_cured_slots:
+		var cured_slot := int(slot_index)
+		if cured_slot < 0 or cured_slot >= per_slot.size():
+			continue
+		per_slot[cured_slot].append(
+			{
+				"ingredient_id": IngredientEffects.UNICORN_HORN_ID,
+				"overlay_text": "",
+			}
+		)
 
 
 static func _append_pristine_feather_entries(

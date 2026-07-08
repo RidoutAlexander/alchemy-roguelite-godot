@@ -448,7 +448,7 @@ static func compute_hand_cobbler_bonuses(
 	return bonuses
 
 
-static func compute_hand_display_stats(
+static func compute_unicorn_cured_hand_slots(
 	hand_slots: Array,
 	cauldron_contents: Array,
 	aura: AuraData,
@@ -456,6 +456,30 @@ static func compute_hand_display_stats(
 	growth_potion_doubles_remaining: int = 0,
 	modifiers: Dictionary = {},
 	severed_layout_slots: Array = []
+) -> Array[int]:
+	var cured_slots: Array[int] = []
+	compute_hand_display_stats(
+		hand_slots,
+		cauldron_contents,
+		aura,
+		hand_slot_count,
+		growth_potion_doubles_remaining,
+		modifiers,
+		severed_layout_slots,
+		cured_slots
+	)
+	return cured_slots
+
+
+static func compute_hand_display_stats(
+	hand_slots: Array,
+	cauldron_contents: Array,
+	aura: AuraData,
+	hand_slot_count: int = 5,
+	growth_potion_doubles_remaining: int = 0,
+	modifiers: Dictionary = {},
+	severed_layout_slots: Array = [],
+	unicorn_cured_slots: Variant = null
 ) -> Array:
 	var display_stats: Array = []
 	for _slot_index in hand_slot_count:
@@ -568,6 +592,8 @@ static func compute_hand_display_stats(
 		if unicorn_cures_next and explosive_add > 0:
 			explosive_add = 0
 			unicorn_cures_next = false
+			if unicorn_cured_slots is Array:
+				unicorn_cured_slots.append(play_slot)
 		if ice_cube_shields > 0:
 			if (
 				explosive_add > 0
@@ -615,6 +641,8 @@ static func compute_hand_display_stats(
 			if unicorn_cures_next and repeat_explosive_add > 0:
 				repeat_explosive_add = 0
 				unicorn_cures_next = false
+				if unicorn_cured_slots is Array:
+					unicorn_cured_slots.append(play_slot)
 			if ice_cube_shields > 0:
 				if (
 					repeat_explosive_add > 0

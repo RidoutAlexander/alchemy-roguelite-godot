@@ -321,14 +321,26 @@ func get_hand_slot_effect_entries(slots_override: Array = []) -> Array:
 		return []
 	var slots := _resolve_display_hand_slots(slots_override)
 	var layout_slots: Array = []
+	var severed_layout_slots: Array = []
 	if _hand_phase == HandPhase.PLAYING and not _hand_start_slots.is_empty():
 		layout_slots = _hand_start_slots
+		severed_layout_slots = _hand_start_slots
+	var unicorn_cured_slots := IngredientEffects.compute_unicorn_cured_hand_slots(
+		slots,
+		context.cauldron_contents,
+		context.current_aura,
+		HAND_SLOT_COUNT,
+		_growth_potion_doubles_remaining,
+		_build_hand_display_modifiers(),
+		severed_layout_slots
+	)
 	return _HandSlotEffects.compute_entries(
 		slots,
 		HAND_SLOT_COUNT,
 		layout_slots,
 		_compute_hand_preview_steps(slots_override),
-		context.owned_trinket_ids
+		context.owned_trinket_ids,
+		unicorn_cured_slots
 	)
 
 
