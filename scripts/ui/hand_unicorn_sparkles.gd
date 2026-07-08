@@ -14,7 +14,7 @@ func _ready() -> void:
 	_layers.append(_make_sparkle_layer(
 		"Twinkles",
 		glow_tex,
-		120,
+		60,
 		0.35,
 		0.75,
 		1.05,
@@ -24,7 +24,7 @@ func _ready() -> void:
 	_layers.append(_make_sparkle_layer(
 		"Stars",
 		star_tex,
-		45,
+		22,
 		0.55,
 		1.15,
 		1.35,
@@ -34,7 +34,7 @@ func _ready() -> void:
 	_layers.append(_make_sparkle_layer(
 		"BigStars",
 		star_tex,
-		16,
+		8,
 		0.95,
 		1.75,
 		1.8,
