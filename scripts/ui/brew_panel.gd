@@ -1306,7 +1306,7 @@ func _try_finalize_brew_transition() -> void:
 func _try_begin_frog_leg_return_animations() -> bool:
 	if GameManager.run == null:
 		return false
-	var returns := GameManager.run.brew_session.get_jar_of_froglegs_return_entries()
+	var returns := GameManager.run.brew_session.consume_jar_of_froglegs_return_entries()
 	if returns.is_empty():
 		return false
 	_frog_leg_return_queue = returns.duplicate()

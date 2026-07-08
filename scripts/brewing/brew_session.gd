@@ -117,6 +117,7 @@ var _jar_of_dirt_broke_poof_pending: bool = false
 var _pending_time_turner_new_hand: Array = []
 var _pending_time_turner_target_slots: Array = []
 var _frog_legs_played_this_brew: Array[IngredientData] = []
+var _jar_of_froglegs_returns_consumed: bool = false
 var last_bag_grant_ingredient: IngredientData = null
 
 
@@ -654,9 +655,12 @@ func complete_frog_leg_save() -> void:
 	brew_updated.emit(context)
 
 
-func get_jar_of_froglegs_return_entries() -> Array:
+func consume_jar_of_froglegs_return_entries() -> Array:
+	if _jar_of_froglegs_returns_consumed:
+		return []
 	if not TrinketEffects.has_jar_of_froglegs(context.owned_trinket_ids):
 		return []
+	_jar_of_froglegs_returns_consumed = true
 	var entries: Array = []
 	var seen: Dictionary = {}
 	for ingredient in _frog_legs_played_this_brew:
@@ -2012,6 +2016,7 @@ func _reset_draw_flow_state() -> void:
 	_pending_time_turner_new_hand.clear()
 	_pending_time_turner_target_slots.clear()
 	_frog_legs_played_this_brew.clear()
+	_jar_of_froglegs_returns_consumed = false
 	_booberry_count_this_hand = 0
 	_poison_apple_pending.clear()
 	_growth_potion_doubles_remaining = 0

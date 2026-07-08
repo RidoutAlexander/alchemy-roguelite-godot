@@ -17,6 +17,17 @@ def return_entries(played: list[str], master: list[str]) -> list[dict]:
     return entries
 
 
+def consume_return_entries(
+    played: list[str],
+    master: list[str],
+    consumed: bool,
+    has_trinket: bool,
+) -> tuple[list[dict], bool]:
+    if consumed or not has_trinket:
+        return [], consumed
+    return return_entries(played, master), True
+
+
 def main() -> int:
     entries = return_entries(["frog_a", "frog_b"], ["frog_b", "rat_a"])
     assert len(entries) == 2
@@ -27,6 +38,27 @@ def main() -> int:
     assert return_entries(["frog_a", "frog_a"], ["frog_a"]) == [
         {"needs_restore": False}
     ]
+
+    consumed = False
+    first, consumed = consume_return_entries(
+        ["frog_a", "frog_b"],
+        [],
+        consumed,
+        True,
+    )
+    second, consumed = consume_return_entries(
+        ["frog_a", "frog_b"],
+        [],
+        consumed,
+        True,
+    )
+    assert len(first) == 2
+    assert second == []
+    assert consumed
+
+    no_trinket, consumed = consume_return_entries(["frog_a"], [], False, False)
+    assert no_trinket == []
+    assert not consumed
 
     print("PASS: jar of froglegs verification checks passed")
     return 0
