@@ -25,9 +25,10 @@ SceneTransition="*res://scripts/autoload/scene_transition.gd"
 
 window/size/viewport_width=1024
 window/size/viewport_height=576
-window/size/mode=4
+window/size/mode=3
 window/size/resizable=false
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [gui]
 

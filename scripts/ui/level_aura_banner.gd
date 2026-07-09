@@ -58,6 +58,7 @@ func _on_hand_card_played(
 
 func bind_preview(level: int, aura: AuraData) -> void:
 	_preview_mode = true
+	_layout_description_label()
 	if _level_label != null:
 		_level_label.text = "Level %d" % level
 	if aura == null:
@@ -106,3 +107,20 @@ func refresh_interval_countdown() -> void:
 			_countdown_label.text = str(countdown)
 	if _countdown_caption != null:
 		_countdown_caption.visible = show_countdown
+	_layout_description_label()
+
+
+func _layout_description_label() -> void:
+	if _aura_description_label == null:
+		return
+	var reserve_countdown := (
+		not _preview_mode
+		and _countdown_label != null
+		and _countdown_label.visible
+	)
+	if reserve_countdown:
+		_aura_description_label.offset_left = 18.0
+		_aura_description_label.offset_right = 236.0
+	else:
+		_aura_description_label.offset_left = 14.0
+		_aura_description_label.offset_right = 292.0

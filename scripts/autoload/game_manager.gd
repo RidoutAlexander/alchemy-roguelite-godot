@@ -724,8 +724,16 @@ func _cancel_hand_end_effects_delay() -> void:
 
 
 func _apply_exclusive_fullscreen() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	# The editor owns windowing for play-in-editor sessions; forcing fullscreen
+	# here can fight nested editor dialogs and child windows.
+	if Engine.is_embedded_in_editor():
+		return
+	if OS.get_environment("GODOT_EDITOR_PID") != "":
+		return
 	var window := get_window()
 	if window != null:
-		window.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+		window.mode = Window.MODE_FULLSCREEN
 	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)

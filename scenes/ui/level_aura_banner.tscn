@@ -86,9 +86,9 @@ vertical_alignment = 1
 
 [node name="AuraDescriptionLabel" type="Label" parent="."]
 layout_mode = 0
-offset_left = 18.0
+offset_left = 14.0
 offset_top = 58.0
-offset_right = 236.0
+offset_right = 292.0
 offset_bottom = 98.0
 theme_override_colors/font_color = Color(0.12, 0.08, 0.04, 1)
 theme_override_fonts/font = ExtResource("1_font")
